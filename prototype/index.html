@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dotto</title>
+<style>
+  :root{
+    --bg:#FAF8F5;
+    --cell:#F0EDE8;
+    --border:#E0DDD8;
+    --dot:#FFB347;
+    --start:#81C784;
+    --exit:#FFD54F;
+    --arrow:#64B5F6;
+    --pause:#BA68C8;
+    --tele:#FF8A65;
+    --destroy:#EF5350;
+    --wall:#78909C;
+    --ink:#5B5750;
+    --ink-soft:#9A958C;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--ink);
+    display:flex;justify-content:center;
+    overscroll-behavior:none;
+    user-select:none;-webkit-user-select:none;
+  }
+  #app{
+    width:100%;max-width:460px;min-height:100%;
+    display:flex;flex-direction:column;
+    padding:14px 16px 22px;
+    gap:14px;
+  }
+
+  /* ---------- Header ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;}
+  .lvl-nav{display:flex;align-items:center;gap:10px;}
+  .navbtn{
+    width:38px;height:38px;border:none;border-radius:50%;
+    background:#fff;color:var(--ink);font-size:20px;
+    box-shadow:0 2px 6px rgba(0,0,0,.06);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .navbtn:active{transform:scale(.92);}
+  .navbtn:disabled{opacity:.35;cursor:default;}
+  .title-block{text-align:center;line-height:1.1;}
+  .title-block h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.5px;}
+  .title-block .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .stars{font-size:15px;font-weight:600;color:var(--ink-soft);display:flex;align-items:center;gap:4px;}
+
+  /* ---------- Board ---------- */
+  #boardWrap{display:flex;justify-content:center;align-items:center;flex:0 0 auto;}
+  #board{
+    position:relative;
+    width:min(92vw,92vmin,420px);
+    aspect-ratio:1/1;
+    background:var(--cell);
+    border-radius:22px;
+    padding:6px;
+    box-shadow:0 10px 26px rgba(120,110,95,.14), inset 0 0 0 1px var(--border);
+    display:grid;
+    touch-action:manipulation;
+  }
+  .cell{position:relative;}
+  .cell .bg{
+    position:absolute;inset:4px;
+    background:#fff;
+    border-radius:12px;
+    box-shadow:inset 0 0 0 1px var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(14px,5vw,26px);font-weight:700;
+    transition:background .15s, box-shadow .15s, transform .12s;
+    overflow:hidden;
+  }
+  .cell.empty .bg{background:#fff;}
+  .cell.empty.hint .bg{box-shadow:inset 0 0 0 2px rgba(100,181,246,.45);}
+  .cell:active .bg{transform:scale(.94);}
+
+  .cell.start  .bg{background:var(--start);color:#fff;}
+  .cell.exit   .bg{background:var(--exit);color:#fff;box-shadow:inset 0 0 0 2px #f4c430;}
+  .cell.wall   .bg{background:var(--wall);box-shadow:none;}
+  .cell.destroyer .bg{background:var(--destroy);color:#fff;animation:pulse 1.4s ease-in-out infinite;}
+  .cell.gap .bg{background:transparent;border:2px dashed var(--ink-soft);box-shadow:none;}
+
+  /* placed elements */
+  .cell.p-arrow .bg{background:#E3F1FD;color:var(--arrow);box-shadow:inset 0 0 0 2px var(--arrow);}
+  .cell.p-pause .bg{background:#F3E5F8;color:var(--pause);box-shadow:inset 0 0 0 2px var(--pause);}
+  .cell.p-tele  .bg{background:#FFE7DD;color:var(--tele);box-shadow:inset 0 0 0 2px var(--tele);}
+
+  .cell .trail{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;
+  }
+  .cell .trail::after{
+    content:"";width:26%;height:26%;border-radius:50%;
+    background:var(--dot);opacity:0;transform:scale(.3);
+    transition:opacity .3s, transform .3s;
+  }
+  .cell.trailed .trail::after{opacity:.28;transform:scale(1);}
+
+  .arrowglyph{display:inline-block;transition:transform .15s;}
+
+  /* start-direction indicator — sits at the leading edge so the orb doesn't hide it */
+  .cell.start .startdir{
+    position:absolute;color:#fff;font-weight:900;line-height:1;
+    font-size:clamp(13px,4.4vw,22px);
+    text-shadow:0 1px 2px rgba(60,110,70,.55);z-index:2;pointer-events:none;
+  }
+  .cell.sdir-right .startdir{right:7%;top:50%;animation:nudge-r 1.1s ease-in-out infinite;}
+  .cell.sdir-left  .startdir{left:7%; top:50%;animation:nudge-l 1.1s ease-in-out infinite;}
+  .cell.sdir-up    .startdir{top:6%;  left:50%;animation:nudge-u 1.1s ease-in-out infinite;}
+  .cell.sdir-down  .startdir{bottom:6%;left:50%;animation:nudge-d 1.1s ease-in-out infinite;}
+  @keyframes nudge-r{0%,100%{transform:translate(0,-50%);}50%{transform:translate(40%,-50%);}}
+  @keyframes nudge-l{0%,100%{transform:translate(0,-50%);}50%{transform:translate(-40%,-50%);}}
+  @keyframes nudge-u{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,-40%);}}
+  @keyframes nudge-d{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,40%);}}
+
+  /* dot + movers overlays */
+  .orb{
+    position:absolute;width:11%;height:11%;border-radius:50%;
+    transform:translate(-50%,-50%);
+    pointer-events:none;z-index:5;
+  }
+  #dot{
+    background:radial-gradient(circle at 35% 32%, #ffd89b, var(--dot) 70%);
+    box-shadow:0 0 0 4px rgba(255,179,71,.22), 0 0 14px rgba(255,179,71,.55);
+    transition:left .32s linear, top .32s linear;
+  }
+  #dot.jump{transition:none;}
+  #dot.paused{animation:pausepulse .5s ease-in-out infinite;}
+  .mover{
+    background:radial-gradient(circle at 35% 32%, #ff9a96, var(--destroy) 75%);
+    box-shadow:0 0 10px rgba(239,83,80,.5);
+    transition:left .32s linear, top .32s linear;
+    z-index:4;
+    width:12%;height:12%;
+  }
+  .poof{
+    position:absolute;width:11%;height:11%;border-radius:50%;
+    transform:translate(-50%,-50%);background:var(--destroy);
+    z-index:6;animation:poof .45s ease-out forwards;pointer-events:none;
+  }
+
+  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(.9);}}
+  @keyframes pausepulse{0%,100%{box-shadow:0 0 0 4px rgba(186,104,200,.3),0 0 14px rgba(186,104,200,.6);}50%{box-shadow:0 0 0 9px rgba(186,104,200,.08),0 0 14px rgba(186,104,200,.6);}}
+  @keyframes poof{0%{opacity:.9;transform:translate(-50%,-50%) scale(.6);}100%{opacity:0;transform:translate(-50%,-50%) scale(2.6);}}
+
+  /* ---------- Toolbar ---------- */
+  .hintbar{text-align:center;font-size:13px;color:var(--ink-soft);min-height:18px;}
+  #toolbar{
+    display:flex;justify-content:center;gap:10px;flex-wrap:wrap;
+  }
+  .tool{
+    position:relative;width:62px;height:62px;border-radius:16px;border:none;
+    background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.07);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    cursor:pointer;color:var(--ink);transition:transform .12s, box-shadow .12s;
+  }
+  .tool:active{transform:scale(.94);}
+  .tool .ic{font-size:24px;line-height:1;}
+  .tool .lb{font-size:9px;color:var(--ink-soft);font-weight:600;letter-spacing:.3px;}
+  .tool.sel{box-shadow:0 0 0 3px var(--ink), 0 3px 8px rgba(0,0,0,.12);}
+  .tool.t-arrow .ic{color:var(--arrow);}
+  .tool[data-t="pause"] .ic{color:var(--pause);}
+  .tool[data-t="teleporter"] .ic{color:var(--tele);}
+  .tool[data-t="eraser"] .ic{color:var(--ink-soft);}
+  .tool.disabled{opacity:.35;pointer-events:none;}
+  .badge{
+    position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;
+    background:var(--ink);color:#fff;border-radius:10px;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- Footer ---------- */
+  footer{display:flex;gap:12px;margin-top:auto;}
+  .bigbtn{
+    flex:1;height:54px;border:none;border-radius:16px;font-size:17px;font-weight:700;
+    cursor:pointer;color:#fff;transition:transform .12s, filter .12s;letter-spacing:.5px;
+  }
+  .bigbtn:active{transform:scale(.97);}
+  #playBtn{background:var(--start);box-shadow:0 5px 14px rgba(129,199,132,.4);}
+  #resetBtn{background:#fff;color:var(--ink);box-shadow:0 3px 10px rgba(0,0,0,.08);flex:0 0 110px;}
+  .bigbtn:disabled{filter:grayscale(.4) opacity(.6);transform:none;cursor:default;}
+
+  /* ---------- Overlay ---------- */
+  #overlay{
+    position:fixed;inset:0;background:rgba(70,64,56,.32);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:30;padding:24px;
+  }
+  #overlay.show{display:flex;}
+  .card{
+    background:#fff;border-radius:26px;padding:30px 26px;text-align:center;
+    width:100%;max-width:320px;box-shadow:0 20px 50px rgba(0,0,0,.22);
+    animation:pop .3s cubic-bezier(.2,1.3,.5,1);
+  }
+  @keyframes pop{0%{transform:scale(.7);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .card .emoji{font-size:52px;}
+  .card h2{margin:8px 0 4px;font-size:24px;}
+  .card p{margin:0 0 18px;color:var(--ink-soft);font-size:14px;}
+  .card .starrow{font-size:38px;margin:6px 0 14px;}
+  .card .starrow span{display:inline-block;opacity:0;transform:scale(.3);animation:starpop .4s ease forwards;}
+  .card .starrow span:nth-child(2){animation-delay:.12s;}
+  .card .starrow span:nth-child(3){animation-delay:.24s;}
+  @keyframes starpop{to{opacity:1;transform:scale(1);}}
+  .card button{
+    width:100%;height:48px;border:none;border-radius:14px;font-size:16px;font-weight:700;
+    color:#fff;cursor:pointer;margin-top:8px;
+  }
+  .card button.primary{background:var(--start);}
+  .card button.retry{background:var(--dot);}
+  .card button.ghost{background:#F0EDE8;color:var(--ink);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="lvl-nav">
+      <button class="navbtn" id="prevBtn">‹</button>
+    </div>
+    <div class="title-block">
+      <h1 id="lvlTitle">Level 1</h1>
+      <div class="sub" id="lvlSub">1 of 5</div>
+    </div>
+    <div class="lvl-nav">
+      <button class="navbtn" id="nextBtn">›</button>
+    </div>
+  </header>
+
+  <div class="stars" id="starCount" style="justify-content:center;">⭐ <span id="starNum">0</span> / 5</div>
+
+  <div id="boardWrap">
+    <div id="board"></div>
+  </div>
+
+  <div class="hintbar" id="hint">Tap a tool, then tap a cell to place it.</div>
+
+  <div id="toolbar"></div>
+
+  <footer>
+    <button class="bigbtn" id="resetBtn">Reset</button>
+    <button class="bigbtn" id="playBtn">▶ Play</button>
+  </footer>
+</div>
+
+<div id="overlay"><div class="card" id="card"></div></div>
+
+<script>
+/* =========================================================
+   DOTTO — flat pastel puzzle prototype
+   ========================================================= */
+
+const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+const ARROWGLYPH = { up:'↑', right:'→', down:'↓', left:'←' };
+
+/* ---- Level definitions ----
+   Each cell laid out by helpers below. Coordinates are [row, col].
+*/
+const LEVELS = [
+  /* 1 — teach arrows: 4x4. Solution: Up arrow at (3,3). */
+  {
+    n:4, title:'Level 1', tip:'You have one Up arrow. Place it where the dot should turn toward the exit.',
+    start:{r:3,c:0,dir:'right'}, exit:{r:0,c:3},
+    walls:[], destroyers:[], gaps:[], movers:[],
+    kit:{up:1}
+  },
+  /* 2 — teach walls: 5x5. Solution: Up at (4,1), Right at (0,1). */
+  {
+    n:5, title:'Level 2', tip:'A wall blocks the straight path. Use the Up and Right arrows to go around it.',
+    start:{r:4,c:0,dir:'right'}, exit:{r:0,c:4},
+    walls:[[4,2]], destroyers:[], gaps:[], movers:[],
+    kit:{up:1, right:1}
+  },
+  /* 3 — teach destroyers: 5x5. Solution: Up at (3,1), Right at (0,1). */
+  {
+    n:5, title:'Level 3', tip:'The red cell is deadly. Use the Up and Right arrows to route around it.',
+    start:{r:3,c:0,dir:'right'}, exit:{r:0,c:4},
+    walls:[], destroyers:[[3,2]], gaps:[], movers:[],
+    kit:{up:1, right:1}
+  },
+  /* 4 — teach pause + timing: 6x6. Solution: Pause at (5,1). */
+  {
+    n:6, title:'Level 4', tip:'A patrolling destroyer crosses the path. Use a pause block to time it.',
+    start:{r:5,c:0,dir:'right'}, exit:{r:5,c:5},
+    walls:[], destroyers:[], gaps:[],
+    movers:[{orient:'v', line:3, pos:2, lo:0, hi:5, dir:1}],
+    kit:{pause:1}
+  },
+  /* 5 — teach teleporters: 6x6. Solution: teleporters at (5,2)&(5,4), Up at (5,5). */
+  {
+    n:6, title:'Level 5', tip:'A wall splits the board. Use the teleporter pair to cross, then the Up arrow to reach the exit.',
+    start:{r:5,c:0,dir:'right'}, exit:{r:0,c:5},
+    walls:[[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[0,4],[1,4],[2,4]],
+    destroyers:[], gaps:[], movers:[],
+    kit:{up:1, teleporter:2}
+  },
+];
+
+/* ---- State ---- */
+let levelIdx = 0;
+let N = 4;
+let grid = [];              // grid[r][c] = {type, dir?, placed?, pdir?}
+let cellEls = [];           // DOM refs
+let kit = {};               // remaining counts
+let selectedTool = null;
+let movers = [];            // runtime mover state
+let moverEls = [];
+let dot = null;
+let running = false;
+let timer = null;
+let trail = new Set();
+const progress = new Array(LEVELS.length).fill(false);
+
+const boardEl = document.getElementById('board');
+const toolbarEl = document.getElementById('toolbar');
+const hintEl = document.getElementById('hint');
+const overlayEl = document.getElementById('overlay');
+const cardEl = document.getElementById('card');
+
+/* ====================== LEVEL LOADING ====================== */
+function loadLevel(idx){
+  stopLoop();
+  levelIdx = (idx + LEVELS.length) % LEVELS.length;
+  const L = LEVELS[levelIdx];
+  N = L.n;
+  selectedTool = null;
+  trail = new Set();
+
+  // build grid model
+  grid = [];
+  for(let r=0;r<N;r++){
+    const row=[];
+    for(let c=0;c<N;c++) row.push({type:'empty'});
+    grid.push(row);
+  }
+  L.walls.forEach(([r,c])=> grid[r][c]={type:'wall'});
+  L.gaps.forEach(([r,c])=> grid[r][c]={type:'gap'});
+  L.destroyers.forEach(([r,c])=> grid[r][c]={type:'destroyer'});
+  grid[L.start.r][L.start.c]={type:'start', dir:L.start.dir};
+  grid[L.exit.r][L.exit.c]={type:'exit'};
+
+  // movers runtime copy
+  movers = L.movers.map(m=>({...m}));
+
+  // kit copy
+  kit = {...L.kit};
+
+  buildBoard();
+  buildToolbar();
+  resetDot();
+  renderMovers(false);
+
+  document.getElementById('lvlTitle').textContent = L.title;
+  document.getElementById('lvlSub').textContent = (levelIdx+1)+' of '+LEVELS.length;
+  document.getElementById('prevBtn').disabled = levelIdx===0;
+  document.getElementById('nextBtn').disabled = levelIdx===LEVELS.length-1;
+  hint(L.tip);
+  updateStars();
+  setPlaying(false);
+}
+
+function buildBoard(){
+  boardEl.style.gridTemplateColumns = `repeat(${N},1fr)`;
+  boardEl.style.gridTemplateRows = `repeat(${N},1fr)`;
+  boardEl.innerHTML='';
+  cellEls=[];
+  for(let r=0;r<N;r++){
+    const row=[];
+    for(let c=0;c<N;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      const bg=document.createElement('div'); bg.className='bg';
+      const tr=document.createElement('div'); tr.className='trail';
+      cell.appendChild(tr); cell.appendChild(bg);
+      cell.addEventListener('click',()=>onCellTap(r,c));
+      boardEl.appendChild(cell);
+      row.push(cell);
+    }
+    cellEls.push(row);
+  }
+  // dot overlay
+  dotEl = document.createElement('div');
+  dotEl.className='orb'; dotEl.id='dot';
+  boardEl.appendChild(dotEl);
+  paintCells();
+}
+
+let dotEl=null;
+
+function paintCells(){
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const cell=cellEls[r][c], m=grid[r][c], bg=cell.querySelector('.bg');
+    cell.className='cell';
+    bg.innerHTML='';
+    cell.classList.toggle('trailed', trail.has(r+','+c));
+    if(m.placed==='arrow'){
+      cell.classList.add('p-arrow');
+      bg.innerHTML=`<span class="arrowglyph">${ARROWGLYPH[m.pdir]}</span>`;
+    } else if(m.placed==='pause'){
+      cell.classList.add('p-pause'); bg.textContent='❚❚';
+    } else if(m.placed==='teleporter'){
+      cell.classList.add('p-tele'); bg.textContent='◎';
+    } else {
+      switch(m.type){
+        case 'wall': cell.classList.add('wall'); break;
+        case 'gap': cell.classList.add('gap'); break;
+        case 'destroyer': cell.classList.add('destroyer'); bg.textContent='✕'; break;
+        case 'start': cell.classList.add('start','sdir-'+m.dir); bg.innerHTML=`<span class="startdir">${ARROWGLYPH[m.dir]}</span>`; break;
+        case 'exit': cell.classList.add('exit'); bg.textContent='⚑'; break;
+        default: cell.classList.add('empty');
+      }
+    }
+  }
+}
+
+/* ====================== TOOLBAR ====================== */
+function buildToolbar(){
+  toolbarEl.innerHTML='';
+  const tools=[
+    {t:'up',    ic:'↑',  lb:'UP',    grp:'arrow'},
+    {t:'down',  ic:'↓',  lb:'DOWN',  grp:'arrow'},
+    {t:'left',  ic:'←',  lb:'LEFT',  grp:'arrow'},
+    {t:'right', ic:'→',  lb:'RIGHT', grp:'arrow'},
+    {t:'pause', ic:'❚❚', lb:'PAUSE'},
+    {t:'teleporter', ic:'◎', lb:'TELEPORT'},
+    {t:'eraser', ic:'⌫', lb:'ERASE'},
+  ];
+  tools.forEach(tool=>{
+    if(tool.t!=='eraser' && !(LEVELS[levelIdx].kit[tool.t]>0)) return; // hide unused
+    const b=document.createElement('button');
+    b.className='tool'; b.dataset.t=tool.t;
+    if(tool.grp==='arrow') b.classList.add('t-arrow');
+    b.innerHTML=`<span class="ic">${tool.ic}</span><span class="lb">${tool.lb}</span>`;
+    if(tool.t!=='eraser'){
+      const badge=document.createElement('span'); badge.className='badge'; badge.dataset.b=tool.t;
+      b.appendChild(badge);
+    }
+    b.addEventListener('click',()=>selectTool(tool.t));
+    toolbarEl.appendChild(b);
+  });
+  refreshToolbar();
+}
+
+function refreshToolbar(){
+  document.querySelectorAll('.tool').forEach(b=>{
+    const t=b.dataset.t;
+    b.classList.toggle('sel', t===selectedTool);
+    if(t!=='eraser'){
+      const badge=b.querySelector('.badge'); badge.textContent=kit[t];
+      b.classList.toggle('disabled', kit[t]<=0 && !running);
+    }
+    if(running) b.classList.add('disabled'); else if(t==='eraser') b.classList.remove('disabled');
+  });
+}
+
+function selectTool(t){
+  if(running) return;
+  selectedTool = (selectedTool===t)?null:t;
+  refreshToolbar();
+  highlightPlaceable();
+}
+
+function highlightPlaceable(){
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const cell=cellEls[r][c];
+    const placeable = selectedTool && selectedTool!=='eraser' &&
+                      grid[r][c].type==='empty' && !grid[r][c].placed && kit[selectedTool]>0;
+    cell.classList.toggle('hint', !!placeable);
+  }
+}
+
+/* ====================== PLACEMENT ====================== */
+function onCellTap(r,c){
+  if(running) return;
+  const m=grid[r][c];
+
+  // tap a placed element -> remove it (return to its toolkit slot)
+  if(m.placed){
+    kit[m.kitKey] = (kit[m.kitKey]||0)+1;
+    delete m.placed; delete m.pdir; delete m.kitKey;
+    m.type='empty';
+    paintCells(); refreshToolbar(); highlightPlaceable();
+    return;
+  }
+
+  // place new
+  if(!selectedTool || selectedTool==='eraser') return;
+  if(m.type!=='empty') return;
+  if((kit[selectedTool]||0)<=0){ hint('None of those left.'); return; }
+
+  if(selectedTool==='pause'){ m.placed='pause'; }
+  else if(selectedTool==='teleporter'){ m.placed='teleporter'; }
+  else { m.placed='arrow'; m.pdir=selectedTool; } // up/down/left/right
+  m.kitKey=selectedTool;
+  kit[selectedTool]--;
+  paintCells(); refreshToolbar(); highlightPlaceable();
+}
+
+/* ====================== DOT + MOVEMENT ====================== */
+function cellSize(){ return (boardEl.clientWidth - 12) / N; } // minus padding(6*2)
+function px(rc){ return 6 + rc*cellSize() + cellSize()/2; }
+
+function placeOrb(el, r, c, jump){
+  if(jump){ el.classList.add('jump'); }
+  el.style.left = px(c)+'px';
+  el.style.top  = px(r)+'px';
+  if(jump){ void el.offsetWidth; el.classList.remove('jump'); }
+}
+
+function resetDot(){
+  const s=LEVELS[levelIdx].start;
+  dot={ r:s.r, c:s.c, dir:s.dir, pause:0 };
+  trail=new Set([s.r+','+s.c]);
+  paintCells();
+  dotEl.classList.remove('paused');
+  placeOrb(dotEl, dot.r, dot.c, true);
+}
+
+function moverCell(m){ return m.orient==='v' ? [m.pos, m.line] : [m.line, m.pos]; }
+
+function renderMovers(animate){
+  // ensure correct number of overlay elements
+  while(moverEls.length < movers.length){
+    const e=document.createElement('div'); e.className='mover orb';
+    boardEl.appendChild(e); moverEls.push(e);
+  }
+  while(moverEls.length > movers.length){ moverEls.pop().remove(); }
+  movers.forEach((m,i)=>{
+    const [r,c]=moverCell(m);
+    placeOrb(moverEls[i], r, c, !animate);
+  });
+}
+
+function hitMover(r,c){
+  return movers.some(m=>{ const [mr,mc]=moverCell(m); return mr===r && mc===c; });
+}
+
+function beat(){
+  // 1. advance moving destroyers
+  movers.forEach(m=>{
+    m.pos += m.dir;
+    if(m.pos<=m.lo){ m.pos=m.lo; m.dir=1; }
+    else if(m.pos>=m.hi){ m.pos=m.hi; m.dir=-1; }
+  });
+  renderMovers(true);
+
+  // destroyer stepped onto the dot
+  if(hitMover(dot.r,dot.c)) return die(dot.r,dot.c);
+
+  // 2. handle pause
+  if(dot.pause>0){
+    dot.pause--;
+    if(dot.pause===0) dotEl.classList.remove('paused');
+    if(hitMover(dot.r,dot.c)) return die(dot.r,dot.c);
+    return;
+  }
+
+  // 3. compute next
+  const [dr,dc]=DIRS[dot.dir];
+  let nr=dot.r+dr, nc=dot.c+dc;
+  if(nr<0||nr>=N||nc<0||nc>=N) return fail('The dot ran off the edge.');
+  if(grid[nr][nc].type==='wall') return fail('The dot hit a wall.');
+
+  dot.r=nr; dot.c=nc;
+  trail.add(nr+','+nc);
+  cellEls[nr][nc].classList.add('trailed');
+  placeOrb(dotEl, dot.r, dot.c, false);
+
+  const cell=grid[nr][nc];
+
+  if(cell.type==='gap'){ return die(nr,nc,'The dot fell into a hole.'); }
+  if(cell.type==='destroyer'){ return die(nr,nc); }
+
+  // placed effects
+  if(cell.placed==='arrow') dot.dir=cell.pdir;
+  else if(cell.placed==='pause'){ dot.pause=2; dotEl.classList.add('paused'); }
+  else if(cell.placed==='teleporter'){ teleport(); }
+
+  if(grid[dot.r][dot.c].type==='exit') return win();
+  if(hitMover(dot.r,dot.c)) return die(dot.r,dot.c);
+}
+
+function teleport(){
+  // find the other teleporter
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    if(grid[r][c].placed==='teleporter' && !(r===dot.r && c===dot.c)){
+      dot.r=r; dot.c=c;
+      trail.add(r+','+c);
+      cellEls[r][c].classList.add('trailed');
+      placeOrb(dotEl, r, c, true); // instant jump
+      return;
+    }
+  }
+}
+
+/* ====================== GAME FLOW ====================== */
+function play(){
+  if(running) return;
+  resetDot();
+  // reset movers to level start positions
+  movers = LEVELS[levelIdx].movers.map(m=>({...m}));
+  renderMovers(false);
+  setPlaying(true);
+  hint('The dot is moving…');
+  timer = setInterval(beat, 400);
+}
+
+function stopLoop(){ if(timer){ clearInterval(timer); timer=null; } running=false; }
+
+function setPlaying(on){
+  running=on;
+  document.getElementById('playBtn').disabled = on;
+  refreshToolbar();
+  if(on){ document.querySelectorAll('.cell').forEach(c=>c.classList.remove('hint')); }
+}
+
+function die(r,c,msg){
+  stopLoop(); setPlaying(false);
+  const poof=document.createElement('div'); poof.className='poof';
+  poof.style.left=px(c)+'px'; poof.style.top=px(r)+'px';
+  boardEl.appendChild(poof);
+  dotEl.style.opacity=0;
+  setTimeout(()=>{poof.remove(); dotEl.style.opacity=1;}, 450);
+  setTimeout(()=> showFail(msg||'The dot was destroyed!'), 350);
+}
+
+function fail(msg){
+  stopLoop(); setPlaying(false);
+  setTimeout(()=> showFail(msg), 250);
+}
+
+function win(){
+  stopLoop(); setPlaying(false);
+  const first = !progress[levelIdx];
+  progress[levelIdx]=true;
+  updateStars();
+  // celebratory pop on dot
+  dotEl.animate([{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.6)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:500});
+  setTimeout(()=> showWin(first), 350);
+}
+
+/* ====================== OVERLAYS ====================== */
+function showWin(first){
+  const last = levelIdx===LEVELS.length-1;
+  cardEl.innerHTML = `
+    <div class="emoji">🎉</div>
+    <h2>Level Complete!</h2>
+    <div class="starrow"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+    <p>${LEVELS[levelIdx].title} solved.</p>
+    ${ last
+      ? `<button class="primary" id="ovReplay">Play Again</button>`
+      : `<button class="primary" id="ovNext">Next Level ›</button>` }
+    <button class="ghost" id="ovReset">Replay Level</button>
+  `;
+  overlayEl.classList.add('show');
+  const nx=document.getElementById('ovNext');
+  if(nx) nx.onclick=()=>{ hideOverlay(); loadLevel(levelIdx+1); };
+  const rp=document.getElementById('ovReplay');
+  if(rp) rp.onclick=()=>{ hideOverlay(); loadLevel(0); };
+  document.getElementById('ovReset').onclick=()=>{ hideOverlay(); resetDot(); renderMovers(false); hint(LEVELS[levelIdx].tip); };
+}
+
+function showFail(msg){
+  cardEl.innerHTML = `
+    <div class="emoji">💥</div>
+    <h2>Try Again</h2>
+    <p>${msg}</p>
+    <button class="retry" id="ovRetry">↻ Retry</button>
+    <button class="ghost" id="ovClear">Clear & Edit</button>
+  `;
+  overlayEl.classList.add('show');
+  document.getElementById('ovRetry').onclick=()=>{ hideOverlay(); resetDot(); renderMovers(false); hint('Adjust your pieces and press Play.'); };
+  document.getElementById('ovClear').onclick=()=>{ hideOverlay(); loadLevel(levelIdx); };
+}
+
+function hideOverlay(){ overlayEl.classList.remove('show'); }
+
+/* ====================== MISC UI ====================== */
+function hint(t){ hintEl.textContent=t; }
+function updateStars(){ document.getElementById('starNum').textContent = progress.filter(Boolean).length; }
+
+function resetLevel(){
+  // remove all placed pieces, restore kit
+  stopLoop(); setPlaying(false); hideOverlay();
+  loadLevel(levelIdx);
+  hint('Cleared. '+LEVELS[levelIdx].tip);
+}
+
+/* ====================== EVENTS ====================== */
+document.getElementById('playBtn').onclick = play;
+document.getElementById('resetBtn').onclick = resetLevel;
+document.getElementById('prevBtn').onclick = ()=> loadLevel(levelIdx-1);
+document.getElementById('nextBtn').onclick = ()=> loadLevel(levelIdx+1);
+window.addEventListener('resize', ()=>{
+  placeOrb(dotEl, dot.r, dot.c, true);
+  renderMovers(false);
+});
+
+/* ====================== START ====================== */
+loadLevel(0);
+</script>
+</body>
+</html>
