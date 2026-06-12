@@ -443,10 +443,12 @@ class GameGridPainter extends CustomPainter {
     }
 
     // Small, soft arrowhead on the leading edge — a hint, not a focal point.
+    // Gentle breathing scale 1.0 → 1.15 → 1.0 over the (~1.4s) glow cycle.
+    final scale = 1.0 + 0.075 * (1 - math.cos(glowTick * 2 * math.pi));
     final anchor = center + dir * (cell * 0.5 + cell * 0.04);
-    final tip = anchor + dir * (cell * 0.19);
-    final b1 = anchor + perp * (cell * 0.15);
-    final b2 = anchor - perp * (cell * 0.15);
+    final tip = anchor + dir * (cell * 0.19 * scale);
+    final b1 = anchor + perp * (cell * 0.15 * scale);
+    final b2 = anchor - perp * (cell * 0.15 * scale);
     final head = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(b1.dx, b1.dy)
