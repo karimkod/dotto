@@ -98,6 +98,50 @@ void main() {
     expect(find.text('0'), findsOneWidget);
   });
 
+  testWidgets('a placed element can be dragged to another cell', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+    final wrongCell = boardRect.topLeft + geo.center(3, 2);
+    final solutionCell = boardRect.topLeft + geo.center(3, 3);
+
+    // Place the arrow on the wrong cell (3, 2) first...
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), wrongCell);
+    // ...then move it from (3, 2) to the solution cell (3, 3).
+    await _dragArrow(tester, wrongCell, solutionCell);
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    for (var i = 0; i < 9; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    // The move worked → the level is solved.
+    expect(find.text('Level Complete!'), findsOneWidget);
+  });
+
+  testWidgets('dragging a placed element off-grid returns it to the toolkit',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+    final cell = boardRect.topLeft + geo.center(3, 3);
+
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell);
+    expect(find.text('0'), findsOneWidget); // arrow consumed
+
+    // Drag it from the grid down onto the toolbar (off-grid) → removed.
+    final offGrid = tester.getCenter(find.text('UP'));
+    await _dragArrow(tester, cell, offGrid);
+
+    // Arrow refunded → count badge back to 1.
+    expect(find.text('1'), findsOneWidget);
+  });
+
   testWidgets('Level 1 fails when no arrow is placed', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
     await tester.pump();

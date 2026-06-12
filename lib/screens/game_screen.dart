@@ -60,8 +60,9 @@ class _GameScreenState extends State<GameScreen>
   final Map<ToolType, GlobalKey> _toolKeys = {};
 
   // Manual-drag state.
-  ToolType? _dragTool; // tool being dragged from the toolbar
-  int? _dragRemoveKey; // placed cell being dragged off to remove
+  ToolType? _dragTool; // tool being dragged from the toolbar (place new)
+  PlacedElement? _dragPiece; // a placed piece picked up off the grid (move)
+  int? _dragOriginKey; // the cell the picked-up piece came from
   Offset? _dragGlobal; // current pointer position (global)
 
   // Live placement preview (valid empty cell under the pointer).
@@ -158,13 +159,28 @@ class _GameScreenState extends State<GameScreen>
     return (_kit[tool] ?? 0) > 0;
   }
 
+  /// The tool currently in hand, whether dragged from the toolbar (place new)
+  /// or picked up off the grid (move).
+  ToolType? get _activeDragTool => _dragTool ?? _dragPiece?.tool;
+
+  /// Whether the in-hand drag can drop on [cell]. The picked-up piece's origin
+  /// cell is already empty (removed on pick-up), so dropping back is allowed.
+  bool _canDropAt((int, int) cell) {
+    if (_status != GameStatus.planning) return false;
+    final (r, c) = cell;
+    if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
+    if (_placed.containsKey(_idx(r, c))) return false;
+    // Toolkit drag needs stock; a picked-up piece is already in hand.
+    if (_dragTool != null) return (_kit[_dragTool] ?? 0) > 0;
+    return _dragPiece != null;
+  }
+
   /// Recompute the placement preview for a pointer position (no setState).
   void _refreshHover(Offset global) {
-    final tool = _dragTool;
-    final cell = tool == null ? null : _cellAt(global);
-    final valid = cell != null && _canPlace(cell, tool!);
+    final cell = _activeDragTool == null ? null : _cellAt(global);
+    final valid = cell != null && _canDropAt(cell);
     _hoverCell = valid ? cell : null;
-    _hoverTool = valid ? tool : null;
+    _hoverTool = valid ? _activeDragTool : null;
   }
 
   // ----- tap (fallback) -----
@@ -215,46 +231,60 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    // Otherwise, start dragging a placed piece off the grid to remove it.
+    // Otherwise, pick up a placed piece to move it (removed from its cell
+    // during the drag; returned/relocated/removed on drop).
     final cell = _cellAt(g);
     if (cell != null) {
       final key = _idx(cell.$1, cell.$2);
-      if (_placed.containsKey(key)) {
+      final piece = _placed[key];
+      if (piece != null) {
         setState(() {
-          _dragRemoveKey = key;
+          _placed.remove(key);
+          _dragPiece = piece;
+          _dragOriginKey = key;
           _dragGlobal = g;
+          _refreshHover(g);
         });
       }
     }
   }
 
   void _onPanUpdate(DragUpdateDetails d) {
-    if (_dragTool == null && _dragRemoveKey == null) return;
+    if (_dragTool == null && _dragPiece == null) return;
     setState(() {
       _dragGlobal = d.globalPosition;
-      if (_dragTool != null) _refreshHover(d.globalPosition);
+      _refreshHover(d.globalPosition);
     });
   }
 
   void _onPanEnd(DragEndDetails d) {
     // Use the end position directly (robust even if no update fired).
     final g = d.globalPosition;
-    final tool = _dragTool;
-    final removeKey = _dragRemoveKey;
+    final cell = _cellAt(g);
 
-    if (tool != null) {
-      final cell = _cellAt(g);
-      if (cell != null && _canPlace(cell, tool)) {
-        _placeTool(cell, tool);
+    if (_dragTool != null) {
+      // Toolkit drag → place a new piece if valid.
+      if (cell != null && _canDropAt(cell)) _placeTool(cell, _dragTool!);
+    } else if (_dragPiece != null) {
+      final piece = _dragPiece!;
+      if (cell != null && _canDropAt(cell)) {
+        // Move to the new cell.
+        setState(() => _placed[_idx(cell.$1, cell.$2)] = piece);
+        HapticFeedback.lightImpact();
+      } else if (cell == null) {
+        // Dropped off the grid → remove, returning it to the toolkit.
+        setState(() => _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1);
+        HapticFeedback.lightImpact();
+      } else {
+        // Dropped on an occupied/invalid cell → return to its origin.
+        setState(() => _placed[_dragOriginKey!] = piece);
       }
-    } else if (removeKey != null) {
-      // Dropped off the grid → remove.
-      if (_cellAt(g) == null) _removeAt(removeKey);
     }
 
     setState(() {
       _dragTool = null;
-      _dragRemoveKey = null;
+      _dragPiece = null;
+      _dragOriginKey = null;
       _dragGlobal = null;
       _hoverCell = null;
       _hoverTool = null;
@@ -570,8 +600,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// The floating ghost element that follows the finger during a drag.
   Widget _buildGhost() {
-    final tool = _dragTool ??
-        (_dragRemoveKey != null ? _placed[_dragRemoveKey]?.tool : null);
+    final tool = _activeDragTool;
     final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
     if (tool == null || rootBox == null || _dragGlobal == null) {
       return const SizedBox.shrink();
