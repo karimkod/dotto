@@ -69,6 +69,29 @@ void main() {
     expect(find.text('Level Complete!'), findsOneWidget);
   });
 
+  testWidgets('drag-drop registers anywhere on the grid, not just near the dot',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+    // Cell (1, 1): empty, and far from the dot/start (3, 0) — this drop only
+    // works if the DragTarget covers the whole grid surface.
+    final target = boardRect.topLeft + geo.center(1, 1);
+
+    final source = tester.getCenter(find.text('UP'));
+    final gesture = await tester.startGesture(source);
+    await tester.pump();
+    await gesture.moveTo(target);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // The single UP arrow was consumed → its count badge now reads 0.
+    expect(find.text('0'), findsOneWidget);
+  });
+
   testWidgets('Level 1 fails when no arrow is placed', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
     await tester.pump();

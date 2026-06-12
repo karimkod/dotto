@@ -309,6 +309,11 @@ class GameGridPainter extends CustomPainter {
     }
   }
 
+  // The whole board surface is hittable so taps and drag-drops register on any
+  // cell, not just where a piece/dot already paints.
+  @override
+  bool? hitTest(Offset position) => true;
+
   @override
   bool shouldRepaint(covariant GameGridPainter old) =>
       old.revision != revision ||

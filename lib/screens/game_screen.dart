@@ -431,6 +431,7 @@ class _GameScreenState extends State<GameScreen>
               : _idx(_hoverCell!.$1, _hoverCell!.$2);
 
           return DragTarget<ToolType>(
+            hitTestBehavior: HitTestBehavior.opaque,
             onWillAcceptWithDetails: (d) {
               final cell = _cellFromGlobal(d.offset);
               return cell != null && _canPlace(cell, d.data);
@@ -444,6 +445,7 @@ class _GameScreenState extends State<GameScreen>
             builder: (context, candidate, rejected) {
               return GestureDetector(
                 key: const ValueKey('gameBoard'),
+                behavior: HitTestBehavior.opaque,
                 onTapUp: (d) => _onBoardTapUp(d, geo),
                 child: Stack(
                   key: _boardKey,
