@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/level.dart';
 import '../theme/app_theme.dart';
 
-/// The fixed bottom call-to-action: a difficulty badge above a big gradient
-/// pill that launches the current level.
+/// The fixed bottom call-to-action: a difficulty tag sitting on top of a big
+/// coral pill that launches the current level. Boardgame-styled with thick
+/// dark outlines.
 class PlayButton extends StatelessWidget {
   const PlayButton({
     super.key,
@@ -17,43 +18,21 @@ class PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Difficulty badge.
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-          decoration: BoxDecoration(
-            color: level.difficulty.color.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            level.difficulty.label,
-            style: TextStyle(
-              color: level.difficulty.color,
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Big gradient pill.
-        GestureDetector(
-          onTap: onPlay,
-          child: Container(
+    return GestureDetector(
+      onTap: onPlay,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.topCenter,
+        children: [
+          // Big coral pill.
+          Container(
+            margin: const EdgeInsets.only(top: 14),
             height: 62,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: AppColors.playGradient,
+              color: AppColors.coral,
               borderRadius: BorderRadius.circular(31),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.coral.withValues(alpha: 0.40),
-                  offset: const Offset(0, 6),
-                  blurRadius: 16,
-                ),
-              ],
+              border: Border.all(color: AppColors.ink, width: 3),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -73,8 +52,26 @@ class PlayButton extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ],
+          // Difficulty tag straddling the top edge of the pill.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            decoration: BoxDecoration(
+              color: level.difficulty.color,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.ink, width: 2.5),
+            ),
+            child: Text(
+              level.difficulty.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

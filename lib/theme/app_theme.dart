@@ -26,6 +26,15 @@ class AppColors {
   /// Primary dark text.
   static const text = Color(0xFF2D2D2D);
 
+  /// Thick "hand-drawn" outline color for cards, tiles and the path line.
+  static const ink = Color(0xFF2D2D2D);
+
+  /// Faint grid line drawn across the background.
+  static const grid = Color(0x122D2D2D);
+
+  /// Green check accent for completed levels.
+  static const completed = Color(0xFF66BB6A);
+
   /// Muted secondary text.
   static const textSoft = Color(0xFF9A958C);
 

@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/level.dart';
 import '../theme/app_theme.dart';
 
-/// A rounded-square node on the level path. Renders differently for locked,
-/// unlocked, current and completed states.
+/// A rounded-square node on the level path, "boardgame" styled with a thick
+/// dark outline (no shadow). Renders differently for locked, unlocked, current
+/// and completed states.
 class LevelCard extends StatelessWidget {
   const LevelCard({
     super.key,
@@ -15,31 +16,27 @@ class LevelCard extends StatelessWidget {
 
   final Level level;
 
-  /// The next playable level gets a glow + slightly larger size.
+  /// The next playable level gets a coral outline + slightly larger size.
   final bool isCurrent;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    const baseSize = 80.0;
+    const baseSize = 76.0;
     final size = isCurrent ? baseSize + 8 : baseSize;
 
     final Color background;
     final Color borderColor;
-    final double borderWidth;
 
     if (level.isLocked) {
-      background = AppColors.locked.withValues(alpha: 0.12);
-      borderColor = AppColors.locked.withValues(alpha: 0.35);
-      borderWidth = 1.5;
+      background = const Color(0xFFEDEBE7); // grayed cream
+      borderColor = AppColors.locked.withValues(alpha: 0.55);
     } else if (isCurrent) {
       background = AppColors.card;
       borderColor = AppColors.coral;
-      borderWidth = 3;
     } else {
       background = AppColors.card;
-      borderColor = AppColors.border;
-      borderWidth = 1.5;
+      borderColor = AppColors.ink;
     }
 
     return GestureDetector(
@@ -50,19 +47,20 @@ class LevelCard extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: borderColor, width: borderWidth),
-          boxShadow: [
-            ...AppTheme.softShadow(y: 4, blur: 12),
-            if (isCurrent)
-              BoxShadow(
-                color: AppColors.coral.withValues(alpha: 0.35),
-                blurRadius: 20,
-                spreadRadius: 1,
-              ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor, width: 3),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Center(child: _buildContent()),
+            // Small check badge in the top-right corner for completed levels —
+            // never overlaps the centered number.
+            if (level.isCompleted)
+              const Positioned(top: -8, right: -8, child: _CheckBadge()),
           ],
         ),
-        child: Center(child: _buildContent()),
       ),
     );
   }
@@ -70,36 +68,38 @@ class LevelCard extends StatelessWidget {
   Widget _buildContent() {
     if (level.isLocked) {
       return Icon(
-        Icons.lock_rounded,
+        Icons.lock_outline_rounded,
         color: AppColors.locked,
         size: 30,
       );
     }
 
-    final number = Text(
+    return Text(
       '${level.number}',
       style: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w800,
-        color: isCurrent ? AppColors.coral : AppColors.text,
+        color: isCurrent ? AppColors.coral : AppColors.ink,
       ),
     );
+  }
+}
 
-    if (level.isCompleted) {
-      return Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          number,
-          Positioned(
-            top: -10,
-            right: -10,
-            child: Icon(Icons.star_rounded, color: AppColors.star, size: 26),
-          ),
-        ],
-      );
-    }
+/// Small circular green check badge shown on completed level cards.
+class _CheckBadge extends StatelessWidget {
+  const _CheckBadge();
 
-    return number;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: AppColors.completed,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.card, width: 2),
+      ),
+      child: const Icon(Icons.check_rounded, color: Colors.white, size: 15),
+    );
   }
 }

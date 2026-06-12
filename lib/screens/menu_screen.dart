@@ -9,10 +9,11 @@ import '../widgets/top_bar.dart';
 import 'game_screen.dart';
 
 /// Vertical slot height per level node on the path.
-const double _slotHeight = 120;
+const double _slotHeight = 116;
 
-/// The Dotto main menu: top bar, wordmark, a winding scrollable level path,
-/// and a fixed play button for the current level.
+/// The Dotto main menu: a grid-patterned background, top bar, wordmark, a
+/// vertical scrollable level path (level 1 at the bottom), and a fixed play
+/// button for the current level.
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
 
@@ -52,8 +53,10 @@ class _MenuScreenState extends State<MenuScreen> {
 
   void _scrollToCurrent() {
     if (!_scrollController.hasClients) return;
-    final index = _levels.indexOf(_currentLevel);
-    final target = (index * _slotHeight) -
+    // The path is rendered top-to-bottom as level 20 → level 1, so the visual
+    // row of a level is its position counted from the end of the list.
+    final visualRow = _levels.length - 1 - _levels.indexOf(_currentLevel);
+    final target = (visualRow * _slotHeight) -
         (_scrollController.position.viewportDimension / 2) +
         (_slotHeight / 2);
     final clamped = target.clamp(
@@ -79,105 +82,123 @@ class _MenuScreenState extends State<MenuScreen> {
     final current = _currentLevel;
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            children: [
-              TopBar(hintCount: _hintCount, onHints: () {}),
-              const SizedBox(height: 18),
-              Text('Dotto', style: AppTheme.title),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Stack(
-                  children: [
-                    _buildPath(current),
-                    _buildSideIcons(),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          // Subtle grid pattern across the whole background.
+          const Positioned.fill(child: CustomPaint(painter: _GridPainter())),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                children: [
+                  TopBar(hintCount: _hintCount, onHints: () {}),
+                  const SizedBox(height: 18),
+                  Text('Dotto', style: AppTheme.title),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        _buildPath(current),
+                        _buildSideIcons(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  PlayButton(level: current, onPlay: () => _openLevel(current)),
+                ],
               ),
-              const SizedBox(height: 8),
-              PlayButton(level: current, onPlay: () => _openLevel(current)),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildPath(Level current) {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(painter: _DashedLinePainter()),
-          ),
-          Column(
-            children: [
-              for (var i = 0; i < _levels.length; i++)
-                _LevelSlot(
-                  level: _levels[i],
-                  isCurrent: _levels[i].id == current.id,
-                  // Alternate left/right of center for a winding path.
-                  align: i.isEven ? -0.42 : 0.42,
-                  onTap: () => _openLevel(_levels[i]),
-                ),
-            ],
-          ),
-        ],
+    return ShaderMask(
+      // Fade levels in/out at the top and bottom edges so they don't hard-cut.
+      shaderCallback: (Rect bounds) {
+        return const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.white,
+            Colors.white,
+            Colors.transparent,
+          ],
+          stops: [0.0, 0.07, 0.93, 1.0],
+        ).createShader(bounds);
+      },
+      blendMode: BlendMode.dstIn,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _DashedLinePainter()),
+            ),
+            Column(
+              // Level 1 sits at the bottom, level 20 at the top — climb upward.
+              // Cards stay centered on the dashed line.
+              children: [
+                for (var i = 0; i < _levels.length; i++)
+                  () {
+                    final level = _levels[_levels.length - 1 - i];
+                    return _LevelSlot(
+                      level: level,
+                      isCurrent: level.id == current.id,
+                      onTap: () => _openLevel(level),
+                    );
+                  }(),
+              ],
+            ),
+          ],
+        ),
+        ),
       ),
     );
   }
 
-  /// Floating left-side shortcuts: daily puzzle + a locked "coming soon" slot.
+  /// Circular shortcuts sitting to the LEFT of the dashed line: a locked daily
+  /// challenge and a calendar.
   Widget _buildSideIcons() {
-    return Positioned(
-      left: 0,
-      top: 8,
-      child: Column(
-        children: [
-          _SideIcon(
-            icon: Icons.calendar_today_rounded,
-            label: 'Daily',
-            tint: AppColors.accent,
-            onTap: () {},
-          ),
-          const SizedBox(height: 12),
-          _SideIcon(
-            icon: Icons.lock_clock_rounded,
-            label: 'Soon',
-            tint: AppColors.locked,
-            locked: true,
-          ),
-        ],
+    return Positioned.fill(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SideIcon(icon: Icons.lock_outline_rounded, locked: true),
+            const SizedBox(height: 14),
+            _SideIcon(icon: Icons.calendar_today_rounded, onTap: () {}),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// One vertical slot on the path holding a single level card, offset left or
-/// right of the center line.
+/// One vertical slot on the path holding a single, centered level card.
 class _LevelSlot extends StatelessWidget {
   const _LevelSlot({
     required this.level,
     required this.isCurrent,
-    required this.align,
     required this.onTap,
   });
 
   final Level level;
   final bool isCurrent;
-  final double align;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: _slotHeight,
-      child: Align(
-        alignment: Alignment(align, 0),
+      child: Center(
         child: LevelCard(
           level: level,
           isCurrent: isCurrent,
@@ -188,67 +209,55 @@ class _LevelSlot extends StatelessWidget {
   }
 }
 
-/// Small labelled icon button used for the left-side shortcuts.
+/// Circular, thick-outlined shortcut icon for the left rail.
 class _SideIcon extends StatelessWidget {
   const _SideIcon({
     required this.icon,
-    required this.label,
-    required this.tint,
     this.onTap,
     this.locked = false,
   });
 
   final IconData icon;
-  final String label;
-  final Color tint;
   final VoidCallback? onTap;
   final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: locked ? 0.55 : 1,
-      child: GestureDetector(
-        onTap: locked ? null : onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-                boxShadow: AppTheme.softShadow(y: 3, blur: 8),
-              ),
-              child: Icon(icon, color: tint, size: 22),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSoft,
-              ),
-            ),
-          ],
+    return GestureDetector(
+      onTap: locked ? null : onTap,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: locked ? const Color(0xFFEDEBE7) : AppColors.card,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: locked
+                ? AppColors.locked.withValues(alpha: 0.55)
+                : AppColors.ink,
+            width: 3,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: locked ? AppColors.locked : AppColors.ink,
+          size: 22,
         ),
       ),
     );
   }
 }
 
-/// Paints the dashed vertical line running down the center of the path.
+/// Paints the thick dark dashed vertical line down the center of the path.
 class _DashedLinePainter extends CustomPainter {
-  static const _dash = 8.0;
-  static const _gap = 7.0;
+  static const _dash = 10.0;
+  static const _gap = 8.0;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.locked.withValues(alpha: 0.35)
-      ..strokeWidth = 3
+      ..color = AppColors.ink
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
 
     final x = size.width / 2;
@@ -261,4 +270,28 @@ class _DashedLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DashedLinePainter oldDelegate) => false;
+}
+
+/// Paints a faint square grid across the background.
+class _GridPainter extends CustomPainter {
+  static const _cell = 28.0;
+
+  const _GridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.grid
+      ..strokeWidth = 1;
+
+    for (var x = 0.0; x <= size.width; x += _cell) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = 0.0; y <= size.height; y += _cell) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GridPainter oldDelegate) => false;
 }

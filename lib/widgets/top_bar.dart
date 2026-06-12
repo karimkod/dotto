@@ -2,79 +2,46 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// A rounded-square icon container with a soft shadow, used across the top bar.
-class IconButtonTile extends StatelessWidget {
-  const IconButtonTile({
+/// A rounded-square tile with a thick dark outline, matching the level cards.
+class BorderedTile extends StatelessWidget {
+  const BorderedTile({
     super.key,
-    required this.icon,
+    required this.child,
     this.onTap,
-    this.tint,
-    this.iconColor,
-    this.badgeCount,
-    this.size = 46,
+    this.background,
+    this.height = 46,
+    this.width,
+    this.padding,
   });
 
-  final IconData icon;
+  final Widget child;
   final VoidCallback? onTap;
-
-  /// Background tint. Defaults to white.
-  final Color? tint;
-  final Color? iconColor;
-
-  /// Optional count badge (e.g. hint count). Null hides it.
-  final int? badgeCount;
-  final double size;
+  final Color? background;
+  final double height;
+  final double? width;
+  final EdgeInsets? padding;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: tint ?? AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: AppTheme.softShadow(y: 3, blur: 8),
-            ),
-            child: Icon(
-              icon,
-              size: size * 0.5,
-              color: iconColor ?? AppColors.text,
-            ),
-          ),
-          if (badgeCount != null)
-            Positioned(
-              right: -4,
-              top: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                constraints: const BoxConstraints(minWidth: 20),
-                decoration: BoxDecoration(
-                  color: AppColors.coral,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$badgeCount',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-        ],
+      child: Container(
+        height: height,
+        width: width,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: background ?? AppColors.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.ink, width: 3),
+        ),
+        child: Center(child: child),
       ),
     );
   }
 }
 
-/// Top bar: profile (left), hint counter (center-left), settings (right).
+/// Top bar: profile (warm tint), crown hint counter (dark), settings (dark) —
+/// all with thick rounded outlines.
 class TopBar extends StatelessWidget {
   const TopBar({
     super.key,
@@ -93,24 +60,42 @@ class TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButtonTile(
-          icon: Icons.person_rounded,
-          tint: AppColors.accent.withValues(alpha: 0.18),
-          iconColor: AppColors.accent,
+        // Profile — orange tint, dark person silhouette.
+        BorderedTile(
+          background: AppColors.accent.withValues(alpha: 0.30),
+          width: 46,
           onTap: onProfile,
+          child: const Icon(Icons.person_rounded, color: AppColors.ink, size: 24),
         ),
         const SizedBox(width: 10),
-        IconButtonTile(
-          icon: Icons.lightbulb_rounded,
-          iconColor: AppColors.accent,
-          badgeCount: hintCount,
+        // Crown + count — dark background.
+        BorderedTile(
+          background: AppColors.ink,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           onTap: onHints,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('👑', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 6),
+              Text(
+                'x$hintCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
         const Spacer(),
-        IconButtonTile(
-          icon: Icons.settings_rounded,
-          iconColor: AppColors.textSoft,
+        // Settings — dark background, white gear.
+        BorderedTile(
+          background: AppColors.ink,
+          width: 46,
           onTap: onSettings,
+          child: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
         ),
       ],
     );
