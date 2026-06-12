@@ -794,6 +794,7 @@ class _GameScreenState extends State<GameScreen>
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,
                         glowTick: _glowCtrl.value,
+                        showStartHint: _status == GameStatus.planning,
                         previewKey: previewKey,
                         previewTool: _hoverTool,
                       ),

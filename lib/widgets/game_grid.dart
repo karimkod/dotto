@@ -181,6 +181,7 @@ class GameGridPainter extends CustomPainter {
     required this.cellGlowColor,
     required this.cellPulse,
     required this.glowTick,
+    required this.showStartHint,
     this.previewKey,
     this.previewTool,
   });
@@ -209,6 +210,9 @@ class GameGridPainter extends CustomPainter {
   /// Continuously-changing value so the painter repaints every frame while
   /// effects are running.
   final double glowTick;
+
+  /// Whether to draw the pulsing start-direction indicator (planning phase).
+  final bool showStartHint;
 
   final int? previewKey;
   final ToolType? previewTool;
@@ -239,6 +243,8 @@ class GameGridPainter extends CustomPainter {
     }
 
     _paintTrail(canvas, geo);
+
+    if (showStartHint) _paintStartHint(canvas, geo);
 
     // Cell glow highlights (dot entry, arrow flash, placement ripple).
     cellGlow.forEach((key, intensity) {
@@ -408,6 +414,60 @@ class GameGridPainter extends CustomPainter {
         Paint()..color = AppColors.accent.withValues(alpha: 0.18 + 0.30 * recency),
       );
     }
+  }
+
+  /// Bold pulsing arrow just outside the start cell, plus a few fading lead
+  /// dots, so the dot's initial direction is unmistakable.
+  void _paintStartHint(Canvas canvas, GridGeometry geo) {
+    final s = level.start;
+    final center = geo.center(s.r, s.c);
+    final (dr, dc) = s.dir.delta;
+    final dir = Offset(dc.toDouble(), dr.toDouble());
+    final perp = Offset(-dir.dy, dir.dx);
+    final cell = geo.cell;
+    final pulse = 0.5 + 0.5 * math.sin(glowTick * 2 * math.pi);
+
+    // Lead dots tracing the initial path.
+    for (var k = 1; k <= 3; k++) {
+      final nr = s.r + dr * k;
+      final nc = s.c + dc * k;
+      if (nr < 0 || nr >= geo.n || nc < 0 || nc >= geo.n) break;
+      final p = geo.center(nr, nc);
+      final fade = 1 - (k - 1) / 3.0; // 1 → .67 → .33
+      canvas.drawCircle(
+        p,
+        cell * 0.11 * fade,
+        Paint()
+          ..color = AppColors.accent
+              .withValues(alpha: 0.42 * fade * (0.55 + 0.45 * pulse)),
+      );
+    }
+
+    // Bold arrowhead sitting on the leading edge, pulsing in scale + opacity.
+    final grow = 0.9 + 0.18 * pulse;
+    final anchor = center + dir * (cell * 0.5 + cell * 0.05);
+    final tip = anchor + dir * (cell * 0.32 * grow);
+    final b1 = anchor + perp * (cell * 0.24 * grow);
+    final b2 = anchor - perp * (cell * 0.24 * grow);
+    final head = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(b1.dx, b1.dy)
+      ..lineTo(b2.dx, b2.dy)
+      ..close();
+
+    // Dark outline for contrast on any background.
+    canvas.drawPath(
+      head,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeJoin = StrokeJoin.round
+        ..color = AppColors.ink.withValues(alpha: 0.85),
+    );
+    canvas.drawPath(
+      head,
+      Paint()..color = AppColors.accent.withValues(alpha: 0.80 + 0.20 * pulse),
+    );
   }
 
   /// Translucent ghost of the tool snapped to the hovered cell, gently
