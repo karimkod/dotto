@@ -156,7 +156,7 @@ class _GameScreenState extends State<GameScreen>
     const dt = 1 / 60;
     if (_placeAnim.isNotEmpty) {
       final done = <int>[];
-      _placeAnim.updateAll((k, v) => v + dt / 0.35); // ~350ms bounce
+      _placeAnim.updateAll((k, v) => v + dt / 0.60); // ~600ms leisurely bounce
       _placeAnim.forEach((k, v) {
         if (v >= 1) done.add(k);
       });
@@ -166,7 +166,7 @@ class _GameScreenState extends State<GameScreen>
     }
     if (_cellPulse.isNotEmpty) {
       final done = <int>[];
-      _cellPulse.updateAll((k, v) => v + dt / 0.30);
+      _cellPulse.updateAll((k, v) => v + dt / 0.40); // ~400ms ripple
       _cellPulse.forEach((k, v) {
         if (v >= 1) done.add(k);
       });
@@ -182,7 +182,7 @@ class _GameScreenState extends State<GameScreen>
     }
     if (_cellGlow.isNotEmpty) {
       final gone = <int>[];
-      _cellGlow.updateAll((k, v) => v - 0.04);
+      _cellGlow.updateAll((k, v) => v - 0.022); // ~500ms lingering flash
       _cellGlow.forEach((k, v) {
         if (v <= 0) gone.add(k);
       });

@@ -64,10 +64,14 @@ final TweenSequence<double> _popTween = TweenSequence<double>([
 
 double popScale(double p) => _popTween.transform(p.clamp(0.0, 1.0));
 
-/// Extra border thickness while the piece lands (peaks early, then settles).
+/// Extra border thickness while the piece lands. Progress fractions are of the
+/// ~600ms pop: thicken over ~150ms, hold ~100ms, then thin back over ~250ms.
 double placeBorderBoost(double p) {
-  if (p >= 0.55) return 0;
-  return math.sin(math.pi * (p / 0.55)) * 2.5; // 0 → +2.5px → 0
+  const peak = 2.5;
+  if (p < 0.25) return peak * (p / 0.25); // thicken
+  if (p < 0.42) return peak; // hold
+  if (p < 0.83) return peak * (1 - (p - 0.42) / 0.41); // thin back
+  return 0;
 }
 
 /// Shrink-out scale curve: 1.0 → 0.8 → 0.0.
