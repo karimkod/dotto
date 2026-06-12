@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
@@ -33,7 +35,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   LevelData? _level;
 
   final Map<int, PlacedElement> _placed = {};
@@ -42,13 +44,23 @@ class _GameScreenState extends State<GameScreen>
 
   GameStatus _status = GameStatus.planning;
   late DotState _dot;
-  final Set<int> _trail = {};
+
+  /// Ordered list of visited cells (most recent last) for the fading trail.
+  final List<int> _trail = [];
   String? _failReason;
 
   Timer? _timer;
-  late final AnimationController _dotCtrl;
+  late final AnimationController _dotCtrl; // per-step glide + squish
+  late final Animation<double> _dotScale; // arrival squish
+  late final AnimationController _glowCtrl; // continuous fx driver
   (int, int) _animFrom = (0, 0);
   (int, int) _animTo = (0, 0);
+
+  // Visual effect state, advanced each frame in [_onFxTick].
+  final Map<int, double> _placeAnim = {}; // cell → pop-in progress
+  final List<FadingPiece> _removing = []; // shrinking-away pieces
+  final Map<int, double> _cellGlow = {}; // cell → glow intensity
+  final Map<int, Color> _cellGlowColor = {};
 
   /// Board Stack render key, for global<->local coordinate conversion.
   final GlobalKey _boardKey = GlobalKey();
@@ -76,6 +88,28 @@ class _GameScreenState extends State<GameScreen>
       vsync: this,
       duration: const Duration(milliseconds: 320),
     );
+    // Brief squish: stays at 1.0, then pops to 1.15 and settles on arrival.
+    _dotScale = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.15).chain(
+          CurveTween(curve: Curves.easeOut),
+        ),
+        weight: 18,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.15, end: 1.0).chain(
+          CurveTween(curve: Curves.easeIn),
+        ),
+        weight: 22,
+      ),
+    ]).animate(_dotCtrl);
+    // Always-running driver for the dot's glow pulse and cell effect decay.
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+    _glowCtrl.addListener(_onFxTick);
     _level = levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
@@ -91,12 +125,50 @@ class _GameScreenState extends State<GameScreen>
   void dispose() {
     _timer?.cancel();
     _dotCtrl.dispose();
+    _glowCtrl.dispose();
     super.dispose();
   }
 
   int _idx(int r, int c) => r * _level!.size + c;
 
   int get _revision => _placed.length * 10000 + _trail.length;
+
+  /// Advance per-frame visual effects (called on every [_glowCtrl] tick).
+  void _onFxTick() {
+    const dt = 1 / 60;
+    if (_placeAnim.isNotEmpty) {
+      final done = <int>[];
+      _placeAnim.updateAll((k, v) => v + dt / 0.25);
+      _placeAnim.forEach((k, v) {
+        if (v >= 1) done.add(k);
+      });
+      for (final k in done) {
+        _placeAnim.remove(k);
+      }
+    }
+    if (_removing.isNotEmpty) {
+      for (final f in _removing) {
+        f.progress += dt / 0.15;
+      }
+      _removing.removeWhere((f) => f.progress >= 1);
+    }
+    if (_cellGlow.isNotEmpty) {
+      final gone = <int>[];
+      _cellGlow.updateAll((k, v) => v - 0.04);
+      _cellGlow.forEach((k, v) {
+        if (v <= 0) gone.add(k);
+      });
+      for (final k in gone) {
+        _cellGlow.remove(k);
+        _cellGlowColor.remove(k);
+      }
+    }
+  }
+
+  void _glow(int key, Color color, [double intensity = 0.85]) {
+    _cellGlow[key] = intensity;
+    _cellGlowColor[key] = color;
+  }
 
   // ----- dot / animation -----
 
@@ -109,6 +181,9 @@ class _GameScreenState extends State<GameScreen>
     _trail
       ..clear()
       ..add(_idx(s.r, s.c));
+    _cellGlow.clear();
+    _cellGlowColor.clear();
+    _removing.clear();
     _animFrom = (s.r, s.c);
     _animTo = (s.r, s.c);
     _dotCtrl.value = 1;
@@ -269,11 +344,18 @@ class _GameScreenState extends State<GameScreen>
       final piece = _dragPiece!;
       if (cell != null && _canDropAt(cell)) {
         // Move to the new cell.
-        setState(() => _placed[_idx(cell.$1, cell.$2)] = piece);
+        final key = _idx(cell.$1, cell.$2);
+        setState(() {
+          _placed[key] = piece;
+          _placeAnim[key] = 0;
+          _glow(key, toolGlowColor(piece.tool), 1.0);
+        });
+        Sfx.place();
         HapticFeedback.lightImpact();
       } else if (cell == null) {
         // Dropped off the grid → remove, returning it to the toolkit.
         setState(() => _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1);
+        Sfx.remove();
         HapticFeedback.lightImpact();
       } else {
         // Dropped on an occupied/invalid cell → return to its origin.
@@ -292,14 +374,18 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _placeTool((int, int) cell, ToolType tool) {
+    final key = _idx(cell.$1, cell.$2);
     setState(() {
-      _placed[_idx(cell.$1, cell.$2)] = PlacedElement(
+      _placed[key] = PlacedElement(
         type: tool.placedType,
         tool: tool,
         direction: tool.direction,
       );
       _kit[tool] = _kit[tool]! - 1;
+      _placeAnim[key] = 0; // pop-in
+      _glow(key, toolGlowColor(tool), 1.0); // placement ripple
     });
+    Sfx.place();
     HapticFeedback.lightImpact();
   }
 
@@ -308,8 +394,11 @@ class _GameScreenState extends State<GameScreen>
     if (piece == null) return;
     setState(() {
       _placed.remove(key);
+      _placeAnim.remove(key);
+      _removing.add(FadingPiece(key, piece.tool, piece.direction)); // shrink-out
       _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
     });
+    Sfx.remove();
     HapticFeedback.lightImpact();
   }
 
@@ -317,6 +406,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _play() {
     if (_status == GameStatus.running) return;
+    Sfx.click();
     setState(() {
       _resetDot();
       _status = GameStatus.running;
@@ -348,12 +438,15 @@ class _GameScreenState extends State<GameScreen>
     }
 
     final fromR = _dot.r, fromC = _dot.c;
+    final newKey = _idx(nr, nc);
     setState(() {
       _dot.r = nr;
       _dot.c = nc;
-      _trail.add(_idx(nr, nc));
+      _trail.add(newKey);
+      _glow(newKey, AppColors.accent, 0.7); // warm cell highlight on entry
     });
     _glide(fromR, fromC, nr, nc);
+    Sfx.tick();
 
     final base = _level!.baseTypeAt(nr, nc);
     if (base == CellType.gap) {
@@ -365,13 +458,21 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    final piece = _placed[_idx(nr, nc)];
+    final piece = _placed[newKey];
     if (piece != null) {
       switch (piece.type) {
         case PlacedType.arrow:
-          setState(() => _dot.dir = piece.direction!);
+          setState(() {
+            _dot.dir = piece.direction!;
+            _glow(newKey, const Color(0xFF1E88E5), 1.0); // arrow activation flash
+          });
+          Sfx.arrow();
         case PlacedType.pause:
-          setState(() => _dot.pause = 2);
+          setState(() {
+            _dot.pause = 2;
+            _glow(newKey, const Color(0xFFBA68C8), 1.0);
+          });
+          Sfx.pause();
         case PlacedType.teleporter:
           _teleport();
       }
@@ -393,8 +494,10 @@ class _GameScreenState extends State<GameScreen>
         _dot.r = r;
         _dot.c = c;
         _trail.add(entry.key);
+        _glow(entry.key, const Color(0xFFFF8A65), 1.0);
       });
       _jump(r, c);
+      Sfx.teleport();
       return;
     }
   }
@@ -402,8 +505,10 @@ class _GameScreenState extends State<GameScreen>
   void _win() {
     _timer?.cancel();
     _timer = null;
+    Sfx.exit();
     Future.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
+      Sfx.levelComplete();
       setState(() => _status = GameStatus.won);
     });
   }
@@ -412,6 +517,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _timer = null;
     _failReason = msg;
+    Sfx.die();
     Future.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
       setState(() => _status = GameStatus.lost);
@@ -560,31 +666,50 @@ class _GameScreenState extends State<GameScreen>
               key: _boardKey,
               children: [
                 RepaintBoundary(
-                  child: CustomPaint(
-                    size: Size.square(side),
-                    painter: GameGridPainter(
-                      level: _level!,
-                      placed: _placed,
-                      trail: _trail,
-                      revision: _revision,
-                      previewKey: previewKey,
-                      previewTool: _hoverTool,
+                  child: AnimatedBuilder(
+                    animation: _glowCtrl,
+                    builder: (_, _) => CustomPaint(
+                      size: Size.square(side),
+                      painter: GameGridPainter(
+                        level: _level!,
+                        placed: _placed,
+                        trail: _trail,
+                        revision: _revision,
+                        placeAnim: _placeAnim,
+                        removing: _removing,
+                        cellGlow: _cellGlow,
+                        cellGlowColor: _cellGlowColor,
+                        glowTick: _glowCtrl.value,
+                        previewKey: previewKey,
+                        previewTool: _hoverTool,
+                      ),
                     ),
                   ),
                 ),
                 Positioned.fill(
                   child: AnimatedBuilder(
-                    animation: _dotCtrl,
+                    animation: Listenable.merge([_dotCtrl, _glowCtrl]),
                     builder: (_, _) {
                       final from = geo.center(_animFrom.$1, _animFrom.$2);
                       final to = geo.center(_animTo.$1, _animTo.$2);
-                      final pos = Offset.lerp(from, to, _dotCtrl.value)!;
+                      final t = Curves.easeInOutCubic.transform(_dotCtrl.value);
+                      final pos = Offset.lerp(from, to, t)!;
                       final d = geo.cell * 0.46;
+                      // Subtle continuous glow pulse (0..1).
+                      final glow =
+                          0.5 + 0.5 * math.sin(_glowCtrl.value * 2 * math.pi);
                       return Transform.translate(
                         offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
                         child: Align(
                           alignment: Alignment.topLeft,
-                          child: _Dot(size: d, paused: _dot.pause > 0),
+                          child: Transform.scale(
+                            scale: _dotScale.value,
+                            child: _Dot(
+                              size: d,
+                              paused: _dot.pause > 0,
+                              glow: glow,
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -759,15 +884,20 @@ class _GameScreenState extends State<GameScreen>
   }
 }
 
-/// The animated dot.
+/// The animated dot, with a subtle pulsing glow ([glow] in 0..1).
 class _Dot extends StatelessWidget {
-  const _Dot({required this.size, required this.paused});
+  const _Dot({required this.size, required this.paused, this.glow = 0.5});
 
   final double size;
   final bool paused;
+  final double glow;
 
   @override
   Widget build(BuildContext context) {
+    final base = paused ? 0.12 : 0.40;
+    final span = paused ? 0.10 : 0.30;
+    final alpha = base + span * glow;
+    final blur = (paused ? 5.0 : 9.0) + 7.0 * glow;
     return Container(
       width: size,
       height: size,
@@ -781,9 +911,9 @@ class _Dot extends StatelessWidget {
         border: Border.all(color: AppColors.ink, width: 2.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: paused ? 0.15 : 0.55),
-            blurRadius: paused ? 6 : 12,
-            spreadRadius: paused ? 0 : 1,
+            color: AppColors.accent.withValues(alpha: alpha),
+            blurRadius: blur,
+            spreadRadius: 1 + 1.5 * glow,
           ),
         ],
       ),

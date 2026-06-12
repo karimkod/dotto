@@ -19,6 +19,37 @@ class _C {
   static const tele = Color(0xFFFF8A65);
 }
 
+/// Solid accent color used when a tool's cell glows.
+Color toolGlowColor(ToolType tool) {
+  switch (tool.placedType) {
+    case PlacedType.arrow:
+      return _C.arrow;
+    case PlacedType.pause:
+      return _C.pause;
+    case PlacedType.teleporter:
+      return _C.tele;
+  }
+}
+
+/// A placed piece in the middle of its shrink-out (removal) animation.
+class FadingPiece {
+  FadingPiece(this.key, this.tool, this.direction);
+  final int key;
+  final ToolType tool;
+  final Direction? direction;
+  double progress = 0; // 0 → 1
+}
+
+/// Pop-in scale curve (overshoots ~1.1 then settles to 1.0).
+double popScale(double p) => Curves.elasticOut.transform(p.clamp(0.0, 1.0));
+
+/// Shrink-out scale curve: 1.0 → 0.8 → 0.0.
+double shrinkScale(double p) {
+  if (p <= 0) return 1;
+  if (p < 0.3) return 1.0 - 0.2 * (p / 0.3);
+  return 0.8 * (1 - (p - 0.3) / 0.7);
+}
+
 /// Semi-transparent preview of a tool that follows the finger during a drag.
 class DragGhost extends StatelessWidget {
   const DragGhost({super.key, required this.tool, this.size = 58});
@@ -93,28 +124,46 @@ class GridGeometry {
   }
 }
 
-/// Paints the static board: outer frame, cells, hazards, placed pieces and the
-/// dot's trail. The moving dot itself is drawn as a sibling widget on top.
+/// Paints the board: outer frame, cells, hazards, trail, cell glows, placed
+/// pieces (with pop-in / shrink-out scaling) and the drag preview. The moving
+/// dot is drawn as a sibling widget on top.
 class GameGridPainter extends CustomPainter {
   GameGridPainter({
     required this.level,
     required this.placed,
     required this.trail,
     required this.revision,
+    required this.placeAnim,
+    required this.removing,
+    required this.cellGlow,
+    required this.cellGlowColor,
+    required this.glowTick,
     this.previewKey,
     this.previewTool,
   });
 
   final LevelData level;
   final Map<int, PlacedElement> placed;
-  final Set<int> trail;
 
-  /// Bumped by the screen whenever [placed] or [trail] change, so the painter
-  /// repaints even though the underlying collections are mutated in place.
+  /// Ordered list of visited cells (most recent last).
+  final List<int> trail;
+
   final int revision;
 
-  /// Cell index currently being hovered during a drag (null if none), plus the
-  /// tool being dragged — used to draw a translucent placement preview.
+  /// Per-cell pop-in progress (0→1) for freshly placed pieces.
+  final Map<int, double> placeAnim;
+
+  /// Pieces currently shrinking away (removal animation).
+  final List<FadingPiece> removing;
+
+  /// Per-cell glow intensity (0→1) and color for the highlight effect.
+  final Map<int, double> cellGlow;
+  final Map<int, Color> cellGlowColor;
+
+  /// Continuously-changing value so the painter repaints every frame while
+  /// effects are running.
+  final double glowTick;
+
   final int? previewKey;
   final ToolType? previewTool;
 
@@ -136,14 +185,168 @@ class GameGridPainter extends CustomPainter {
         ..color = AppColors.ink,
     );
 
+    // Base cells (no placed pieces — those are drawn scaled below).
     for (var r = 0; r < n; r++) {
       for (var c = 0; c < n; c++) {
-        _paintCell(canvas, geo, r, c);
+        _paintBase(canvas, geo, r, c);
       }
+    }
+
+    _paintTrail(canvas, geo);
+
+    // Cell glow highlights (dot entry, arrow flash, placement ripple).
+    cellGlow.forEach((key, intensity) {
+      _paintGlow(canvas, geo, key, intensity, cellGlowColor[key] ?? _C.arrow);
+    });
+
+    // Placed pieces, scaled by their pop-in animation.
+    placed.forEach((key, piece) {
+      final p = placeAnim[key];
+      final scale = p == null ? 1.0 : popScale(p);
+      _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale);
+    });
+
+    // Pieces shrinking away.
+    for (final f in removing) {
+      _paintPiece(canvas, geo, f.key, f.tool, f.direction, shrinkScale(f.progress));
     }
 
     if (previewKey != null && previewTool != null) {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
+    }
+  }
+
+  RRect _cellRRect(GridGeometry geo, Offset center) => RRect.fromRectAndRadius(
+        Rect.fromCenter(
+            center: center, width: geo.cell - 7, height: geo.cell - 7),
+        const Radius.circular(10),
+      );
+
+  void _paintBase(Canvas canvas, GridGeometry geo, int r, int c) {
+    final center = geo.center(r, c);
+    final rrect = _cellRRect(geo, center);
+    final base = level.baseTypeAt(r, c);
+
+    Color fill = AppColors.card;
+    Color border = AppColors.ink.withValues(alpha: 0.85);
+    String? glyph;
+    Color glyphColor = AppColors.ink;
+    bool dashedBorder = false;
+
+    switch (base) {
+      case CellType.start:
+        fill = _C.start;
+        border = const Color(0xFF5BA45F);
+        glyph = level.start.dir.glyph;
+        glyphColor = Colors.white;
+      case CellType.exit:
+        fill = _C.exit;
+        border = const Color(0xFFE0B73C);
+        glyph = '⚑';
+        glyphColor = Colors.white;
+      case CellType.wall:
+        fill = _C.wall;
+        border = const Color(0xFF5C6B73);
+      case CellType.destroyer:
+      case CellType.movingDestroyer:
+        fill = _C.destroyer;
+        border = const Color(0xFFC62828);
+        glyph = '✕';
+        glyphColor = Colors.white;
+      case CellType.gap:
+        fill = AppColors.background;
+        border = AppColors.textSoft;
+        dashedBorder = true;
+      case CellType.empty:
+        break;
+    }
+
+    canvas.drawRRect(rrect, Paint()..color = fill);
+
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = border;
+    if (dashedBorder) {
+      _drawDashedRRect(canvas, rrect, borderPaint);
+    } else {
+      canvas.drawRRect(rrect, borderPaint);
+    }
+
+    if (glyph != null) {
+      _drawGlyph(canvas, center, glyph, glyphColor, geo.cell * 0.42);
+    }
+  }
+
+  void _paintPiece(Canvas canvas, GridGeometry geo, int key, ToolType tool,
+      Direction? dir, double scale) {
+    if (scale <= 0) return;
+    final r = key ~/ geo.n;
+    final c = key % geo.n;
+    final center = geo.center(r, c);
+    final rrect = _cellRRect(geo, center);
+    final (fill, color, glyph) = _toolStyle(tool, dir);
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scale);
+    canvas.translate(-center.dx, -center.dy);
+
+    canvas.drawRRect(rrect, Paint()..color = fill);
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = color,
+    );
+    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    canvas.restore();
+  }
+
+  void _paintGlow(
+      Canvas canvas, GridGeometry geo, int key, double intensity, Color color) {
+    final i = intensity.clamp(0.0, 1.0);
+    final r = key ~/ geo.n;
+    final c = key % geo.n;
+    final rrect = _cellRRect(geo, geo.center(r, c));
+    canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: 0.18 * i));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = color.withValues(alpha: 0.75 * i)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 + 3 * i),
+    );
+  }
+
+  void _paintTrail(Canvas canvas, GridGeometry geo) {
+    if (trail.isEmpty) return;
+    final start = trail.length <= 6 ? 0 : trail.length - 6;
+    final visible = trail.sublist(start);
+    for (var i = 0; i < visible.length; i++) {
+      final key = visible[i];
+      final r = key ~/ geo.n;
+      final c = key % geo.n;
+      if (level.baseTypeAt(r, c) == CellType.exit) continue;
+      final center = geo.center(r, c);
+      final recency = (i + 1) / visible.length; // newest → 1
+      final radius = geo.cell * (0.14 + 0.07 * recency);
+      // Warm outer glow.
+      canvas.drawCircle(
+        center,
+        radius * 1.8,
+        Paint()
+          ..color = AppColors.accent.withValues(alpha: 0.10 * recency)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+      // Core dot.
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()..color = AppColors.accent.withValues(alpha: 0.18 + 0.30 * recency),
+      );
     }
   }
 
@@ -152,14 +355,9 @@ class GameGridPainter extends CustomPainter {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
-    final rect = Rect.fromCenter(
-      center: center,
-      width: geo.cell - 7,
-      height: geo.cell - 7,
-    );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
+    final rrect = _cellRRect(geo, center);
 
-    final (fill, color, glyph) = _toolStyle(tool);
+    final (fill, color, glyph) = _toolStyle(tool, tool.direction);
     canvas.drawRRect(rrect, Paint()..color = fill.withValues(alpha: 0.55));
     canvas.drawRRect(
       rrect,
@@ -172,107 +370,15 @@ class GameGridPainter extends CustomPainter {
         color.withValues(alpha: 0.85), geo.cell * 0.42);
   }
 
-  (Color fill, Color color, String glyph) _toolStyle(ToolType tool) {
+  (Color fill, Color color, String glyph) _toolStyle(
+      ToolType tool, Direction? dir) {
     switch (tool.placedType) {
       case PlacedType.arrow:
-        return (_C.arrowFill, _C.arrow, tool.direction!.glyph);
+        return (_C.arrowFill, _C.arrow, (dir ?? tool.direction!).glyph);
       case PlacedType.pause:
         return (_C.pauseFill, _C.pause, '❚❚');
       case PlacedType.teleporter:
         return (_C.teleFill, _C.tele, '◎');
-    }
-  }
-
-  void _paintCell(Canvas canvas, GridGeometry geo, int r, int c) {
-    final center = geo.center(r, c);
-    final rect = Rect.fromCenter(
-      center: center,
-      width: geo.cell - 7,
-      height: geo.cell - 7,
-    );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
-
-    final base = level.baseTypeAt(r, c);
-    final piece = placed[r * geo.n + c];
-
-    Color fill = AppColors.card;
-    Color border = AppColors.ink.withValues(alpha: 0.85);
-    double borderWidth = 2;
-    String? glyph;
-    Color glyphColor = AppColors.ink;
-    bool dashedBorder = false;
-
-    if (piece != null) {
-      switch (piece.type) {
-        case PlacedType.arrow:
-          fill = _C.arrowFill;
-          border = _C.arrow;
-          glyph = piece.direction!.glyph;
-          glyphColor = _C.arrow;
-        case PlacedType.pause:
-          fill = _C.pauseFill;
-          border = _C.pause;
-          glyph = '❚❚';
-          glyphColor = _C.pause;
-        case PlacedType.teleporter:
-          fill = _C.teleFill;
-          border = _C.tele;
-          glyph = '◎';
-          glyphColor = _C.tele;
-      }
-    } else {
-      switch (base) {
-        case CellType.start:
-          fill = _C.start;
-          border = const Color(0xFF5BA45F);
-          glyph = level.start.dir.glyph;
-          glyphColor = Colors.white;
-        case CellType.exit:
-          fill = _C.exit;
-          border = const Color(0xFFE0B73C);
-          glyph = '⚑';
-          glyphColor = Colors.white;
-        case CellType.wall:
-          fill = _C.wall;
-          border = const Color(0xFF5C6B73);
-        case CellType.destroyer:
-        case CellType.movingDestroyer:
-          fill = _C.destroyer;
-          border = const Color(0xFFC62828);
-          glyph = '✕';
-          glyphColor = Colors.white;
-        case CellType.gap:
-          fill = AppColors.background;
-          border = AppColors.textSoft;
-          dashedBorder = true;
-        case CellType.empty:
-          break;
-      }
-    }
-
-    canvas.drawRRect(rrect, Paint()..color = fill);
-
-    // Faint trail dot for visited empty/start cells.
-    if (trail.contains(r * geo.n + c) && base != CellType.exit) {
-      canvas.drawCircle(
-        center,
-        geo.cell * 0.14,
-        Paint()..color = AppColors.accent.withValues(alpha: 0.30),
-      );
-    }
-
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = borderWidth
-      ..color = border;
-    if (dashedBorder) {
-      _drawDashedRRect(canvas, rrect, borderPaint);
-    } else {
-      canvas.drawRRect(rrect, borderPaint);
-    }
-
-    if (glyph != null) {
-      _drawGlyph(canvas, center, glyph, glyphColor, geo.cell * 0.42);
     }
   }
 
@@ -300,10 +406,7 @@ class GameGridPainter extends CustomPainter {
     for (final metric in path.computeMetrics()) {
       var d = 0.0;
       while (d < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(d, d + dash),
-          paint,
-        );
+        canvas.drawPath(metric.extractPath(d, d + dash), paint);
         d += dash + gap;
       }
     }
@@ -316,6 +419,7 @@ class GameGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant GameGridPainter old) =>
+      old.glowTick != glowTick ||
       old.revision != revision ||
       old.level != level ||
       old.previewKey != previewKey ||
