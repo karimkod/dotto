@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/grid_cell.dart';
 import '../theme/app_theme.dart';
+import 'game_grid.dart';
 
 /// Horizontal row of selectable toolkit items, each a thick-bordered tile with
 /// a glyph, label and remaining-count badge.
@@ -63,15 +64,31 @@ class _ToolTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyphColor = _isArrow ? const Color(0xFF1E88E5) : AppColors.ink;
+    final content = _buildContent();
 
     return Opacity(
       opacity: enabled ? 1 : 0.4,
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
+      // Drag is the primary interaction; tap-to-select is the fallback.
+      child: Draggable<ToolType>(
+        data: tool,
+        maxSimultaneousDrags: enabled ? 1 : 0,
+        dragAnchorStrategy: pointerDragAnchorStrategy,
+        feedback: DragGhost(tool: tool),
+        childWhenDragging: Opacity(opacity: 0.3, child: content),
+        child: GestureDetector(
+          onTap: enabled ? onTap : null,
+          child: content,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    final glyphColor = _isArrow ? const Color(0xFF1E88E5) : AppColors.ink;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
             Container(
               width: 64,
               height: 64,
@@ -131,8 +148,6 @@ class _ToolTile extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
+        );
   }
 }

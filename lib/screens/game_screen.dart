@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/level_definitions.dart';
 import '../models/game_state.dart';
@@ -43,6 +44,13 @@ class _GameScreenState extends State<GameScreen>
   late final AnimationController _dotCtrl;
   (int, int) _animFrom = (0, 0);
   (int, int) _animTo = (0, 0);
+
+  /// Board RenderBox key, used to convert drag globals to local cell coords.
+  final GlobalKey _boardKey = GlobalKey();
+
+  /// Cell currently hovered during a valid drag, and the tool being dragged.
+  (int, int)? _hoverCell;
+  ToolType? _hoverTool;
 
   @override
   void initState() {
@@ -129,6 +137,73 @@ class _GameScreenState extends State<GameScreen>
       );
       _kit[tool] = _kit[tool]! - 1;
     });
+  }
+
+  // ----- drag & drop -----
+
+  /// Convert a global drag position to a board cell, or null if off-grid.
+  (int, int)? _cellFromGlobal(Offset global) {
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    return GridGeometry(box.size.width, _level!.size)
+        .cellAt(box.globalToLocal(global));
+  }
+
+  bool _canPlace((int, int) cell, ToolType tool) {
+    if (_status != GameStatus.planning) return false;
+    final (r, c) = cell;
+    if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
+    if (_placed.containsKey(_idx(r, c))) return false;
+    return (_kit[tool] ?? 0) > 0;
+  }
+
+  /// Live preview update while a toolkit item is dragged over the board.
+  void _onDragMove(ToolType tool, Offset global) {
+    final cell = _cellFromGlobal(global);
+    final valid = cell != null && _canPlace(cell, tool);
+    setState(() {
+      _hoverCell = valid ? cell : null;
+      _hoverTool = valid ? tool : null;
+    });
+  }
+
+  void _onDragDrop(ToolType tool, Offset global) {
+    final cell = _cellFromGlobal(global);
+    if (cell != null && _canPlace(cell, tool)) {
+      final (r, c) = cell;
+      setState(() {
+        _placed[_idx(r, c)] = PlacedElement(
+          type: tool.placedType,
+          tool: tool,
+          direction: tool.direction,
+        );
+        _kit[tool] = _kit[tool]! - 1;
+      });
+      HapticFeedback.lightImpact();
+    }
+    setState(() {
+      _hoverCell = null;
+      _hoverTool = null;
+    });
+  }
+
+  /// Dragging a placed piece off the grid removes it (refunds the toolkit).
+  void _onPlacedDragEnd(int key, DraggableDetails details) {
+    if (_status != GameStatus.planning) return;
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final local = box.globalToLocal(details.offset);
+    final side = box.size.width;
+    final offGrid =
+        local.dx < 0 || local.dy < 0 || local.dx > side || local.dy > side;
+    if (!offGrid) return;
+    final piece = _placed[key];
+    if (piece == null) return;
+    setState(() {
+      _placed.remove(key);
+      _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
+    });
+    HapticFeedback.lightImpact();
   }
 
   // ----- run loop -----
@@ -351,46 +426,108 @@ class _GameScreenState extends State<GameScreen>
         builder: (context, constraints) {
           final side = constraints.maxWidth;
           final geo = GridGeometry(side, _level!.size);
-          return GestureDetector(
-            key: const ValueKey('gameBoard'),
-            onTapUp: (d) => _onBoardTapUp(d, geo),
-            child: Stack(
-              children: [
-                RepaintBoundary(
-                  child: CustomPaint(
-                    size: Size.square(side),
-                    painter: GameGridPainter(
-                      level: _level!,
-                      placed: _placed,
-                      trail: _trail,
-                      revision: _revision,
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: AnimatedBuilder(
-                    animation: _dotCtrl,
-                    builder: (_, _) {
-                      final from = geo.center(_animFrom.$1, _animFrom.$2);
-                      final to = geo.center(_animTo.$1, _animTo.$2);
-                      final pos = Offset.lerp(from, to, _dotCtrl.value)!;
-                      final d = geo.cell * 0.46;
-                      return Transform.translate(
-                        offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
-                        child: Align(
-                          alignment: Alignment.topLeft,
-                          child: _Dot(size: d, paused: _dot.pause > 0),
+          final previewKey = _hoverCell == null
+              ? null
+              : _idx(_hoverCell!.$1, _hoverCell!.$2);
+
+          return DragTarget<ToolType>(
+            onWillAcceptWithDetails: (d) {
+              final cell = _cellFromGlobal(d.offset);
+              return cell != null && _canPlace(cell, d.data);
+            },
+            onMove: (d) => _onDragMove(d.data, d.offset),
+            onLeave: (_) => setState(() {
+              _hoverCell = null;
+              _hoverTool = null;
+            }),
+            onAcceptWithDetails: (d) => _onDragDrop(d.data, d.offset),
+            builder: (context, candidate, rejected) {
+              return GestureDetector(
+                key: const ValueKey('gameBoard'),
+                onTapUp: (d) => _onBoardTapUp(d, geo),
+                child: Stack(
+                  key: _boardKey,
+                  children: [
+                    RepaintBoundary(
+                      child: CustomPaint(
+                        size: Size.square(side),
+                        painter: GameGridPainter(
+                          level: _level!,
+                          placed: _placed,
+                          trail: _trail,
+                          revision: _revision,
+                          previewKey: previewKey,
+                          previewTool: _hoverTool,
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                    ..._buildPlacedDragHandles(geo),
+                    Positioned.fill(
+                      child: AnimatedBuilder(
+                        animation: _dotCtrl,
+                        builder: (_, _) {
+                          final from = geo.center(_animFrom.$1, _animFrom.$2);
+                          final to = geo.center(_animTo.$1, _animTo.$2);
+                          final pos = Offset.lerp(from, to, _dotCtrl.value)!;
+                          final d = geo.cell * 0.46;
+                          return Transform.translate(
+                            offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: _Dot(size: d, paused: _dot.pause > 0),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
     );
+  }
+
+  /// Transparent, draggable handles over each placed piece: long-press-drag off
+  /// the grid to remove, or tap to remove.
+  List<Widget> _buildPlacedDragHandles(GridGeometry geo) {
+    if (_status != GameStatus.planning) return const [];
+    final cs = geo.cell;
+    return _placed.entries.map((e) {
+      final r = e.key ~/ _level!.size;
+      final c = e.key % _level!.size;
+      final center = geo.center(r, c);
+      return Positioned(
+        left: center.dx - cs / 2,
+        top: center.dy - cs / 2,
+        width: cs,
+        height: cs,
+        child: LongPressDraggable<int>(
+          data: e.key,
+          dragAnchorStrategy: pointerDragAnchorStrategy,
+          feedback: DragGhost(tool: e.value.tool, size: cs * 0.8),
+          childWhenDragging: const SizedBox.shrink(),
+          onDragEnd: (d) => _onPlacedDragEnd(e.key, d),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _removePlaced(e.key),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  void _removePlaced(int key) {
+    if (_status != GameStatus.planning) return;
+    final piece = _placed[key];
+    if (piece == null) return;
+    setState(() {
+      _placed.remove(key);
+      _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
+    });
   }
 
   Widget _buildFooter() {

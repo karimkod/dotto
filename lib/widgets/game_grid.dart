@@ -19,6 +19,56 @@ class _C {
   static const tele = Color(0xFFFF8A65);
 }
 
+/// Semi-transparent preview of a tool that follows the finger during a drag.
+class DragGhost extends StatelessWidget {
+  const DragGhost({super.key, required this.tool, this.size = 58});
+
+  final ToolType tool;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill;
+    final Color color;
+    switch (tool.placedType) {
+      case PlacedType.arrow:
+        fill = _C.arrowFill;
+        color = _C.arrow;
+      case PlacedType.pause:
+        fill = _C.pauseFill;
+        color = _C.pause;
+      case PlacedType.teleporter:
+        fill = _C.teleFill;
+        color = _C.tele;
+    }
+    return Material(
+      color: Colors.transparent,
+      child: Opacity(
+        opacity: 0.85,
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color, width: 3),
+          ),
+          child: Text(
+            tool.glyph,
+            style: TextStyle(
+              fontSize: size * 0.42,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Maps between board pixels and cell coordinates for a square board of [side]
 /// pixels holding [n] cells, with an outer [pad].
 class GridGeometry {
@@ -51,6 +101,8 @@ class GameGridPainter extends CustomPainter {
     required this.placed,
     required this.trail,
     required this.revision,
+    this.previewKey,
+    this.previewTool,
   });
 
   final LevelData level;
@@ -60,6 +112,11 @@ class GameGridPainter extends CustomPainter {
   /// Bumped by the screen whenever [placed] or [trail] change, so the painter
   /// repaints even though the underlying collections are mutated in place.
   final int revision;
+
+  /// Cell index currently being hovered during a drag (null if none), plus the
+  /// tool being dragged — used to draw a translucent placement preview.
+  final int? previewKey;
+  final ToolType? previewTool;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -83,6 +140,46 @@ class GameGridPainter extends CustomPainter {
       for (var c = 0; c < n; c++) {
         _paintCell(canvas, geo, r, c);
       }
+    }
+
+    if (previewKey != null && previewTool != null) {
+      _paintPreview(canvas, geo, previewKey!, previewTool!);
+    }
+  }
+
+  /// Translucent ghost of the tool snapped to the hovered cell.
+  void _paintPreview(Canvas canvas, GridGeometry geo, int key, ToolType tool) {
+    final r = key ~/ geo.n;
+    final c = key % geo.n;
+    final center = geo.center(r, c);
+    final rect = Rect.fromCenter(
+      center: center,
+      width: geo.cell - 7,
+      height: geo.cell - 7,
+    );
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
+
+    final (fill, color, glyph) = _toolStyle(tool);
+    canvas.drawRRect(rrect, Paint()..color = fill.withValues(alpha: 0.55));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = color.withValues(alpha: 0.85),
+    );
+    _drawGlyph(canvas, center, glyph,
+        color.withValues(alpha: 0.85), geo.cell * 0.42);
+  }
+
+  (Color fill, Color color, String glyph) _toolStyle(ToolType tool) {
+    switch (tool.placedType) {
+      case PlacedType.arrow:
+        return (_C.arrowFill, _C.arrow, tool.direction!.glyph);
+      case PlacedType.pause:
+        return (_C.pauseFill, _C.pause, '❚❚');
+      case PlacedType.teleporter:
+        return (_C.teleFill, _C.tele, '◎');
     }
   }
 
@@ -214,5 +311,8 @@ class GameGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant GameGridPainter old) =>
-      old.revision != revision || old.level != level;
+      old.revision != revision ||
+      old.level != level ||
+      old.previewKey != previewKey ||
+      old.previewTool != previewTool;
 }

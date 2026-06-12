@@ -42,6 +42,33 @@ void main() {
     expect(find.text('Level Complete!'), findsOneWidget);
   });
 
+  testWidgets('Level 1 is solvable by dragging the arrow onto the grid',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+    final target = boardRect.topLeft + geo.center(3, 3);
+
+    // Drag the UP tool from the toolbar onto cell (3, 3).
+    final source = tester.getCenter(find.text('UP'));
+    final gesture = await tester.startGesture(source);
+    await tester.pump();
+    await gesture.moveTo(target);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    for (var i = 0; i < 9; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    expect(find.text('Level Complete!'), findsOneWidget);
+  });
+
   testWidgets('Level 1 fails when no arrow is placed', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level1)));
     await tester.pump();
