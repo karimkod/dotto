@@ -90,7 +90,31 @@ void _noise({
   } catch (_) {}
 }
 
-void playPlace() => _tone(600, dur: 0.08, gain: 0.20);
+void playPlace() {
+  // Deep, chunky "thock": loud attack, fast decay, with a low body partial.
+  _toneThock(400, dur: 0.12, gain: 0.34);
+  _toneThock(180, dur: 0.10, gain: 0.20);
+}
+
+/// Tone with a sharp attack (~3ms) and fast exponential decay.
+void _toneThock(double freq, {required double dur, double gain = 0.3}) {
+  final ctx = _ensure();
+  if (ctx == null) return;
+  try {
+    final t0 = ctx.currentTime;
+    final osc = ctx.createOscillator();
+    final g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.003); // sharp attack
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); // fast decay
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  } catch (_) {}
+}
 
 void playRemove() => _noise(dur: 0.10, gain: 0.14, cutoff: 1200, decay: true);
 

@@ -21,9 +21,11 @@ Future<void> _dragArrow(
   await gesture.moveTo(target);
   await tester.pump(const Duration(milliseconds: 16));
   await gesture.up();
-  // Note: a continuous glow animation runs, so settle with a fixed pump
-  // rather than pumpAndSettle (which would never settle).
-  await tester.pump(const Duration(milliseconds: 50));
+  // A continuous glow animation runs (so no pumpAndSettle), and a valid drop
+  // plays a ~110ms magnet-snap before the piece commits — pump past both.
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 20));
+  }
 }
 
 void main() {

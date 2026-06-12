@@ -61,6 +61,15 @@ class _GameScreenState extends State<GameScreen>
   final List<FadingPiece> _removing = []; // shrinking-away pieces
   final Map<int, double> _cellGlow = {}; // cell → glow intensity
   final Map<int, Color> _cellGlowColor = {};
+  final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
+
+  // "Magnet snap": the dropped ghost flies into the target cell, then pops in.
+  late final AnimationController _snapCtrl;
+  ToolType? _snapTool; // tool to place when the snap finishes
+  PlacedElement? _snapPiece; // moved piece to drop when the snap finishes
+  int? _snapKey; // target cell
+  Offset? _snapFrom; // drop position (global)
+  Offset? _snapTo; // target cell center (global)
 
   /// Board Stack render key, for global<->local coordinate conversion.
   final GlobalKey _boardKey = GlobalKey();
@@ -110,6 +119,14 @@ class _GameScreenState extends State<GameScreen>
       duration: const Duration(milliseconds: 1400),
     )..repeat();
     _glowCtrl.addListener(_onFxTick);
+    // Quick magnet-snap of the dropped ghost into the cell.
+    _snapCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 110),
+    );
+    _snapCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed) _finishSnap();
+    });
     _level = levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
@@ -126,6 +143,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _dotCtrl.dispose();
     _glowCtrl.dispose();
+    _snapCtrl.dispose();
     super.dispose();
   }
 
@@ -138,12 +156,22 @@ class _GameScreenState extends State<GameScreen>
     const dt = 1 / 60;
     if (_placeAnim.isNotEmpty) {
       final done = <int>[];
-      _placeAnim.updateAll((k, v) => v + dt / 0.25);
+      _placeAnim.updateAll((k, v) => v + dt / 0.35); // ~350ms bounce
       _placeAnim.forEach((k, v) {
         if (v >= 1) done.add(k);
       });
       for (final k in done) {
         _placeAnim.remove(k);
+      }
+    }
+    if (_cellPulse.isNotEmpty) {
+      final done = <int>[];
+      _cellPulse.updateAll((k, v) => v + dt / 0.30);
+      _cellPulse.forEach((k, v) {
+        if (v >= 1) done.add(k);
+      });
+      for (final k in done) {
+        _cellPulse.remove(k);
       }
     }
     if (_removing.isNotEmpty) {
@@ -170,6 +198,19 @@ class _GameScreenState extends State<GameScreen>
     _cellGlowColor[key] = color;
   }
 
+  /// Kick a ripple pulse on the cells orthogonally adjacent to [key].
+  void _rippleNeighbors(int key) {
+    final n = _level!.size;
+    final r = key ~/ n;
+    final c = key % n;
+    for (final (dr, dc) in const [(-1, 0), (1, 0), (0, -1), (0, 1)]) {
+      final nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
+        _cellPulse[nr * n + nc] = 0;
+      }
+    }
+  }
+
   // ----- dot / animation -----
 
   void _resetDot() {
@@ -183,6 +224,7 @@ class _GameScreenState extends State<GameScreen>
       ..add(_idx(s.r, s.c));
     _cellGlow.clear();
     _cellGlowColor.clear();
+    _cellPulse.clear();
     _removing.clear();
     _animFrom = (s.r, s.c);
     _animTo = (s.r, s.c);
@@ -338,20 +380,16 @@ class _GameScreenState extends State<GameScreen>
     final cell = _cellAt(g);
 
     if (_dragTool != null) {
-      // Toolkit drag → place a new piece if valid.
-      if (cell != null && _canDropAt(cell)) _placeTool(cell, _dragTool!);
+      // Toolkit drag → snap then place if valid.
+      if (cell != null && _canDropAt(cell)) {
+        _startSnap(tool: _dragTool!, cell: cell, from: g);
+        return;
+      }
     } else if (_dragPiece != null) {
       final piece = _dragPiece!;
       if (cell != null && _canDropAt(cell)) {
-        // Move to the new cell.
-        final key = _idx(cell.$1, cell.$2);
-        setState(() {
-          _placed[key] = piece;
-          _placeAnim[key] = 0;
-          _glow(key, toolGlowColor(piece.tool), 1.0);
-        });
-        Sfx.place();
-        HapticFeedback.lightImpact();
+        _startSnap(piece: piece, cell: cell, from: g);
+        return;
       } else if (cell == null) {
         // Dropped off the grid → remove, returning it to the toolkit.
         setState(() => _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1);
@@ -362,7 +400,10 @@ class _GameScreenState extends State<GameScreen>
         setState(() => _placed[_dragOriginKey!] = piece);
       }
     }
+    _clearDrag();
+  }
 
+  void _clearDrag() {
     setState(() {
       _dragTool = null;
       _dragPiece = null;
@@ -373,20 +414,88 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
-  void _placeTool((int, int) cell, ToolType tool) {
+  Offset? _cellCenterGlobal((int, int) cell) {
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    final geo = GridGeometry(box.size.width, _level!.size);
+    return box.localToGlobal(geo.center(cell.$1, cell.$2));
+  }
+
+  /// Begin the magnet-snap: the ghost flies from [from] into [cell], and the
+  /// piece is committed (with the weighty pop) when the snap completes.
+  void _startSnap({
+    ToolType? tool,
+    PlacedElement? piece,
+    required (int, int) cell,
+    required Offset from,
+  }) {
     final key = _idx(cell.$1, cell.$2);
+    final to = _cellCenterGlobal(cell);
     setState(() {
-      _placed[key] = PlacedElement(
-        type: tool.placedType,
-        tool: tool,
-        direction: tool.direction,
-      );
-      _kit[tool] = _kit[tool]! - 1;
-      _placeAnim[key] = 0; // pop-in
-      _glow(key, toolGlowColor(tool), 1.0); // placement ripple
+      _snapTool = tool;
+      _snapPiece = piece;
+      _snapKey = key;
+      _snapFrom = from;
+      _snapTo = to ?? from;
+      // The snap ghost takes over; clear the active drag.
+      _dragTool = null;
+      _dragPiece = null;
+      _dragOriginKey = null;
+      _dragGlobal = null;
+      _hoverCell = null;
+      _hoverTool = null;
+    });
+    if (to == null) {
+      _finishSnap();
+    } else {
+      _snapCtrl.forward(from: 0);
+    }
+  }
+
+  void _finishSnap() {
+    final key = _snapKey;
+    final tool = _snapTool;
+    final piece = _snapPiece;
+    if (key != null) {
+      if (tool != null) {
+        _commitPlace(
+          key,
+          PlacedElement(
+              type: tool.placedType, tool: tool, direction: tool.direction),
+          decrementKit: true,
+        );
+      } else if (piece != null) {
+        _commitPlace(key, piece, decrementKit: false);
+      }
+    }
+    setState(() {
+      _snapTool = null;
+      _snapPiece = null;
+      _snapKey = null;
+      _snapFrom = null;
+      _snapTo = null;
+    });
+  }
+
+  /// Drop a piece onto a cell with the full landing reaction.
+  void _commitPlace(int key, PlacedElement el, {required bool decrementKit}) {
+    setState(() {
+      _placed[key] = el;
+      if (decrementKit) _kit[el.tool] = (_kit[el.tool] ?? 1) - 1;
+      _placeAnim[key] = 0; // weighty pop-in
+      _glow(key, toolGlowColor(el.tool), 1.0); // bright flash
+      _rippleNeighbors(key); // neighbors react
     });
     Sfx.place();
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact();
+  }
+
+  void _placeTool((int, int) cell, ToolType tool) {
+    _commitPlace(
+      _idx(cell.$1, cell.$2),
+      PlacedElement(type: tool.placedType, tool: tool, direction: tool.direction),
+      decrementKit: true,
+    );
   }
 
   void _removeAt(int key) {
@@ -600,7 +709,11 @@ class _GameScreenState extends State<GameScreen>
             ),
             if (_status == GameStatus.won || _status == GameStatus.lost)
               _buildOverlay(),
-            if (_dragGlobal != null) _buildGhost(),
+            // Drag/snap ghost (rebuilds during the snap flight via _snapCtrl).
+            AnimatedBuilder(
+              animation: _snapCtrl,
+              builder: (_, _) => _buildGhost(),
+            ),
           ],
         ),
       ),
@@ -679,6 +792,7 @@ class _GameScreenState extends State<GameScreen>
                         removing: _removing,
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
+                        cellPulse: _cellPulse,
                         glowTick: _glowCtrl.value,
                         previewKey: previewKey,
                         previewTool: _hoverTool,
@@ -723,15 +837,36 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// The floating ghost element that follows the finger during a drag.
+  /// The floating ghost element — slightly larger than a cell while dragging
+  /// (so it feels like a lifted piece), and flying into the cell during the
+  /// magnet-snap before the piece pops in.
   Widget _buildGhost() {
-    final tool = _activeDragTool;
     final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
-    if (tool == null || rootBox == null || _dragGlobal == null) {
+    if (rootBox == null) return const SizedBox.shrink();
+
+    final boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    final cell =
+        boardBox == null ? 58.0 : GridGeometry(boardBox.size.width, _level!.size).cell;
+
+    ToolType? tool;
+    Offset? globalPos;
+    double scale;
+    if ((_dragTool != null || _dragPiece != null) && _dragGlobal != null) {
+      tool = _activeDragTool;
+      globalPos = _dragGlobal;
+      scale = 1.2; // lifted piece, larger than the cell
+    } else if (_snapKey != null && _snapFrom != null && _snapTo != null) {
+      tool = _snapTool ?? _snapPiece?.tool;
+      final t = Curves.easeOut.transform(_snapCtrl.value);
+      globalPos = Offset.lerp(_snapFrom, _snapTo, t);
+      scale = 1.2 - 0.2 * t; // settle to cell size on arrival
+    } else {
       return const SizedBox.shrink();
     }
-    final local = rootBox.globalToLocal(_dragGlobal!);
-    const size = 58.0;
+    if (tool == null || globalPos == null) return const SizedBox.shrink();
+
+    final local = rootBox.globalToLocal(globalPos);
+    final size = cell * scale;
     return Positioned(
       left: local.dx - size / 2,
       top: local.dy - size / 2,

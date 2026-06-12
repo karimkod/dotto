@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../models/game_state.dart';
@@ -40,8 +42,33 @@ class FadingPiece {
   double progress = 0; // 0 → 1
 }
 
-/// Pop-in scale curve (overshoots ~1.1 then settles to 1.0).
-double popScale(double p) => Curves.elasticOut.transform(p.clamp(0.0, 1.0));
+/// Weighty pop-in: 0 → 1.3 → 0.95 → 1.05 → 1.0 (bouncy overshoot + settle).
+final TweenSequence<double> _popTween = TweenSequence<double>([
+  TweenSequenceItem(
+    tween: Tween(begin: 0.0, end: 1.3).chain(CurveTween(curve: Curves.easeOutCubic)),
+    weight: 34,
+  ),
+  TweenSequenceItem(
+    tween: Tween(begin: 1.3, end: 0.95).chain(CurveTween(curve: Curves.easeInOut)),
+    weight: 26,
+  ),
+  TweenSequenceItem(
+    tween: Tween(begin: 0.95, end: 1.05).chain(CurveTween(curve: Curves.easeInOut)),
+    weight: 20,
+  ),
+  TweenSequenceItem(
+    tween: Tween(begin: 1.05, end: 1.0).chain(CurveTween(curve: Curves.easeOut)),
+    weight: 20,
+  ),
+]);
+
+double popScale(double p) => _popTween.transform(p.clamp(0.0, 1.0));
+
+/// Extra border thickness while the piece lands (peaks early, then settles).
+double placeBorderBoost(double p) {
+  if (p >= 0.55) return 0;
+  return math.sin(math.pi * (p / 0.55)) * 2.5; // 0 → +2.5px → 0
+}
 
 /// Shrink-out scale curve: 1.0 → 0.8 → 0.0.
 double shrinkScale(double p) {
@@ -49,6 +76,9 @@ double shrinkScale(double p) {
   if (p < 0.3) return 1.0 - 0.2 * (p / 0.3);
   return 0.8 * (1 - (p - 0.3) / 0.7);
 }
+
+/// Neighbor ripple pulse: 1.0 → ~1.09 → 1.0.
+double pulseScale(double p) => 1 + 0.09 * math.sin(math.pi * p.clamp(0.0, 1.0));
 
 /// Semi-transparent preview of a tool that follows the finger during a drag.
 class DragGhost extends StatelessWidget {
@@ -75,7 +105,7 @@ class DragGhost extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Opacity(
-        opacity: 0.85,
+        opacity: 0.92,
         child: Container(
           width: size,
           height: size,
@@ -84,6 +114,14 @@ class DragGhost extends StatelessWidget {
             color: fill,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color, width: 3),
+            // Soft shadow so the piece feels lifted off the board.
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.ink.withValues(alpha: 0.28),
+                blurRadius: size * 0.22,
+                offset: Offset(0, size * 0.14),
+              ),
+            ],
           ),
           child: Text(
             tool.glyph,
@@ -137,6 +175,7 @@ class GameGridPainter extends CustomPainter {
     required this.removing,
     required this.cellGlow,
     required this.cellGlowColor,
+    required this.cellPulse,
     required this.glowTick,
     this.previewKey,
     this.previewTool,
@@ -159,6 +198,9 @@ class GameGridPainter extends CustomPainter {
   /// Per-cell glow intensity (0→1) and color for the highlight effect.
   final Map<int, double> cellGlow;
   final Map<int, Color> cellGlowColor;
+
+  /// Per-cell ripple-pulse progress (0→1) for neighbor reactions.
+  final Map<int, double> cellPulse;
 
   /// Continuously-changing value so the painter repaints every frame while
   /// effects are running.
@@ -203,12 +245,14 @@ class GameGridPainter extends CustomPainter {
     placed.forEach((key, piece) {
       final p = placeAnim[key];
       final scale = p == null ? 1.0 : popScale(p);
-      _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale);
+      final border = 2.5 + (p == null ? 0.0 : placeBorderBoost(p));
+      _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale, border);
     });
 
     // Pieces shrinking away.
     for (final f in removing) {
-      _paintPiece(canvas, geo, f.key, f.tool, f.direction, shrinkScale(f.progress));
+      _paintPiece(
+          canvas, geo, f.key, f.tool, f.direction, shrinkScale(f.progress), 2.5);
     }
 
     if (previewKey != null && previewTool != null) {
@@ -226,6 +270,15 @@ class GameGridPainter extends CustomPainter {
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
     final base = level.baseTypeAt(r, c);
+
+    // Neighbor ripple: briefly scale the cell around its center.
+    final pulse = cellPulse[r * geo.n + c];
+    if (pulse != null) {
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(pulseScale(pulse));
+      canvas.translate(-center.dx, -center.dy);
+    }
 
     Color fill = AppColors.card;
     Color border = AppColors.ink.withValues(alpha: 0.85);
@@ -276,10 +329,12 @@ class GameGridPainter extends CustomPainter {
     if (glyph != null) {
       _drawGlyph(canvas, center, glyph, glyphColor, geo.cell * 0.42);
     }
+
+    if (pulse != null) canvas.restore();
   }
 
   void _paintPiece(Canvas canvas, GridGeometry geo, int key, ToolType tool,
-      Direction? dir, double scale) {
+      Direction? dir, double scale, double borderWidth) {
     if (scale <= 0) return;
     final r = key ~/ geo.n;
     final c = key % geo.n;
@@ -297,7 +352,7 @@ class GameGridPainter extends CustomPainter {
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
+        ..strokeWidth = borderWidth
         ..color = color,
     );
     _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
@@ -310,14 +365,15 @@ class GameGridPainter extends CustomPainter {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final rrect = _cellRRect(geo, geo.center(r, c));
-    canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: 0.18 * i));
+    // Brighter, more visible flash.
+    canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: 0.30 * i));
     canvas.drawRRect(
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = color.withValues(alpha: 0.75 * i)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 + 3 * i),
+        ..strokeWidth = 3 + 3 * i
+        ..color = color.withValues(alpha: 0.92 * i)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 + 4 * i),
     );
   }
 
@@ -350,12 +406,19 @@ class GameGridPainter extends CustomPainter {
     }
   }
 
-  /// Translucent ghost of the tool snapped to the hovered cell.
+  /// Translucent ghost of the tool snapped to the hovered cell, gently
+  /// "breathing" (scaling) to invite the drop.
   void _paintPreview(Canvas canvas, GridGeometry geo, int key, ToolType tool) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
+    final breathe = 1 + 0.07 * (0.5 + 0.5 * math.sin(glowTick * 2 * math.pi));
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(breathe);
+    canvas.translate(-center.dx, -center.dy);
 
     final (fill, color, glyph) = _toolStyle(tool, tool.direction);
     canvas.drawRRect(rrect, Paint()..color = fill.withValues(alpha: 0.55));
@@ -368,6 +431,7 @@ class GameGridPainter extends CustomPainter {
     );
     _drawGlyph(canvas, center, glyph,
         color.withValues(alpha: 0.85), geo.cell * 0.42);
+    canvas.restore();
   }
 
   (Color fill, Color color, String glyph) _toolStyle(
