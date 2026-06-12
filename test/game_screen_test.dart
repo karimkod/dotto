@@ -8,6 +8,22 @@ import 'package:dotto/models/level.dart';
 import 'package:dotto/widgets/game_grid.dart';
 import 'package:dotto/screens/game_screen.dart';
 
+/// Drags from [source] to [target] in several steps so onPanStart/Update/End
+/// all fire, mimicking a real finger drag.
+Future<void> _dragArrow(
+    WidgetTester tester, Offset source, Offset target) async {
+  final gesture = await tester.startGesture(source);
+  await tester.pump(const Duration(milliseconds: 16));
+  await gesture.moveTo(Offset.lerp(source, target, 0.33)!);
+  await tester.pump(const Duration(milliseconds: 16));
+  await gesture.moveTo(Offset.lerp(source, target, 0.66)!);
+  await tester.pump(const Duration(milliseconds: 16));
+  await gesture.moveTo(target);
+  await tester.pump(const Duration(milliseconds: 16));
+  await gesture.up();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   const level1 = Level(
     id: 1,
@@ -53,12 +69,7 @@ void main() {
 
     // Drag the UP tool from the toolbar onto cell (3, 3).
     final source = tester.getCenter(find.text('UP'));
-    final gesture = await tester.startGesture(source);
-    await tester.pump();
-    await gesture.moveTo(target);
-    await tester.pump();
-    await gesture.up();
-    await tester.pumpAndSettle();
+    await _dragArrow(tester, source, target);
 
     await tester.tap(find.text('Play'));
     await tester.pump();
@@ -81,12 +92,7 @@ void main() {
     final target = boardRect.topLeft + geo.center(1, 1);
 
     final source = tester.getCenter(find.text('UP'));
-    final gesture = await tester.startGesture(source);
-    await tester.pump();
-    await gesture.moveTo(target);
-    await tester.pump();
-    await gesture.up();
-    await tester.pumpAndSettle();
+    await _dragArrow(tester, source, target);
 
     // The single UP arrow was consumed → its count badge now reads 0.
     expect(find.text('0'), findsOneWidget);

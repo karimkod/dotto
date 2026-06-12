@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -18,6 +19,10 @@ const _tickMs = 400;
 
 /// The core game screen. For levels with a definition it is fully playable;
 /// otherwise it shows a "coming soon" placeholder.
+///
+/// Drag-and-drop is implemented manually with pan gestures on a top-level
+/// [GestureDetector] (no [DragTarget]) so all coordinate math is under our
+/// control — reliable across platforms including web.
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.level});
 
@@ -45,10 +50,21 @@ class _GameScreenState extends State<GameScreen>
   (int, int) _animFrom = (0, 0);
   (int, int) _animTo = (0, 0);
 
-  /// Board RenderBox key, used to convert drag globals to local cell coords.
+  /// Board Stack render key, for global<->local coordinate conversion.
   final GlobalKey _boardKey = GlobalKey();
 
-  /// Cell currently hovered during a valid drag, and the tool being dragged.
+  /// Root Stack key, for positioning the floating drag ghost.
+  final GlobalKey _rootKey = GlobalKey();
+
+  /// One key per toolkit tile, so a pan can be matched to the tile it began on.
+  final Map<ToolType, GlobalKey> _toolKeys = {};
+
+  // Manual-drag state.
+  ToolType? _dragTool; // tool being dragged from the toolbar
+  int? _dragRemoveKey; // placed cell being dragged off to remove
+  Offset? _dragGlobal; // current pointer position (global)
+
+  // Live placement preview (valid empty cell under the pointer).
   (int, int)? _hoverCell;
   ToolType? _hoverTool;
 
@@ -62,6 +78,9 @@ class _GameScreenState extends State<GameScreen>
     _level = levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
+      for (final e in _level!.toolkit) {
+        _toolKeys[e.type] = GlobalKey();
+      }
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
     }
@@ -106,47 +125,29 @@ class _GameScreenState extends State<GameScreen>
     _dotCtrl.value = 1;
   }
 
-  // ----- placement -----
+  // ----- coordinate helpers -----
 
-  void _onBoardTapUp(TapUpDetails d, GridGeometry geo) {
-    if (_status != GameStatus.planning) return;
-    final cell = geo.cellAt(d.localPosition);
-    if (cell == null) return;
-    final (r, c) = cell;
-    final key = _idx(r, c);
-
-    final existing = _placed[key];
-    if (existing != null) {
-      setState(() {
-        _placed.remove(key);
-        _kit[existing.tool] = (_kit[existing.tool] ?? 0) + 1;
-      });
-      return;
-    }
-
-    final tool = _selected;
-    if (tool == null) return;
-    if (_level!.baseTypeAt(r, c) != CellType.empty) return;
-    if ((_kit[tool] ?? 0) <= 0) return;
-
-    setState(() {
-      _placed[key] = PlacedElement(
-        type: tool.placedType,
-        tool: tool,
-        direction: tool.direction,
-      );
-      _kit[tool] = _kit[tool]! - 1;
-    });
-  }
-
-  // ----- drag & drop -----
-
-  /// Convert a global drag position to a board cell, or null if off-grid.
-  (int, int)? _cellFromGlobal(Offset global) {
+  /// The board cell under a global position, or null if off-grid.
+  (int, int)? _cellAt(Offset global) {
     final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return null;
-    return GridGeometry(box.size.width, _level!.size)
-        .cellAt(box.globalToLocal(global));
+    final local = box.globalToLocal(global);
+    final side = box.size.width;
+    if (local.dx < 0 || local.dy < 0 || local.dx >= side || local.dy >= side) {
+      return null;
+    }
+    return GridGeometry(side, _level!.size).cellAt(local);
+  }
+
+  /// The toolkit tool whose tile contains a global position, or null.
+  ToolType? _toolAt(Offset global) {
+    for (final entry in _toolKeys.entries) {
+      final box = entry.value.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) continue;
+      final rect = box.localToGlobal(Offset.zero) & box.size;
+      if (rect.contains(global)) return entry.key;
+    }
+    return null;
   }
 
   bool _canPlace((int, int) cell, ToolType tool) {
@@ -157,46 +158,122 @@ class _GameScreenState extends State<GameScreen>
     return (_kit[tool] ?? 0) > 0;
   }
 
-  /// Live preview update while a toolkit item is dragged over the board.
-  void _onDragMove(ToolType tool, Offset global) {
-    final cell = _cellFromGlobal(global);
-    final valid = cell != null && _canPlace(cell, tool);
+  /// Recompute the placement preview for a pointer position (no setState).
+  void _refreshHover(Offset global) {
+    final tool = _dragTool;
+    final cell = tool == null ? null : _cellAt(global);
+    final valid = cell != null && _canPlace(cell, tool!);
+    _hoverCell = valid ? cell : null;
+    _hoverTool = valid ? tool : null;
+  }
+
+  // ----- tap (fallback) -----
+
+  void _onTapUp(TapUpDetails d) {
+    if (_status != GameStatus.planning) return;
+    final g = d.globalPosition;
+
+    // Tap on a toolkit tile → select it.
+    final tool = _toolAt(g);
+    if (tool != null) {
+      setState(() => _selected = tool);
+      return;
+    }
+
+    final cell = _cellAt(g);
+    if (cell == null) return;
+    final key = _idx(cell.$1, cell.$2);
+
+    // Tap a placed piece → remove it.
+    if (_placed.containsKey(key)) {
+      _removeAt(key);
+      return;
+    }
+
+    // Tap an empty cell → place the selected tool.
+    final sel = _selected;
+    if (sel != null && _canPlace(cell, sel)) {
+      _placeTool(cell, sel);
+    }
+  }
+
+  // ----- manual drag -----
+
+  void _onPanStart(DragStartDetails d) {
+    if (_status != GameStatus.planning) return;
+    final g = d.globalPosition;
+
+    // Start dragging a tool out of the toolbar.
+    final tool = _toolAt(g);
+    if (tool != null && (_kit[tool] ?? 0) > 0) {
+      setState(() {
+        _dragTool = tool;
+        _selected = tool;
+        _dragGlobal = g;
+        _refreshHover(g);
+      });
+      return;
+    }
+
+    // Otherwise, start dragging a placed piece off the grid to remove it.
+    final cell = _cellAt(g);
+    if (cell != null) {
+      final key = _idx(cell.$1, cell.$2);
+      if (_placed.containsKey(key)) {
+        setState(() {
+          _dragRemoveKey = key;
+          _dragGlobal = g;
+        });
+      }
+    }
+  }
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_dragTool == null && _dragRemoveKey == null) return;
     setState(() {
-      _hoverCell = valid ? cell : null;
-      _hoverTool = valid ? tool : null;
+      _dragGlobal = d.globalPosition;
+      if (_dragTool != null) _refreshHover(d.globalPosition);
     });
   }
 
-  void _onDragDrop(ToolType tool, Offset global) {
-    final cell = _cellFromGlobal(global);
-    if (cell != null && _canPlace(cell, tool)) {
-      final (r, c) = cell;
-      setState(() {
-        _placed[_idx(r, c)] = PlacedElement(
-          type: tool.placedType,
-          tool: tool,
-          direction: tool.direction,
-        );
-        _kit[tool] = _kit[tool]! - 1;
-      });
-      HapticFeedback.lightImpact();
+  void _onPanEnd(DragEndDetails d) {
+    // Use the end position directly (robust even if no update fired).
+    final g = d.globalPosition;
+    final tool = _dragTool;
+    final removeKey = _dragRemoveKey;
+
+    if (tool != null) {
+      final cell = _cellAt(g);
+      if (cell != null && _canPlace(cell, tool)) {
+        _placeTool(cell, tool);
+      }
+    } else if (removeKey != null) {
+      // Dropped off the grid → remove.
+      if (_cellAt(g) == null) _removeAt(removeKey);
     }
+
     setState(() {
+      _dragTool = null;
+      _dragRemoveKey = null;
+      _dragGlobal = null;
       _hoverCell = null;
       _hoverTool = null;
     });
   }
 
-  /// Dragging a placed piece off the grid removes it (refunds the toolkit).
-  void _onPlacedDragEnd(int key, DraggableDetails details) {
-    if (_status != GameStatus.planning) return;
-    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final local = box.globalToLocal(details.offset);
-    final side = box.size.width;
-    final offGrid =
-        local.dx < 0 || local.dy < 0 || local.dx > side || local.dy > side;
-    if (!offGrid) return;
+  void _placeTool((int, int) cell, ToolType tool) {
+    setState(() {
+      _placed[_idx(cell.$1, cell.$2)] = PlacedElement(
+        type: tool.placedType,
+        tool: tool,
+        direction: tool.direction,
+      );
+      _kit[tool] = _kit[tool]! - 1;
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _removeAt(int key) {
     final piece = _placed[key];
     if (piece == null) return;
     setState(() {
@@ -214,7 +291,8 @@ class _GameScreenState extends State<GameScreen>
       _resetDot();
       _status = GameStatus.running;
     });
-    _timer = Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
+    _timer =
+        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
   void _beat() {
@@ -336,45 +414,59 @@ class _GameScreenState extends State<GameScreen>
     if (_level == null) return _buildPlaceholder();
 
     return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(child: CustomPaint(painter: _BgGridPainter())),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 14),
-                  Text(
-                    _level!.tip,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.3,
-                      color: AppColors.textSoft,
-                      fontWeight: FontWeight.w600,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // Report the touch-down position to onPanStart (not the post-slop
+        // position) so a drag is matched to the tile it actually started on.
+        dragStartBehavior: DragStartBehavior.down,
+        onTapUp: _onTapUp,
+        onPanStart: _onPanStart,
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+        child: Stack(
+          key: _rootKey,
+          children: [
+            const Positioned.fill(child: CustomPaint(painter: _BgGridPainter())),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 14),
+                    Text(
+                      _level!.tip,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.3,
+                        color: AppColors.textSoft,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(child: Center(child: _buildBoard())),
-                  const SizedBox(height: 16),
-                  GameToolbar(
-                    tools: _level!.toolkit.map((e) => e.type).toList(),
-                    counts: _kit,
-                    selected: _selected,
-                    enabled: _status != GameStatus.running,
-                    onSelect: (t) => setState(() => _selected = t),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildFooter(),
-                ],
+                    const SizedBox(height: 12),
+                    Expanded(child: Center(child: _buildBoard())),
+                    const SizedBox(height: 16),
+                    GameToolbar(
+                      tools: _level!.toolkit.map((e) => e.type).toList(),
+                      counts: _kit,
+                      selected: _selected,
+                      enabled: _status != GameStatus.running,
+                      tileKeys: _toolKeys,
+                      draggingTool: _dragTool,
+                      onSelect: (t) => setState(() => _selected = t),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFooter(),
+                  ],
+                ),
               ),
             ),
-          ),
-          if (_status == GameStatus.won || _status == GameStatus.lost)
-            _buildOverlay(),
-        ],
+            if (_status == GameStatus.won || _status == GameStatus.lost)
+              _buildOverlay(),
+            if (_dragGlobal != null) _buildGhost(),
+          ],
+        ),
       ),
     );
   }
@@ -430,106 +522,67 @@ class _GameScreenState extends State<GameScreen>
               ? null
               : _idx(_hoverCell!.$1, _hoverCell!.$2);
 
-          return DragTarget<ToolType>(
-            hitTestBehavior: HitTestBehavior.opaque,
-            onWillAcceptWithDetails: (d) {
-              final cell = _cellFromGlobal(d.offset);
-              return cell != null && _canPlace(cell, d.data);
-            },
-            onMove: (d) => _onDragMove(d.data, d.offset),
-            onLeave: (_) => setState(() {
-              _hoverCell = null;
-              _hoverTool = null;
-            }),
-            onAcceptWithDetails: (d) => _onDragDrop(d.data, d.offset),
-            builder: (context, candidate, rejected) {
-              return GestureDetector(
-                key: const ValueKey('gameBoard'),
-                behavior: HitTestBehavior.opaque,
-                onTapUp: (d) => _onBoardTapUp(d, geo),
-                child: Stack(
-                  key: _boardKey,
-                  children: [
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        size: Size.square(side),
-                        painter: GameGridPainter(
-                          level: _level!,
-                          placed: _placed,
-                          trail: _trail,
-                          revision: _revision,
-                          previewKey: previewKey,
-                          previewTool: _hoverTool,
-                        ),
-                      ),
+          // KeyedSubtree exposes a stable test key while the inner Stack keeps
+          // the GlobalKey used for coordinate conversion.
+          return KeyedSubtree(
+            key: const ValueKey('gameBoard'),
+            child: Stack(
+              key: _boardKey,
+              children: [
+                RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size.square(side),
+                    painter: GameGridPainter(
+                      level: _level!,
+                      placed: _placed,
+                      trail: _trail,
+                      revision: _revision,
+                      previewKey: previewKey,
+                      previewTool: _hoverTool,
                     ),
-                    ..._buildPlacedDragHandles(geo),
-                    Positioned.fill(
-                      child: AnimatedBuilder(
-                        animation: _dotCtrl,
-                        builder: (_, _) {
-                          final from = geo.center(_animFrom.$1, _animFrom.$2);
-                          final to = geo.center(_animTo.$1, _animTo.$2);
-                          final pos = Offset.lerp(from, to, _dotCtrl.value)!;
-                          final d = geo.cell * 0.46;
-                          return Transform.translate(
-                            offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: _Dot(size: d, paused: _dot.pause > 0),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              );
-            },
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _dotCtrl,
+                    builder: (_, _) {
+                      final from = geo.center(_animFrom.$1, _animFrom.$2);
+                      final to = geo.center(_animTo.$1, _animTo.$2);
+                      final pos = Offset.lerp(from, to, _dotCtrl.value)!;
+                      final d = geo.cell * 0.46;
+                      return Transform.translate(
+                        offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
+                        child: Align(
+                          alignment: Alignment.topLeft,
+                          child: _Dot(size: d, paused: _dot.pause > 0),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  /// Transparent, draggable handles over each placed piece: long-press-drag off
-  /// the grid to remove, or tap to remove.
-  List<Widget> _buildPlacedDragHandles(GridGeometry geo) {
-    if (_status != GameStatus.planning) return const [];
-    final cs = geo.cell;
-    return _placed.entries.map((e) {
-      final r = e.key ~/ _level!.size;
-      final c = e.key % _level!.size;
-      final center = geo.center(r, c);
-      return Positioned(
-        left: center.dx - cs / 2,
-        top: center.dy - cs / 2,
-        width: cs,
-        height: cs,
-        child: LongPressDraggable<int>(
-          data: e.key,
-          dragAnchorStrategy: pointerDragAnchorStrategy,
-          feedback: DragGhost(tool: e.value.tool, size: cs * 0.8),
-          childWhenDragging: const SizedBox.shrink(),
-          onDragEnd: (d) => _onPlacedDragEnd(e.key, d),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _removePlaced(e.key),
-            child: const SizedBox.expand(),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  void _removePlaced(int key) {
-    if (_status != GameStatus.planning) return;
-    final piece = _placed[key];
-    if (piece == null) return;
-    setState(() {
-      _placed.remove(key);
-      _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
-    });
+  /// The floating ghost element that follows the finger during a drag.
+  Widget _buildGhost() {
+    final tool = _dragTool ??
+        (_dragRemoveKey != null ? _placed[_dragRemoveKey]?.tool : null);
+    final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
+    if (tool == null || rootBox == null || _dragGlobal == null) {
+      return const SizedBox.shrink();
+    }
+    final local = rootBox.globalToLocal(_dragGlobal!);
+    const size = 58.0;
+    return Positioned(
+      left: local.dx - size / 2,
+      top: local.dy - size / 2,
+      child: IgnorePointer(child: DragGhost(tool: tool, size: size)),
+    );
   }
 
   Widget _buildFooter() {
@@ -599,11 +652,7 @@ class _GameScreenState extends State<GameScreen>
                   onTap: () => Navigator.of(context).pop(true),
                 ),
                 const SizedBox(height: 10),
-                _PillButton(
-                  label: 'Replay',
-                  filled: false,
-                  onTap: _retry,
-                ),
+                _PillButton(label: 'Replay', filled: false, onTap: _retry),
               ] else ...[
                 _PillButton(
                   label: 'Retry',
