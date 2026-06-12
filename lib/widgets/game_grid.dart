@@ -425,9 +425,10 @@ class GameGridPainter extends CustomPainter {
     final dir = Offset(dc.toDouble(), dr.toDouble());
     final perp = Offset(-dir.dy, dir.dx);
     final cell = geo.cell;
-    final pulse = 0.5 + 0.5 * math.sin(glowTick * 2 * math.pi);
+    // Very gentle opacity breathe only (no scale pulse).
+    final breathe = 0.85 + 0.15 * (0.5 + 0.5 * math.sin(glowTick * 2 * math.pi));
 
-    // Lead dots tracing the initial path.
+    // Lead dots tracing the initial path — small and faint.
     for (var k = 1; k <= 3; k++) {
       final nr = s.r + dr * k;
       final nc = s.c + dc * k;
@@ -436,37 +437,24 @@ class GameGridPainter extends CustomPainter {
       final fade = 1 - (k - 1) / 3.0; // 1 → .67 → .33
       canvas.drawCircle(
         p,
-        cell * 0.11 * fade,
-        Paint()
-          ..color = AppColors.accent
-              .withValues(alpha: 0.42 * fade * (0.55 + 0.45 * pulse)),
+        cell * 0.07 * fade,
+        Paint()..color = AppColors.accent.withValues(alpha: 0.22 * fade * breathe),
       );
     }
 
-    // Bold arrowhead sitting on the leading edge, pulsing in scale + opacity.
-    final grow = 0.9 + 0.18 * pulse;
-    final anchor = center + dir * (cell * 0.5 + cell * 0.05);
-    final tip = anchor + dir * (cell * 0.32 * grow);
-    final b1 = anchor + perp * (cell * 0.24 * grow);
-    final b2 = anchor - perp * (cell * 0.24 * grow);
+    // Small, soft arrowhead on the leading edge — a hint, not a focal point.
+    final anchor = center + dir * (cell * 0.5 + cell * 0.04);
+    final tip = anchor + dir * (cell * 0.19);
+    final b1 = anchor + perp * (cell * 0.15);
+    final b2 = anchor - perp * (cell * 0.15);
     final head = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(b1.dx, b1.dy)
       ..lineTo(b2.dx, b2.dy)
       ..close();
-
-    // Dark outline for contrast on any background.
     canvas.drawPath(
       head,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeJoin = StrokeJoin.round
-        ..color = AppColors.ink.withValues(alpha: 0.85),
-    );
-    canvas.drawPath(
-      head,
-      Paint()..color = AppColors.accent.withValues(alpha: 0.80 + 0.20 * pulse),
+      Paint()..color = AppColors.accent.withValues(alpha: 0.50 * breathe),
     );
   }
 
