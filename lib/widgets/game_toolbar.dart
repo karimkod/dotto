@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/grid_cell.dart';
 import '../theme/app_theme.dart';
+import 'bouncy_button.dart';
 
 /// Horizontal row of selectable toolkit items, each a thick-bordered tile with
 /// a glyph, label and remaining-count badge.
@@ -82,8 +83,11 @@ class _ToolTile extends StatelessWidget {
     final opacity = !enabled ? 0.4 : (dragging ? 0.3 : 1.0);
     return Opacity(
       opacity: opacity,
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
+      child: BouncyButton(
+        enabled: enabled,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        rippleColor: AppColors.coral,
         child: _buildContent(),
       ),
     );

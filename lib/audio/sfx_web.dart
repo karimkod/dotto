@@ -146,3 +146,6 @@ void playLevelComplete() {
 }
 
 void playClick() => _noise(dur: 0.05, gain: 0.12, cutoff: 2200);
+
+/// Light, short button "thock" — a quieter, briefer version of place.
+void playTap() => _toneThock(600, dur: 0.05, gain: 0.16);

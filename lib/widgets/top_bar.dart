@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'bouncy_button.dart';
 
 /// A rounded-square tile with a thick dark outline, matching the level cards.
 class BorderedTile extends StatelessWidget {
@@ -23,8 +24,11 @@ class BorderedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final dark = background == AppColors.ink;
+    return BouncyButton(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      rippleColor: dark ? Colors.white : AppColors.coral,
       child: Container(
         height: height,
         width: width,

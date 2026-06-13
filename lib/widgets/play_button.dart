@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/level.dart';
 import '../theme/app_theme.dart';
+import 'bouncy_button.dart';
 
 /// The fixed bottom call-to-action: a difficulty tag sitting on top of a big
 /// coral pill that launches the current level. Boardgame-styled with thick
@@ -18,41 +19,46 @@ class PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPlay,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          // Big coral pill.
-          Container(
-            margin: const EdgeInsets.only(top: 14),
-            height: 62,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.coral,
-              borderRadius: BorderRadius.circular(31),
-              border: Border.all(color: AppColors.ink, width: 3),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Level ${level.number}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Big coral pill (the tappable CTA).
+        Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: BouncyButton(
+            onTap: onPlay,
+            borderRadius: BorderRadius.circular(31),
+            rippleColor: Colors.white,
+            child: Container(
+              height: 62,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.coral,
+                borderRadius: BorderRadius.circular(31),
+                border: Border.all(color: AppColors.ink, width: 3),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Level ${level.number}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.play_arrow_rounded,
-                    color: Colors.white, size: 28),
-              ],
+                  const SizedBox(width: 8),
+                  const Icon(Icons.play_arrow_rounded,
+                      color: Colors.white, size: 28),
+                ],
+              ),
             ),
           ),
-          // Difficulty tag straddling the top edge of the pill.
+        ),
+        // Difficulty tag straddling the top edge of the pill.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
@@ -71,7 +77,6 @@ class PlayButton extends StatelessWidget {
             ),
           ),
         ],
-      ),
     );
   }
 }

@@ -17,4 +17,7 @@ class Sfx {
   static void exit() => impl.playExit();
   static void levelComplete() => impl.playLevelComplete();
   static void click() => impl.playClick();
+
+  /// Light, short feedback for a button press.
+  static void tap() => impl.playTap();
 }

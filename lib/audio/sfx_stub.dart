@@ -10,3 +10,4 @@ void playDie() {}
 void playExit() {}
 void playLevelComplete() {}
 void playClick() {}
+void playTap() {}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/level.dart';
 import '../theme/app_theme.dart';
+import 'bouncy_button.dart';
 
 /// A rounded-square node on the level path, "boardgame" styled with a thick
 /// dark outline (no shadow). Renders differently for locked, unlocked, current
@@ -39,8 +40,11 @@ class LevelCard extends StatelessWidget {
       borderColor = AppColors.ink;
     }
 
-    return GestureDetector(
-      onTap: level.isLocked ? null : onTap,
+    return BouncyButton(
+      enabled: !level.isLocked,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      rippleColor: isCurrent ? AppColors.coral : AppColors.ink,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: size,

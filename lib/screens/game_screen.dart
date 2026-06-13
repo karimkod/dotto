@@ -14,6 +14,7 @@ import '../models/level.dart';
 import '../models/level_data.dart';
 import '../progress/progress_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/bouncy_button.dart';
 import '../widgets/feedback_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/game_toolbar.dart';
@@ -562,7 +563,6 @@ class _GameScreenState extends State<GameScreen>
 
   void _play() {
     if (_status == GameStatus.running) return;
-    Sfx.click();
     setState(() {
       _resetDot();
       _status = GameStatus.running;
@@ -1312,8 +1312,11 @@ class _PillButton extends StatelessWidget {
     final height = large ? 60.0 : 54.0;
     return Opacity(
       opacity: disabled ? 0.45 : 1,
-      child: GestureDetector(
+      child: BouncyButton(
+        enabled: !disabled,
         onTap: onTap,
+        borderRadius: BorderRadius.circular(height / 2),
+        rippleColor: filled ? Colors.white : AppColors.coral,
         child: Container(
           height: height,
           padding: const EdgeInsets.symmetric(horizontal: 22),
