@@ -12,6 +12,7 @@ import '../models/grid_cell.dart';
 import '../models/level.dart';
 import '../models/level_data.dart';
 import '../theme/app_theme.dart';
+import '../widgets/feedback_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/game_toolbar.dart';
 import '../widgets/top_bar.dart';
@@ -777,7 +778,22 @@ class _GameScreenState extends State<GameScreen>
             ],
           ),
         ),
+        const SizedBox(width: 8),
+        // Small, unobtrusive feedback button (top-right).
+        BorderedTile(
+          width: 44,
+          onTap: _showFeedbackDialog,
+          child: const Icon(Icons.chat_bubble_outline_rounded,
+              color: AppColors.ink, size: 20),
+        ),
       ],
+    );
+  }
+
+  void _showFeedbackDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => FeedbackDialog(level: _level!.id),
     );
   }
 
