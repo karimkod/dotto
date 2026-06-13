@@ -965,8 +965,8 @@ class _GameScreenState extends State<GameScreen>
   Widget _buildCelebrationOverlay(double v) {
     // The overlay starts fading in after the grid ripple has begun (~0.5s).
     final overlayFade = ((v - 0.23) / 0.22).clamp(0.0, 1.0);
-    final iconT = ((v - 0.30) / 0.32).clamp(0.0, 1.0);
-    final iconScale = iconT == 0 ? 0.0 : Curves.easeOutBack.transform(iconT);
+    // Checkmark self-draws over ~0.8s (circle then tick).
+    final checkProgress = ((v - 0.30) / 0.40).clamp(0.0, 1.0);
     final msgT = ((v - 0.36) / 0.34).clamp(0.0, 1.0);
     final msgScale = msgT == 0 ? 0.0 : Curves.elasticOut.transform(msgT);
     final msgOpacity = (msgT / 0.25).clamp(0.0, 1.0);
@@ -983,7 +983,7 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Transform.scale(scale: iconScale, child: const _StarBadge()),
+              _SuccessCheck(progress: checkProgress),
               const SizedBox(height: 26),
               Transform.scale(
                 scale: msgScale,
@@ -1347,24 +1347,73 @@ class _PillButton extends StatelessWidget {
   }
 }
 
-/// Star badge shown at the top of the win celebration.
-class _StarBadge extends StatelessWidget {
-  const _StarBadge();
+/// Classic "success checkmark": a ring draws itself, then a tick draws inside.
+/// [progress] (0..1) is driven by the win controller — circle over the first
+/// half, checkmark over the second.
+class _SuccessCheck extends StatelessWidget {
+  const _SuccessCheck({required this.progress});
+
+  final double progress;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 86,
-      height: 86,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: 4),
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: CustomPaint(
+        painter: _CheckPainter(
+          Curves.easeInOut.transform(progress.clamp(0.0, 1.0)),
+          AppColors.coral,
+        ),
       ),
-      child: const Icon(Icons.star_rounded, color: AppColors.star, size: 50),
     );
   }
+}
+
+class _CheckPainter extends CustomPainter {
+  _CheckPainter(this.progress, this.color);
+
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = color;
+
+    // Phase 1 (0–0.5): the ring draws itself from the top, clockwise.
+    final circleP = (progress / 0.5).clamp(0.0, 1.0);
+    if (circleP > 0) {
+      final rect = Rect.fromCircle(
+        center: Offset(s / 2, s / 2),
+        radius: s / 2 - 4,
+      );
+      canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * circleP, false, paint);
+    }
+
+    // Phase 2 (0.5–1.0): the short leg, then the long leg.
+    final checkP = ((progress - 0.5) / 0.5).clamp(0.0, 1.0);
+    if (checkP > 0) {
+      final p1 = Offset(0.30 * s, 0.52 * s);
+      final corner = Offset(0.44 * s, 0.66 * s);
+      final p3 = Offset(0.72 * s, 0.37 * s);
+      final shortP = (checkP / 0.45).clamp(0.0, 1.0);
+      canvas.drawLine(p1, Offset.lerp(p1, corner, shortP)!, paint);
+      if (checkP > 0.45) {
+        final longP = ((checkP - 0.45) / 0.55).clamp(0.0, 1.0);
+        canvas.drawLine(corner, Offset.lerp(corner, p3, longP)!, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CheckPainter old) =>
+      old.progress != progress || old.color != color;
 }
 
 /// Faint background grid, matching the menu screen.
