@@ -40,6 +40,15 @@ void main() {
   );
   const gridN = 3;
 
+  Future<void> runToWin(WidgetTester tester) async {
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    // Enough ticks for the longest World 1 path plus the ~2.2s celebration.
+    for (var i = 0; i < 24; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+  }
+
   testWidgets('Level 2 is solvable end to end (tap)', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();
@@ -50,13 +59,10 @@ void main() {
     await tester.tapAt(boardRect.topLeft + geo.center(2, 2));
     await tester.pump();
 
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    for (var i = 0; i < 9; i++) {
-      await tester.pump(const Duration(milliseconds: 400));
-    }
+    await runToWin(tester);
 
-    expect(find.text('Level Complete!'), findsOneWidget);
+    // Win → the celebration plays and the Continue button appears.
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('Level 2 is solvable by dragging the arrow onto the grid',
@@ -70,13 +76,10 @@ void main() {
 
     await _dragArrow(tester, tester.getCenter(find.text('UP')), target);
 
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    for (var i = 0; i < 9; i++) {
-      await tester.pump(const Duration(milliseconds: 400));
-    }
+    await runToWin(tester);
 
-    expect(find.text('Level Complete!'), findsOneWidget);
+    // Win → the celebration plays and the Continue button appears.
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('drag-drop registers anywhere on the grid, not just near the dot',
@@ -108,13 +111,10 @@ void main() {
     await _dragArrow(tester, tester.getCenter(find.text('UP')), wrongCell);
     await _dragArrow(tester, wrongCell, solutionCell);
 
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    for (var i = 0; i < 9; i++) {
-      await tester.pump(const Duration(milliseconds: 400));
-    }
+    await runToWin(tester);
 
-    expect(find.text('Level Complete!'), findsOneWidget);
+    // Win → the celebration plays and the Continue button appears.
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('dragging a placed element off-grid returns it to the toolkit',
@@ -149,15 +149,6 @@ void main() {
     expect(find.text('Try Again'), findsOneWidget);
   });
 
-  Future<void> runToWin(WidgetTester tester) async {
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    // Enough ticks for the longest World 1 path plus the ~1.8s celebration.
-    for (var i = 0; i < 24; i++) {
-      await tester.pump(const Duration(milliseconds: 400));
-    }
-  }
-
   testWidgets('Next Level button loads the next level', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();
@@ -168,8 +159,7 @@ void main() {
     await tester.pump();
     await runToWin(tester);
 
-    // Celebration banner on the grid + the Continue button (after celebration).
-    expect(find.text('Level Complete!'), findsOneWidget);
+    // Win → the Continue button appears after the celebration.
     expect(find.text('Continue'), findsOneWidget);
 
     await tester.tap(find.text('Continue'));
@@ -204,7 +194,7 @@ void main() {
 
     await runToWin(tester);
 
-    expect(find.text('World Complete!'), findsOneWidget);
+    // Last level → no Continue; the button is Back to Menu.
     expect(find.text('Continue'), findsNothing);
     expect(find.text('Back to Menu'), findsOneWidget);
   });
@@ -223,12 +213,9 @@ void main() {
     // No toolkit → a "Press Play!" hint instead.
     expect(find.text('Press Play!'), findsOneWidget);
 
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 400));
-    }
+    await runToWin(tester);
 
-    expect(find.text('Level Complete!'), findsOneWidget);
+    // Win → Continue appears.
+    expect(find.text('Continue'), findsOneWidget);
   });
 }

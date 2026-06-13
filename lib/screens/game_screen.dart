@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
@@ -69,9 +70,19 @@ class _GameScreenState extends State<GameScreen>
   final Map<int, Color> _cellGlowColor = {};
   final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
 
-  // On-grid win celebration (golden fuse, bloom, sparkles, "Level Complete").
+  // Win celebration: grid fades out, a full celebration screen fades in.
   late final AnimationController _winCtrl;
   bool _celebrationDone = false;
+  String _winMessage = '';
+
+  static const _winMessages = [
+    'Nailed it!',
+    'Perfect!',
+    'Well done!',
+    'Brilliant!',
+    'Smooth!',
+    'Nice one!',
+  ];
 
   // "Magnet snap": the dropped ghost flies into the target cell, then pops in.
   late final AnimationController _snapCtrl;
@@ -139,7 +150,7 @@ class _GameScreenState extends State<GameScreen>
     });
     _winCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 2200),
     );
     _winCtrl.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
@@ -653,13 +664,15 @@ class _GameScreenState extends State<GameScreen>
     Sfx.exit();
     // Record completion → unlocks the next level.
     ProgressStore.markCompleted(_level!.id);
-    // Celebrate on the grid (no modal); the Continue button appears after.
+    // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
       _status = GameStatus.won;
       _celebrationDone = false;
+      _winMessage = _winMessages[math.Random().nextInt(_winMessages.length)];
     });
     _winCtrl.forward(from: 0);
-    Future.delayed(const Duration(milliseconds: 220), () {
+    // Rising chime as the celebration screen comes in (after the ~0.5s pause).
+    Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) Sfx.levelComplete();
     });
   }
@@ -752,7 +765,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(child: Center(child: _buildBoard())),
+                    Expanded(child: _buildPlayArea()),
                     const SizedBox(height: 16),
                     // Hide the toolkit during the win celebration.
                     if (_status == GameStatus.won)
@@ -863,7 +876,7 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 RepaintBoundary(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_glowCtrl, _winCtrl]),
+                    animation: _glowCtrl,
                     builder: (_, _) => CustomPaint(
                       size: Size.square(side),
                       painter: GameGridPainter(
@@ -879,8 +892,6 @@ class _GameScreenState extends State<GameScreen>
                         cellPulse: _cellPulse,
                         glowTick: _glowCtrl.value,
                         showStartHint: _status == GameStatus.planning,
-                        winProgress:
-                            _status == GameStatus.won ? _winCtrl.value : 0.0,
                         previewKey: previewKey,
                         previewTool: _hoverTool,
                       ),
@@ -916,8 +927,6 @@ class _GameScreenState extends State<GameScreen>
                     },
                   ),
                 ),
-                if (_status == GameStatus.won)
-                  Positioned.fill(child: _buildCelebrationText()),
               ],
             ),
           );
@@ -926,52 +935,106 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// The big "Level Complete!" banner that fades in over the grid (no modal).
-  Widget _buildCelebrationText() {
-    final hasNext = levelDataFor(_level!.id + 1) != null;
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _winCtrl,
-        builder: (_, _) {
-          final fade = ((_winCtrl.value - 0.30) / 0.40).clamp(0.0, 1.0);
-          return Opacity(
-            opacity: fade,
-            child: Align(
-              alignment: const Alignment(0, -0.32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🎉', style: TextStyle(fontSize: 40)),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasNext ? 'Level Complete!' : 'World Complete!',
+  /// The Expanded play region: the interactive board, or — after a win — the
+  /// board fading/sliding away beneath the full celebration screen.
+  Widget _buildPlayArea() {
+    if (_status != GameStatus.won) {
+      return Center(child: _buildBoard());
+    }
+    return AnimatedBuilder(
+      animation: _winCtrl,
+      builder: (_, _) {
+        final v = _winCtrl.value;
+        // Phase 1 (0–0.23): hold. Phase 2 (0.23–0.45): grid fades + slides.
+        final fadeT = ((v - 0.23) / 0.22).clamp(0.0, 1.0);
+        final gridOpacity = 1 - fadeT;
+        final slide = Curves.easeIn.transform(fadeT) * 28;
+        final bgFade = ((v - 0.27) / 0.28).clamp(0.0, 1.0);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (gridOpacity > 0.01)
+              Center(
+                child: Opacity(
+                  opacity: gridOpacity,
+                  child: Transform.translate(
+                    offset: Offset(0, slide),
+                    child: _buildBoard(),
+                  ),
+                ),
+              ),
+            if (bgFade > 0)
+              Opacity(opacity: bgFade, child: _buildCelebration(v)),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The full celebration screen: gentle floating-bubble background, a bouncy
+  /// congratulatory message, the level number, and a star badge.
+  Widget _buildCelebration(double v) {
+    final msgT = ((v - 0.36) / 0.34).clamp(0.0, 1.0);
+    final msgScale = msgT == 0 ? 0.0 : Curves.elasticOut.transform(msgT);
+    final msgOpacity = (msgT / 0.25).clamp(0.0, 1.0);
+    final iconT = ((v - 0.30) / 0.32).clamp(0.0, 1.0);
+    final iconScale = iconT == 0 ? 0.0 : Curves.easeOutBack.transform(iconT);
+    final subT = ((v - 0.50) / 0.30).clamp(0.0, 1.0);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Gentle floating pastel bubbles (keep animating after _winCtrl ends).
+        RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: _glowCtrl,
+            builder: (_, _) => CustomPaint(
+              painter: _BubblesPainter(_glowCtrl.value),
+            ),
+          ),
+        ),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.scale(
+                scale: iconScale,
+                child: const _StarBadge(),
+              ),
+              const SizedBox(height: 26),
+              Transform.scale(
+                scale: msgScale,
+                child: Opacity(
+                  opacity: msgOpacity,
+                  child: Text(
+                    _winMessage,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.ink,
-                      shadows: [
-                        Shadow(color: Colors.white, blurRadius: 8),
-                        Shadow(color: Colors.white, blurRadius: 16),
-                      ],
+                    style: GoogleFonts.poppins(
+                      fontSize: 52,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.coral,
+                      height: 1.0,
                     ),
                   ),
-                  if (hasNext)
-                    Text(
-                      'Level ${_level!.id}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSoft,
-                        shadows: [Shadow(color: Colors.white, blurRadius: 8)],
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+              const SizedBox(height: 10),
+              Opacity(
+                opacity: subT,
+                child: Text(
+                  'Level ${_level!.id}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSoft,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -979,13 +1042,9 @@ class _GameScreenState extends State<GameScreen>
   /// (so it feels like a lifted piece), and flying into the cell during the
   /// magnet-snap before the piece pops in.
   Widget _buildGhost() {
-    final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
-    if (rootBox == null) return const SizedBox.shrink();
-
-    final boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-    final cell =
-        boardBox == null ? 58.0 : GridGeometry(boardBox.size.width, _level!.size).cell;
-
+    // Determine drag/snap state first — when neither is active (e.g. during
+    // the win celebration, when the board is removed) bail out before touching
+    // the board key, whose element may be inactive.
     ToolType? tool;
     Offset? globalPos;
     double scale;
@@ -1002,6 +1061,13 @@ class _GameScreenState extends State<GameScreen>
       return const SizedBox.shrink();
     }
     if (tool == null || globalPos == null) return const SizedBox.shrink();
+
+    final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
+    if (rootBox == null) return const SizedBox.shrink();
+    final boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    final cell = boardBox == null
+        ? 58.0
+        : GridGeometry(boardBox.size.width, _level!.size).cell;
 
     final local = rootBox.globalToLocal(globalPos);
     final size = cell * scale;
@@ -1041,9 +1107,15 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _buildFooter() {
     if (_status == GameStatus.won) {
-      // During the celebration, keep the spot empty; reveal Continue after.
+      // During the celebration, keep the spot empty; fade Continue in after.
       if (!_celebrationDone) return const SizedBox(height: 54);
-      return _buildContinueCluster();
+      return TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        builder: (_, t, child) => Opacity(opacity: t, child: child),
+        child: _buildContinueCluster(),
+      );
     }
 
     final running = _status == GameStatus.running;
@@ -1323,6 +1395,72 @@ class _PillButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Star badge shown at the top of the win celebration.
+class _StarBadge extends StatelessWidget {
+  const _StarBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 86,
+      height: 86,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.ink, width: 4),
+      ),
+      child: const Icon(Icons.star_rounded, color: AppColors.star, size: 50),
+    );
+  }
+}
+
+/// Gentle floating pastel bubbles behind the win message. [t] is the repeating
+/// glow value (0..1); motion uses sine so it loops seamlessly.
+class _BubblesPainter extends CustomPainter {
+  _BubblesPainter(this.t);
+
+  final double t;
+
+  static const _pastels = [
+    Color(0xFFFFC9B3), // peach
+    Color(0xFFFFE3A8), // light gold
+    Color(0xFFBFE3C2), // mint
+    Color(0xFFBBD9F2), // sky
+    Color(0xFFE6C9F0), // lilac
+  ];
+
+  double _frac(double x) => x - x.floorToDouble();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const n = 16;
+    final s = size.shortestSide;
+    for (var i = 0; i < n; i++) {
+      final baseX = _frac(i * 0.6180339887) * size.width;
+      final baseY = _frac(i * 0.7548776662) * size.height;
+      final r = s * (0.03 + 0.05 * _frac(i * 0.3137));
+      final phase = i * 0.41;
+      final bob = math.sin(2 * math.pi * t + phase) * (s * 0.045);
+      final sway = math.cos(2 * math.pi * t + phase * 1.3) * (s * 0.03);
+      final c = _pastels[i % _pastels.length];
+      final center = Offset(baseX + sway, baseY + bob);
+      canvas.drawCircle(center, r, Paint()..color = c.withValues(alpha: 0.32));
+      canvas.drawCircle(
+        center,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = c.withValues(alpha: 0.55),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubblesPainter old) => old.t != t;
 }
 
 /// Faint background grid, matching the menu screen.

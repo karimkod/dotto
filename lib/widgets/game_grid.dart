@@ -183,7 +183,6 @@ class GameGridPainter extends CustomPainter {
     required this.cellPulse,
     required this.glowTick,
     required this.showStartHint,
-    required this.winProgress,
     this.previewKey,
     this.previewTool,
   });
@@ -218,9 +217,6 @@ class GameGridPainter extends CustomPainter {
 
   /// Whether to draw the pulsing start-direction indicator (planning phase).
   final bool showStartHint;
-
-  /// 0 = no win celebration; 0→1 drives the on-grid celebration animation.
-  final double winProgress;
 
   final int? previewKey;
   final ToolType? previewTool;
@@ -281,83 +277,6 @@ class GameGridPainter extends CustomPainter {
     if (previewKey != null && previewTool != null) {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
     }
-
-    if (winProgress > 0) _paintWin(canvas, geo, winProgress);
-  }
-
-  /// On-grid win celebration: a golden fuse lighting the trail from exit back
-  /// to start, an expanding bloom at the exit, and a burst of sparkles.
-  void _paintWin(Canvas canvas, GridGeometry geo, double p) {
-    const gold = AppColors.star;
-    final cell = geo.cell;
-    final exitCenter = geo.center(level.exit.r, level.exit.c);
-
-    // 1. Golden fuse along the trail, lit from the exit backward to the start.
-    if (trail.isNotEmpty) {
-      final fuse = (p / 0.6).clamp(0.0, 1.0);
-      final lit = (fuse * trail.length).ceil();
-      for (var i = 0; i < trail.length; i++) {
-        final fromEnd = trail.length - 1 - i; // 0 at the exit
-        if (fromEnd >= lit) continue;
-        final key = trail[i];
-        final center = geo.center(key ~/ geo.n, key % geo.n);
-        final isFront = fuse < 1.0 && fromEnd == lit - 1;
-        final a = isFront ? 1.0 : 0.7;
-        final rad = isFront ? cell * 0.20 : cell * 0.13;
-        canvas.drawCircle(
-          center,
-          rad * 1.8,
-          Paint()
-            ..color = gold.withValues(alpha: 0.5 * a)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-        );
-        canvas.drawCircle(center, rad, Paint()..color = gold.withValues(alpha: a));
-      }
-    }
-
-    // 2. Exit bloom — expands and fades over the whole celebration.
-    final bloom = Curves.easeOut.transform(p.clamp(0.0, 1.0));
-    for (var ring = 0; ring < 2; ring++) {
-      final t = (bloom - ring * 0.15).clamp(0.0, 1.0);
-      if (t <= 0) continue;
-      canvas.drawCircle(
-        exitCenter,
-        cell * (0.35 + 2.4 * t),
-        Paint()
-          ..color = gold.withValues(alpha: (1 - t) * 0.40)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-      );
-    }
-
-    // 3. Sparkle burst from the exit.
-    const count = 12;
-    final life = (1 - p).clamp(0.0, 1.0);
-    if (life > 0) {
-      for (var k = 0; k < count; k++) {
-        final ang = (k / count) * 2 * math.pi + k * 0.6;
-        final speed = 1.0 + (k % 3) * 0.3;
-        final dist = cell * (0.25 + 2.3 * p * speed);
-        final pos = exitCenter + Offset(math.cos(ang), math.sin(ang)) * dist;
-        _drawSparkle(canvas, pos, cell * 0.07 * (0.5 + life),
-            gold.withValues(alpha: 0.9 * life));
-      }
-    }
-  }
-
-  void _drawSparkle(Canvas canvas, Offset center, double r, Color color) {
-    final path = Path();
-    for (var i = 0; i < 8; i++) {
-      final ang = i * math.pi / 4;
-      final radius = i.isEven ? r : r * 0.4;
-      final pt = center + Offset(math.cos(ang), math.sin(ang)) * radius;
-      if (i == 0) {
-        path.moveTo(pt.dx, pt.dy);
-      } else {
-        path.lineTo(pt.dx, pt.dy);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, Paint()..color = color);
   }
 
   RRect _cellRRect(GridGeometry geo, Offset center) => RRect.fromRectAndRadius(
@@ -647,7 +566,6 @@ class GameGridPainter extends CustomPainter {
       old.glowTick != glowTick ||
       old.revision != revision ||
       old.level != level ||
-      old.winProgress != winProgress ||
       old.previewKey != previewKey ||
       old.previewTool != previewTool;
 }
