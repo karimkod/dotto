@@ -173,6 +173,7 @@ class GameGridPainter extends CustomPainter {
   GameGridPainter({
     required this.level,
     required this.placed,
+    required this.forced,
     required this.trail,
     required this.revision,
     required this.placeAnim,
@@ -188,6 +189,9 @@ class GameGridPainter extends CustomPainter {
 
   final LevelData level;
   final Map<int, PlacedElement> placed;
+
+  /// Immovable, level-defined arrows (drawn with a fixed "pinned" look).
+  final Map<int, PlacedElement> forced;
 
   /// Ordered list of visited cells (most recent last).
   final List<int> trail;
@@ -264,6 +268,11 @@ class GameGridPainter extends CustomPainter {
       _paintPiece(
           canvas, geo, f.key, f.tool, f.direction, shrinkScale(f.progress), 2.5);
     }
+
+    // Fixed (forced) arrows — a "pinned" look so they read as immovable.
+    forced.forEach((key, piece) {
+      _paintForced(canvas, geo, key, piece.direction!);
+    });
 
     if (previewKey != null && previewTool != null) {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
@@ -367,6 +376,23 @@ class GameGridPainter extends CustomPainter {
     );
     _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     canvas.restore();
+  }
+
+  /// A fixed arrow: light blue fill, dark "pinned" ink border, blue glyph.
+  void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
+    final r = key ~/ geo.n;
+    final c = key % geo.n;
+    final center = geo.center(r, c);
+    final rrect = _cellRRect(geo, center);
+    canvas.drawRRect(rrect, Paint()..color = _C.arrowFill);
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = AppColors.ink,
+    );
+    _drawGlyph(canvas, center, dir.glyph, _C.arrow, geo.cell * 0.42);
   }
 
   void _paintGlow(

@@ -39,6 +39,10 @@ class _GameScreenState extends State<GameScreen>
   LevelData? _level;
 
   final Map<int, PlacedElement> _placed = {};
+
+  /// Immovable, level-defined arrows (rendered + simulated, never interactive).
+  final Map<int, PlacedElement> _forced = {};
+
   Map<ToolType, int> _kit = {};
   ToolType? _selected;
 
@@ -132,6 +136,13 @@ class _GameScreenState extends State<GameScreen>
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
       for (final e in _level!.toolkit) {
         _toolKeys[e.type] = GlobalKey();
+      }
+      for (final a in _level!.forcedArrows) {
+        _forced[a.r * _level!.size + a.c] = PlacedElement(
+          type: PlacedType.arrow,
+          tool: a.dir.arrowTool,
+          direction: a.dir,
+        );
       }
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
@@ -268,11 +279,16 @@ class _GameScreenState extends State<GameScreen>
     return null;
   }
 
+  /// The piece occupying [key] — a player piece or a fixed (forced) arrow.
+  PlacedElement? _pieceAt(int key) => _placed[key] ?? _forced[key];
+
   bool _canPlace((int, int) cell, ToolType tool) {
     if (_status != GameStatus.planning) return false;
     final (r, c) = cell;
     if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
-    if (_placed.containsKey(_idx(r, c))) return false;
+    if (_placed.containsKey(_idx(r, c)) || _forced.containsKey(_idx(r, c))) {
+      return false;
+    }
     return (_kit[tool] ?? 0) > 0;
   }
 
@@ -286,7 +302,9 @@ class _GameScreenState extends State<GameScreen>
     if (_status != GameStatus.planning) return false;
     final (r, c) = cell;
     if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
-    if (_placed.containsKey(_idx(r, c))) return false;
+    if (_placed.containsKey(_idx(r, c)) || _forced.containsKey(_idx(r, c))) {
+      return false;
+    }
     // Toolkit drag needs stock; a picked-up piece is already in hand.
     if (_dragTool != null) return (_kit[_dragTool] ?? 0) > 0;
     return _dragPiece != null;
@@ -567,7 +585,7 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    final piece = _placed[newKey];
+    final piece = _pieceAt(newKey);
     if (piece != null) {
       switch (piece.type) {
         case PlacedType.arrow:
@@ -692,15 +710,18 @@ class _GameScreenState extends State<GameScreen>
                     const SizedBox(height: 12),
                     Expanded(child: Center(child: _buildBoard())),
                     const SizedBox(height: 16),
-                    GameToolbar(
-                      tools: _level!.toolkit.map((e) => e.type).toList(),
-                      counts: _kit,
-                      selected: _selected,
-                      enabled: _status != GameStatus.running,
-                      tileKeys: _toolKeys,
-                      draggingTool: _dragTool,
-                      onSelect: (t) => setState(() => _selected = t),
-                    ),
+                    if (_level!.toolkit.isEmpty)
+                      _buildEmptyKitHint()
+                    else
+                      GameToolbar(
+                        tools: _level!.toolkit.map((e) => e.type).toList(),
+                        counts: _kit,
+                        selected: _selected,
+                        enabled: _status != GameStatus.running,
+                        tileKeys: _toolKeys,
+                        draggingTool: _dragTool,
+                        onSelect: (t) => setState(() => _selected = t),
+                      ),
                     const SizedBox(height: 16),
                     _buildFooter(),
                   ],
@@ -790,6 +811,7 @@ class _GameScreenState extends State<GameScreen>
                         revision: _revision,
                         placeAnim: _placeAnim,
                         removing: _removing,
+                        forced: _forced,
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,
@@ -872,6 +894,31 @@ class _GameScreenState extends State<GameScreen>
       left: local.dx - size / 2,
       top: local.dy - size / 2,
       child: IgnorePointer(child: DragGhost(tool: tool, size: size)),
+    );
+  }
+
+  /// Shown instead of the toolbar on levels with no pieces to place.
+  Widget _buildEmptyKitHint() {
+    return SizedBox(
+      height: 64,
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text('👇', style: TextStyle(fontSize: 20)),
+            SizedBox(width: 8),
+            Text(
+              'Press Play!',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textSoft,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

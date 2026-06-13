@@ -29,6 +29,20 @@ extension DirectionX on Direction {
         return '←';
     }
   }
+
+  /// The arrow toolkit item that points this way.
+  ToolType get arrowTool {
+    switch (this) {
+      case Direction.up:
+        return ToolType.arrowUp;
+      case Direction.down:
+        return ToolType.arrowDown;
+      case Direction.left:
+        return ToolType.arrowLeft;
+      case Direction.right:
+        return ToolType.arrowRight;
+    }
+  }
 }
 
 /// Base, level-defined contents of a cell (everything the player can't move).

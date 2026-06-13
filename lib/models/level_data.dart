@@ -22,6 +22,15 @@ class ToolkitEntry {
   final int count;
 }
 
+/// A pre-placed arrow fixed to the board — it redirects the dot like a placed
+/// arrow but cannot be moved or removed.
+class ForcedArrow {
+  const ForcedArrow(this.r, this.c, this.dir);
+  final int r;
+  final int c;
+  final Direction dir;
+}
+
 /// Static definition of a single level.
 class LevelData {
   const LevelData({
@@ -35,6 +44,7 @@ class LevelData {
     this.walls = const [],
     this.destroyers = const [],
     this.gaps = const [],
+    this.forcedArrows = const [],
   });
 
   final int id;
@@ -47,6 +57,15 @@ class LevelData {
   final List<Pos> walls;
   final List<Pos> destroyers;
   final List<Pos> gaps;
+  final List<ForcedArrow> forcedArrows;
+
+  /// The fixed arrow at (r, c), or null if none.
+  Direction? forcedArrowAt(int r, int c) {
+    for (final a in forcedArrows) {
+      if (a.r == r && a.c == c) return a.dir;
+    }
+    return null;
+  }
 
   /// The level-defined contents of cell (r, c), ignoring placed pieces.
   CellType baseTypeAt(int r, int c) {
