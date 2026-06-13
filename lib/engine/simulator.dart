@@ -76,3 +76,54 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
 
   return SimOutcome.lose; // ran out of ticks (loop) → not a solution
 }
+
+/// Runs the level and returns the set of cell keys the dot visits if it wins,
+/// or null if it loses. Used to verify forced arrows lie on the path.
+Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
+  final n = level.size;
+  final forced = <int, PlacedElement>{};
+  for (final a in level.forcedArrows) {
+    forced[a.r * n + a.c] = PlacedElement(
+      type: PlacedType.arrow,
+      tool: a.dir.arrowTool,
+      direction: a.dir,
+    );
+  }
+  PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
+
+  var r = level.start.r;
+  var c = level.start.c;
+  var dir = level.start.dir;
+  var pause = 0;
+  final visited = <int>{r * n + c};
+  final maxTicks = n * n * 4 + 20;
+
+  for (var t = 0; t < maxTicks; t++) {
+    if (pause > 0) {
+      pause--;
+      continue;
+    }
+    final (dr, dc) = dir.delta;
+    final nr = r + dr;
+    final nc = c + dc;
+    if (nr < 0 || nr >= n || nc < 0 || nc >= n) return null;
+    if (level.baseTypeAt(nr, nc) == CellType.wall) return null;
+    r = nr;
+    c = nc;
+    final base = level.baseTypeAt(r, c);
+    if (base == CellType.gap ||
+        base == CellType.destroyer ||
+        base == CellType.movingDestroyer) {
+      return null;
+    }
+    visited.add(r * n + c);
+    final piece = pieceAt(r * n + c);
+    if (piece != null && piece.type == PlacedType.arrow) {
+      dir = piece.direction!;
+    } else if (piece != null && piece.type == PlacedType.pause) {
+      pause = 2;
+    }
+    if (level.baseTypeAt(r, c) == CellType.exit) return visited;
+  }
+  return null;
+}

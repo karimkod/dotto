@@ -33,7 +33,7 @@ void main() {
     5: [(3, 1, Direction.up), (0, 1, Direction.right)],
     6: [(4, 1, Direction.up), (1, 1, Direction.right), (1, 4, Direction.up)],
     7: [(0, 3, Direction.down)],
-    8: [(4, 1, Direction.up), (0, 1, Direction.right)],
+    8: [(0, 4, Direction.left), (0, 0, Direction.down)],
     9: [(4, 1, Direction.up), (1, 1, Direction.right), (1, 4, Direction.up)],
     10: [(5, 1, Direction.up), (2, 1, Direction.right), (2, 5, Direction.up)],
   };
@@ -52,4 +52,25 @@ void main() {
       expect(simulate(level, place(level, intended[n]!)), SimOutcome.win);
     });
   }
+
+  // Levels 8 and 10 were redesigned so no piece is wasted: every solution must
+  // use the whole toolkit.
+  for (final n in [8, 10]) {
+    test('World 1 — level $n requires every toolkit piece', () {
+      final level = levelDataFor(n)!;
+      expect(minSolutionPieces(level), toolkitTotal(level),
+          reason: 'level $n should have no solution that leaves a piece unused');
+    });
+  }
+
+  // Forced arrows must lie on the winning path, not be decoys.
+  test('World 1 — level 8 forced arrow is on the solution path', () {
+    final level = levelDataFor(8)!;
+    final visited = tracePath(level, place(level, intended[8]!));
+    expect(visited, isNotNull);
+    for (final a in level.forcedArrows) {
+      expect(visited!.contains(a.r * level.size + a.c), isTrue,
+          reason: 'the dot must pass through the forced arrow');
+    }
+  });
 }

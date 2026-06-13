@@ -94,19 +94,20 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.arrowDown, 1)],
   ),
 
-  // 8 — wall + a decoy forced arrow.
+  // 8 — the forced arrow is on the only path: the dot must ride it up, then
+  // the player steers it left and down to the goal.
   8: LevelData(
     id: 8,
     size: 5,
     title: 'Detour',
-    tip: 'Turn early to dodge the wall — the fixed arrow is a trap.',
+    tip: 'The fixed arrow sends the dot up. Use it, then guide it down to the goal.',
     start: StartSpec(4, 0, Direction.right),
-    exit: Pos(0, 4),
-    walls: [Pos(4, 2)],
+    exit: Pos(2, 0),
+    walls: [Pos(2, 2)],
     forcedArrows: [ForcedArrow(4, 4, Direction.up)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
@@ -136,7 +137,7 @@ const Map<int, LevelData> levelDefinitions = {
     walls: [Pos(5, 2), Pos(0, 4)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 };

@@ -56,3 +56,15 @@ List<Map<int, PlacedElement>> solveAll(LevelData level) {
 
 /// True if at least one placement of the toolkit solves the level.
 bool isSolvable(LevelData level) => solveAll(level).isNotEmpty;
+
+/// Total number of pieces in the toolkit.
+int toolkitTotal(LevelData level) =>
+    level.toolkit.fold(0, (sum, e) => sum + e.count);
+
+/// Fewest pieces used by any solution (-1 if unsolvable). When this equals
+/// [toolkitTotal], every solution uses all pieces.
+int minSolutionPieces(LevelData level) {
+  final sols = solveAll(level);
+  if (sols.isEmpty) return -1;
+  return sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
+}
