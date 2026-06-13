@@ -183,6 +183,7 @@ class GameGridPainter extends CustomPainter {
     required this.cellPulse,
     required this.glowTick,
     required this.showStartHint,
+    required this.winProgress,
     this.previewKey,
     this.previewTool,
   });
@@ -218,6 +219,9 @@ class GameGridPainter extends CustomPainter {
   /// Whether to draw the pulsing start-direction indicator (planning phase).
   final bool showStartHint;
 
+  /// 0 = none; 0→1 drives the win ripple wave spreading out from the exit.
+  final double winProgress;
+
   final int? previewKey;
   final ToolType? previewTool;
 
@@ -248,6 +252,8 @@ class GameGridPainter extends CustomPainter {
 
     _paintTrail(canvas, geo);
 
+    if (winProgress > 0) _paintWinWave(canvas, geo, winProgress);
+
     if (showStartHint) _paintStartHint(canvas, geo);
 
     // Cell glow highlights (dot entry, arrow flash, placement ripple).
@@ -276,6 +282,41 @@ class GameGridPainter extends CustomPainter {
 
     if (previewKey != null && previewTool != null) {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
+    }
+  }
+
+  /// A gold ripple that expands outward from the exit cell, lighting cells as
+  /// the wave front passes over them. The grid itself stays put.
+  void _paintWinWave(Canvas canvas, GridGeometry geo, double p) {
+    const gold = AppColors.star;
+    final n = geo.n;
+    final ex = level.exit.c.toDouble();
+    final ey = level.exit.r.toDouble();
+    final maxD = n * 1.5;
+    const width = 1.4; // wave-front thickness, in cells
+    // The wave finishes spreading by ~55% of the celebration.
+    final waveR = (p / 0.55).clamp(0.0, 1.0) * (maxD + 1.0);
+
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        final d = math.sqrt(
+            (c - ex) * (c - ex) + (r - ey) * (r - ey));
+        final delta = waveR - d;
+        if (delta < 0 || delta > width) continue;
+        final intensity = math.sin(math.pi * (delta / width));
+        if (intensity <= 0) continue;
+        final rrect = _cellRRect(geo, geo.center(r, c));
+        canvas.drawRRect(
+            rrect, Paint()..color = gold.withValues(alpha: 0.32 * intensity));
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5 + 2 * intensity
+            ..color = gold.withValues(alpha: 0.8 * intensity)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 + 3 * intensity),
+        );
+      }
     }
   }
 
@@ -566,6 +607,7 @@ class GameGridPainter extends CustomPainter {
       old.glowTick != glowTick ||
       old.revision != revision ||
       old.level != level ||
+      old.winProgress != winProgress ||
       old.previewKey != previewKey ||
       old.previewTool != previewTool;
 }

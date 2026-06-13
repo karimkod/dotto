@@ -876,7 +876,7 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 RepaintBoundary(
                   child: AnimatedBuilder(
-                    animation: _glowCtrl,
+                    animation: Listenable.merge([_glowCtrl, _winCtrl]),
                     builder: (_, _) => CustomPaint(
                       size: Size.square(side),
                       painter: GameGridPainter(
@@ -892,6 +892,8 @@ class _GameScreenState extends State<GameScreen>
                         cellPulse: _cellPulse,
                         glowTick: _glowCtrl.value,
                         showStartHint: _status == GameStatus.planning,
+                        winProgress:
+                            _status == GameStatus.won ? _winCtrl.value : 0.0,
                         previewKey: previewKey,
                         previewTool: _hoverTool,
                       ),
@@ -936,7 +938,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// The Expanded play region: the interactive board, or — after a win — the
-  /// board fading/sliding away beneath the full celebration screen.
+  /// rippling board with a translucent celebration overlay fading in on top.
   Widget _buildPlayArea() {
     if (_status != GameStatus.won) {
       return Center(child: _buildBoard());
@@ -944,63 +946,44 @@ class _GameScreenState extends State<GameScreen>
     return AnimatedBuilder(
       animation: _winCtrl,
       builder: (_, _) {
-        final v = _winCtrl.value;
-        // Phase 1 (0–0.23): hold. Phase 2 (0.23–0.45): grid fades + slides.
-        final fadeT = ((v - 0.23) / 0.22).clamp(0.0, 1.0);
-        final gridOpacity = 1 - fadeT;
-        final slide = Curves.easeIn.transform(fadeT) * 28;
-        final bgFade = ((v - 0.27) / 0.28).clamp(0.0, 1.0);
         return Stack(
           fit: StackFit.expand,
           children: [
-            if (gridOpacity > 0.01)
-              Center(
-                child: Opacity(
-                  opacity: gridOpacity,
-                  child: Transform.translate(
-                    offset: Offset(0, slide),
-                    child: _buildBoard(),
-                  ),
-                ),
-              ),
-            if (bgFade > 0)
-              Opacity(opacity: bgFade, child: _buildCelebration(v)),
+            // Grid stays visible and ripples (painter winProgress).
+            Center(child: _buildBoard()),
+            Positioned.fill(
+              child: IgnorePointer(child: _buildCelebrationOverlay(_winCtrl.value)),
+            ),
           ],
         );
       },
     );
   }
 
-  /// The full celebration screen: gentle floating-bubble background, a bouncy
-  /// congratulatory message, the level number, and a star badge.
-  Widget _buildCelebration(double v) {
+  /// Translucent cream overlay (~72%) over the still-visible grid, with the
+  /// bouncy congratulatory message, a star badge and the level number.
+  Widget _buildCelebrationOverlay(double v) {
+    // The overlay starts fading in after the grid ripple has begun (~0.5s).
+    final overlayFade = ((v - 0.23) / 0.22).clamp(0.0, 1.0);
+    final iconT = ((v - 0.30) / 0.32).clamp(0.0, 1.0);
+    final iconScale = iconT == 0 ? 0.0 : Curves.easeOutBack.transform(iconT);
     final msgT = ((v - 0.36) / 0.34).clamp(0.0, 1.0);
     final msgScale = msgT == 0 ? 0.0 : Curves.elasticOut.transform(msgT);
     final msgOpacity = (msgT / 0.25).clamp(0.0, 1.0);
-    final iconT = ((v - 0.30) / 0.32).clamp(0.0, 1.0);
-    final iconScale = iconT == 0 ? 0.0 : Curves.easeOutBack.transform(iconT);
     final subT = ((v - 0.50) / 0.30).clamp(0.0, 1.0);
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Gentle floating pastel bubbles (keep animating after _winCtrl ends).
-        RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _glowCtrl,
-            builder: (_, _) => CustomPaint(
-              painter: _BubblesPainter(_glowCtrl.value),
-            ),
-          ),
+        // Cream wash — grid still faintly visible behind it.
+        ColoredBox(
+          color: AppColors.background.withValues(alpha: 0.72 * overlayFade),
         ),
         Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Transform.scale(
-                scale: iconScale,
-                child: const _StarBadge(),
-              ),
+              Transform.scale(scale: iconScale, child: const _StarBadge()),
               const SizedBox(height: 26),
               Transform.scale(
                 scale: msgScale,
@@ -1139,51 +1122,18 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Post-celebration controls: a prominent Continue (or Back to Menu on the
-  /// last level) with small Replay / Menu text buttons beneath.
+  /// Post-celebration control: a single Continue (or Back to Menu on the last
+  /// level). One clean action — no Replay / Menu.
   Widget _buildContinueCluster() {
     final hasNext = levelDataFor(_level!.id + 1) != null;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: _PillButton(
-            label: hasNext ? 'Continue' : 'Back to Menu',
-            icon: hasNext ? Icons.play_arrow_rounded : null,
-            filled: true,
-            large: true,
-            onTap: hasNext ? _goToNextLevel : _goToMenu,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _smallTextButton('🔄  Replay', _retry),
-            if (hasNext) ...[
-              const SizedBox(width: 12),
-              _smallTextButton('🏠  Menu', _goToMenu),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _smallTextButton(String label, VoidCallback onTap) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.textSoft,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+    return SizedBox(
+      width: double.infinity,
+      child: _PillButton(
+        label: hasNext ? 'Continue' : 'Back to Menu',
+        icon: hasNext ? Icons.play_arrow_rounded : null,
+        filled: true,
+        large: true,
+        onTap: hasNext ? _goToNextLevel : _goToMenu,
       ),
     );
   }
@@ -1415,52 +1365,6 @@ class _StarBadge extends StatelessWidget {
       child: const Icon(Icons.star_rounded, color: AppColors.star, size: 50),
     );
   }
-}
-
-/// Gentle floating pastel bubbles behind the win message. [t] is the repeating
-/// glow value (0..1); motion uses sine so it loops seamlessly.
-class _BubblesPainter extends CustomPainter {
-  _BubblesPainter(this.t);
-
-  final double t;
-
-  static const _pastels = [
-    Color(0xFFFFC9B3), // peach
-    Color(0xFFFFE3A8), // light gold
-    Color(0xFFBFE3C2), // mint
-    Color(0xFFBBD9F2), // sky
-    Color(0xFFE6C9F0), // lilac
-  ];
-
-  double _frac(double x) => x - x.floorToDouble();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const n = 16;
-    final s = size.shortestSide;
-    for (var i = 0; i < n; i++) {
-      final baseX = _frac(i * 0.6180339887) * size.width;
-      final baseY = _frac(i * 0.7548776662) * size.height;
-      final r = s * (0.03 + 0.05 * _frac(i * 0.3137));
-      final phase = i * 0.41;
-      final bob = math.sin(2 * math.pi * t + phase) * (s * 0.045);
-      final sway = math.cos(2 * math.pi * t + phase * 1.3) * (s * 0.03);
-      final c = _pastels[i % _pastels.length];
-      final center = Offset(baseX + sway, baseY + bob);
-      canvas.drawCircle(center, r, Paint()..color = c.withValues(alpha: 0.32));
-      canvas.drawCircle(
-        center,
-        r,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = c.withValues(alpha: 0.55),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BubblesPainter old) => old.t != t;
 }
 
 /// Faint background grid, matching the menu screen.
