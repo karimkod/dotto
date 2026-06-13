@@ -167,9 +167,15 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
-  testWidgets('Level 2 fails when no arrow is placed', (tester) async {
+  testWidgets('Level 2 fails when the arrow is placed wrong', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    // Place the arrow off the dot's path so it never turns and runs off-edge.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(1, 1));
 
     await tester.tap(find.text('Play'));
     await tester.pump();
@@ -177,8 +183,28 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    // Dot runs straight off the right edge.
     expect(find.text('Try Again'), findsOneWidget);
+  });
+
+  testWidgets('Play is disabled until every piece is placed', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+
+    // Hint shown; tapping Play does nothing (still planning, no overlay).
+    expect(find.textContaining('Place all elements'), findsOneWidget);
+    await tester.tap(find.text('Play'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    expect(find.text('Try Again'), findsNothing);
+    expect(find.text('Continue'), findsNothing);
+
+    // Place the arrow → the hint disappears (Play is now enabled).
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(2, 2));
+    expect(find.textContaining('Place all elements'), findsNothing);
   });
 
   testWidgets('Next Level button loads the next level', (tester) async {

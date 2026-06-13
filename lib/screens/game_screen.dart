@@ -190,6 +190,9 @@ class _GameScreenState extends State<GameScreen>
 
   int get _revision => _placed.length * 10000 + _trail.length;
 
+  /// Number of toolkit pieces not yet placed (0 once the kit is fully used).
+  int get _remainingPieces => _kit.values.fold(0, (sum, c) => sum + c);
+
   /// Advance per-frame visual effects (called on every [_glowCtrl] tick).
   void _onFxTick() {
     const dt = 1 / 60;
@@ -1156,14 +1159,34 @@ class _GameScreenState extends State<GameScreen>
     }
 
     final running = _status == GameStatus.running;
-    return SizedBox(
-      width: double.infinity,
-      child: _PillButton(
-        label: 'Play',
-        icon: Icons.play_arrow_rounded,
-        filled: true,
-        onTap: running ? null : _play,
-      ),
+    // Every piece must be placed before Play is enabled (no effect on the
+    // no-toolkit Level 1, whose kit is already empty).
+    final remaining = _remainingPieces;
+    final canPlay = remaining == 0;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: _PillButton(
+            label: 'Play',
+            icon: Icons.play_arrow_rounded,
+            filled: true,
+            onTap: (running || !canPlay) ? null : _play,
+          ),
+        ),
+        if (!running && !canPlay) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Place all elements ($remaining left)',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSoft,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
