@@ -1166,6 +1166,17 @@ class _GameScreenState extends State<GameScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (!running && !canPlay) ...[
+          Text(
+            'Place all elements ($remaining left)',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSoft,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         SizedBox(
           width: double.infinity,
           child: _PillButton(
@@ -1175,17 +1186,6 @@ class _GameScreenState extends State<GameScreen>
             onTap: (running || !canPlay) ? null : _play,
           ),
         ),
-        if (!running && !canPlay) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Place all elements ($remaining left)',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSoft,
-            ),
-          ),
-        ],
       ],
     );
   }
