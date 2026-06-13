@@ -152,7 +152,8 @@ void main() {
   Future<void> runToWin(WidgetTester tester) async {
     await tester.tap(find.text('Play'));
     await tester.pump();
-    for (var i = 0; i < 14; i++) {
+    // Enough ticks for the longest World 1 path plus the ~1.8s celebration.
+    for (var i = 0; i < 24; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
   }
@@ -167,10 +168,11 @@ void main() {
     await tester.pump();
     await runToWin(tester);
 
+    // Celebration banner on the grid + the Continue button (after celebration).
     expect(find.text('Level Complete!'), findsOneWidget);
-    expect(find.text('Next Level'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
 
-    await tester.tap(find.text('Next Level'));
+    await tester.tap(find.text('Continue'));
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -203,7 +205,8 @@ void main() {
     await runToWin(tester);
 
     expect(find.text('World Complete!'), findsOneWidget);
-    expect(find.text('Next Level'), findsNothing);
+    expect(find.text('Continue'), findsNothing);
+    expect(find.text('Back to Menu'), findsOneWidget);
   });
 
   testWidgets('Level 1 has no toolkit and just needs Play', (tester) async {

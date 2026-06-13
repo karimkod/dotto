@@ -69,6 +69,10 @@ class _GameScreenState extends State<GameScreen>
   final Map<int, Color> _cellGlowColor = {};
   final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
 
+  // On-grid win celebration (golden fuse, bloom, sparkles, "Level Complete").
+  late final AnimationController _winCtrl;
+  bool _celebrationDone = false;
+
   // "Magnet snap": the dropped ghost flies into the target cell, then pops in.
   late final AnimationController _snapCtrl;
   ToolType? _snapTool; // tool to place when the snap finishes
@@ -133,6 +137,15 @@ class _GameScreenState extends State<GameScreen>
     _snapCtrl.addStatusListener((s) {
       if (s == AnimationStatus.completed) _finishSnap();
     });
+    _winCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    _winCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed && mounted) {
+        setState(() => _celebrationDone = true);
+      }
+    });
     _level = levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
@@ -157,6 +170,7 @@ class _GameScreenState extends State<GameScreen>
     _dotCtrl.dispose();
     _glowCtrl.dispose();
     _snapCtrl.dispose();
+    _winCtrl.dispose();
     super.dispose();
   }
 
@@ -239,6 +253,8 @@ class _GameScreenState extends State<GameScreen>
     _cellGlowColor.clear();
     _cellPulse.clear();
     _removing.clear();
+    _winCtrl.value = 0;
+    _celebrationDone = false;
     _animFrom = (s.r, s.c);
     _animTo = (s.r, s.c);
     _dotCtrl.value = 1;
@@ -637,10 +653,14 @@ class _GameScreenState extends State<GameScreen>
     Sfx.exit();
     // Record completion → unlocks the next level.
     ProgressStore.markCompleted(_level!.id);
-    Future.delayed(const Duration(milliseconds: 280), () {
-      if (!mounted) return;
-      Sfx.levelComplete();
-      setState(() => _status = GameStatus.won);
+    // Celebrate on the grid (no modal); the Continue button appears after.
+    setState(() {
+      _status = GameStatus.won;
+      _celebrationDone = false;
+    });
+    _winCtrl.forward(from: 0);
+    Future.delayed(const Duration(milliseconds: 220), () {
+      if (mounted) Sfx.levelComplete();
     });
   }
 
@@ -734,7 +754,10 @@ class _GameScreenState extends State<GameScreen>
                     const SizedBox(height: 12),
                     Expanded(child: Center(child: _buildBoard())),
                     const SizedBox(height: 16),
-                    if (_level!.toolkit.isEmpty)
+                    // Hide the toolkit during the win celebration.
+                    if (_status == GameStatus.won)
+                      const SizedBox(height: 64)
+                    else if (_level!.toolkit.isEmpty)
                       _buildEmptyKitHint()
                     else
                       GameToolbar(
@@ -752,8 +775,8 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
             ),
-            if (_status == GameStatus.won || _status == GameStatus.lost)
-              _buildOverlay(),
+            // Fail still uses a small overlay; win celebrates on the grid.
+            if (_status == GameStatus.lost) _buildOverlay(),
             // Drag/snap ghost (rebuilds during the snap flight via _snapCtrl).
             AnimatedBuilder(
               animation: _snapCtrl,
@@ -840,7 +863,7 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 RepaintBoundary(
                   child: AnimatedBuilder(
-                    animation: _glowCtrl,
+                    animation: Listenable.merge([_glowCtrl, _winCtrl]),
                     builder: (_, _) => CustomPaint(
                       size: Size.square(side),
                       painter: GameGridPainter(
@@ -856,6 +879,8 @@ class _GameScreenState extends State<GameScreen>
                         cellPulse: _cellPulse,
                         glowTick: _glowCtrl.value,
                         showStartHint: _status == GameStatus.planning,
+                        winProgress:
+                            _status == GameStatus.won ? _winCtrl.value : 0.0,
                         previewKey: previewKey,
                         previewTool: _hoverTool,
                       ),
@@ -891,7 +916,58 @@ class _GameScreenState extends State<GameScreen>
                     },
                   ),
                 ),
+                if (_status == GameStatus.won)
+                  Positioned.fill(child: _buildCelebrationText()),
               ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// The big "Level Complete!" banner that fades in over the grid (no modal).
+  Widget _buildCelebrationText() {
+    final hasNext = levelDataFor(_level!.id + 1) != null;
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _winCtrl,
+        builder: (_, _) {
+          final fade = ((_winCtrl.value - 0.30) / 0.40).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: fade,
+            child: Align(
+              alignment: const Alignment(0, -0.32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🎉', style: TextStyle(fontSize: 40)),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasNext ? 'Level Complete!' : 'World Complete!',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                      shadows: [
+                        Shadow(color: Colors.white, blurRadius: 8),
+                        Shadow(color: Colors.white, blurRadius: 16),
+                      ],
+                    ),
+                  ),
+                  if (hasNext)
+                    Text(
+                      'Level ${_level!.id}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSoft,
+                        shadows: [Shadow(color: Colors.white, blurRadius: 8)],
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },
@@ -961,7 +1037,15 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  void _goToMenu() => Navigator.of(context).pop(true);
+
   Widget _buildFooter() {
+    if (_status == GameStatus.won) {
+      // During the celebration, keep the spot empty; reveal Continue after.
+      if (!_celebrationDone) return const SizedBox(height: 54);
+      return _buildContinueCluster();
+    }
+
     final running = _status == GameStatus.running;
     return Row(
       children: [
@@ -983,9 +1067,57 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _buildOverlay() {
-    final won = _status == GameStatus.won;
+  /// Post-celebration controls: a prominent Continue (or Back to Menu on the
+  /// last level) with small Replay / Menu text buttons beneath.
+  Widget _buildContinueCluster() {
     final hasNext = levelDataFor(_level!.id + 1) != null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: _PillButton(
+            label: hasNext ? 'Continue' : 'Back to Menu',
+            icon: hasNext ? Icons.play_arrow_rounded : null,
+            filled: true,
+            large: true,
+            onTap: hasNext ? _goToNextLevel : _goToMenu,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _smallTextButton('🔄  Replay', _retry),
+            if (hasNext) ...[
+              const SizedBox(width: 12),
+              _smallTextButton('🏠  Menu', _goToMenu),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _smallTextButton(String label, VoidCallback onTap) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.textSoft,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  /// Fail-only overlay ("Try Again"). Wins celebrate on the grid instead.
+  Widget _buildOverlay() {
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: 0.32),
@@ -1001,11 +1133,11 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(won ? '🎉' : '💥', style: const TextStyle(fontSize: 48)),
+              const Text('💥', style: TextStyle(fontSize: 48)),
               const SizedBox(height: 8),
-              Text(
-                won ? (hasNext ? 'Level Complete!' : 'World Complete!') : 'Try Again',
-                style: const TextStyle(
+              const Text(
+                'Try Again',
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: AppColors.ink,
@@ -1013,11 +1145,7 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(height: 6),
               Text(
-                won
-                    ? (hasNext
-                        ? '${_level!.title} solved.'
-                        : 'You finished World 1. More soon!')
-                    : (_failReason ?? ''),
+                _failReason ?? '',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -1026,42 +1154,18 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              if (won) ...[
-                if (hasNext) ...[
-                  _PillButton(
-                    label: 'Next Level',
-                    icon: Icons.play_arrow_rounded,
-                    filled: true,
-                    large: true,
-                    onTap: _goToNextLevel,
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                _PillButton(
-                  label: '🔄  Replay',
-                  filled: false,
-                  onTap: _retry,
-                ),
-                const SizedBox(height: 10),
-                _PillButton(
-                  label: '🏠  Menu',
-                  filled: false,
-                  onTap: () => Navigator.of(context).pop(true),
-                ),
-              ] else ...[
-                _PillButton(
-                  label: 'Retry',
-                  icon: Icons.refresh_rounded,
-                  filled: true,
-                  onTap: _retry,
-                ),
-                const SizedBox(height: 10),
-                _PillButton(
-                  label: 'Clear & Edit',
-                  filled: false,
-                  onTap: _clearAll,
-                ),
-              ],
+              _PillButton(
+                label: 'Retry',
+                icon: Icons.refresh_rounded,
+                filled: true,
+                onTap: _retry,
+              ),
+              const SizedBox(height: 10),
+              _PillButton(
+                label: 'Clear & Edit',
+                filled: false,
+                onTap: _clearAll,
+              ),
             ],
           ),
         ),
