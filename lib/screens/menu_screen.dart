@@ -72,9 +72,14 @@ class _MenuScreenState extends State<MenuScreen> {
 
   void _openLevel(Level level) {
     if (level.isLocked) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GameScreen(level: level)),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => GameScreen(level: level)))
+        .then((_) {
+      // Reflect any newly-unlocked levels on return.
+      if (!mounted) return;
+      setState(() => _levels = buildInitialLevels());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+    });
   }
 
   @override

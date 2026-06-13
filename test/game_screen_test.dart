@@ -149,6 +149,63 @@ void main() {
     expect(find.text('Try Again'), findsOneWidget);
   });
 
+  Future<void> runToWin(WidgetTester tester) async {
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    for (var i = 0; i < 14; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+  }
+
+  testWidgets('Next Level button loads the next level', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    await tester.tapAt(boardRect.topLeft + geo.center(2, 2));
+    await tester.pump();
+    await runToWin(tester);
+
+    expect(find.text('Level Complete!'), findsOneWidget);
+    expect(find.text('Next Level'), findsOneWidget);
+
+    await tester.tap(find.text('Next Level'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    // Now on level 3 (its header title).
+    expect(find.text('Level 3'), findsOneWidget);
+  });
+
+  testWidgets('last level shows World Complete and no Next Level',
+      (tester) async {
+    const level10 = Level(
+      id: 10,
+      number: 10,
+      title: 'Grand Tour',
+      difficulty: Difficulty.hard,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level10)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 6);
+    final up = tester.getCenter(find.text('UP'));
+    // Solution: Up (5,1), Up (2,5), Right (2,1).
+    await _dragArrow(tester, up, boardRect.topLeft + geo.center(5, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(2, 5));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')),
+        boardRect.topLeft + geo.center(2, 1));
+
+    await runToWin(tester);
+
+    expect(find.text('World Complete!'), findsOneWidget);
+    expect(find.text('Next Level'), findsNothing);
+  });
+
   testWidgets('Level 1 has no toolkit and just needs Play', (tester) async {
     const level1 = Level(
       id: 1,

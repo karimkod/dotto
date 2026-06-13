@@ -1,10 +1,14 @@
 import '../models/level.dart';
+import '../progress/progress_store.dart';
 
 /// Hardcoded menu level list. World 1 (levels 1–10) is built and playable; the
 /// rest are locked placeholders shown further up the path.
 ///
-/// Progress: level 1 completed, levels 2–10 unlocked, 11+ locked.
+/// Progression is gated: level 1 is the completed baseline, and completing a
+/// level unlocks the next one (persisted via [ProgressStore]).
 List<Level> buildInitialLevels() {
+  // Level 1 is always considered complete (the "press Play" intro).
+  final completed = {1, ...ProgressStore.completed()};
   // Titles for World 1 match lib/data/level_definitions.dart.
   const world1Titles = <String>[
     'First Steps', // 1
@@ -26,8 +30,11 @@ List<Level> buildInitialLevels() {
   }
 
   LevelStatus statusFor(int number) {
-    if (number == 1) return LevelStatus.completed;
-    if (number <= 10) return LevelStatus.unlocked;
+    if (completed.contains(number)) return LevelStatus.completed;
+    // Unlocked if it's the first level or the previous one is completed.
+    if (number == 1 || completed.contains(number - 1)) {
+      return LevelStatus.unlocked;
+    }
     return LevelStatus.locked;
   }
 

@@ -11,6 +11,7 @@ import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
 import '../models/level_data.dart';
+import '../progress/progress_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feedback_dialog.dart';
 import '../widgets/game_grid.dart';
@@ -634,11 +635,33 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _timer = null;
     Sfx.exit();
+    // Record completion → unlocks the next level.
+    ProgressStore.markCompleted(_level!.id);
     Future.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
       Sfx.levelComplete();
       setState(() => _status = GameStatus.won);
     });
+  }
+
+  /// Load the next level in place (no trip back to the menu).
+  void _goToNextLevel() {
+    final next = _level!.id + 1;
+    final data = levelDataFor(next);
+    if (data == null) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => GameScreen(
+          level: Level(
+            id: next,
+            number: next,
+            title: data.title,
+            difficulty: Difficulty.easy,
+            status: LevelStatus.unlocked,
+          ),
+        ),
+      ),
+    );
   }
 
   void _die(String msg) {
@@ -962,6 +985,7 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _buildOverlay() {
     final won = _status == GameStatus.won;
+    final hasNext = levelDataFor(_level!.id + 1) != null;
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: 0.32),
@@ -980,7 +1004,7 @@ class _GameScreenState extends State<GameScreen>
               Text(won ? '🎉' : '💥', style: const TextStyle(fontSize: 48)),
               const SizedBox(height: 8),
               Text(
-                won ? 'Level Complete!' : 'Try Again',
+                won ? (hasNext ? 'Level Complete!' : 'World Complete!') : 'Try Again',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -989,7 +1013,11 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(height: 6),
               Text(
-                won ? '${_level!.title} solved.' : (_failReason ?? ''),
+                won
+                    ? (hasNext
+                        ? '${_level!.title} solved.'
+                        : 'You finished World 1. More soon!')
+                    : (_failReason ?? ''),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -999,13 +1027,27 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(height: 20),
               if (won) ...[
+                if (hasNext) ...[
+                  _PillButton(
+                    label: 'Next Level',
+                    icon: Icons.play_arrow_rounded,
+                    filled: true,
+                    large: true,
+                    onTap: _goToNextLevel,
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 _PillButton(
-                  label: 'Back to Menu',
-                  filled: true,
-                  onTap: () => Navigator.of(context).pop(true),
+                  label: '🔄  Replay',
+                  filled: false,
+                  onTap: _retry,
                 ),
                 const SizedBox(height: 10),
-                _PillButton(label: 'Replay', filled: false, onTap: _retry),
+                _PillButton(
+                  label: '🏠  Menu',
+                  filled: false,
+                  onTap: () => Navigator.of(context).pop(true),
+                ),
               ] else ...[
                 _PillButton(
                   label: 'Retry',
@@ -1127,6 +1169,7 @@ class _PillButton extends StatelessWidget {
     required this.filled,
     this.icon,
     this.onTap,
+    this.large = false,
   });
 
   final String label;
@@ -1134,19 +1177,23 @@ class _PillButton extends StatelessWidget {
   final IconData? icon;
   final VoidCallback? onTap;
 
+  /// A bigger, more prominent variant (used for the primary "Next Level").
+  final bool large;
+
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
+    final height = large ? 60.0 : 54.0;
     return Opacity(
       opacity: disabled ? 0.45 : 1,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 54,
+          height: height,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(
             color: filled ? AppColors.coral : AppColors.card,
-            borderRadius: BorderRadius.circular(27),
+            borderRadius: BorderRadius.circular(height / 2),
             border: Border.all(color: AppColors.ink, width: 3),
           ),
           child: Row(
@@ -1155,7 +1202,7 @@ class _PillButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: large ? 19 : 17,
                   fontWeight: FontWeight.w800,
                   color: filled ? Colors.white : AppColors.ink,
                 ),
@@ -1163,7 +1210,8 @@ class _PillButton extends StatelessWidget {
               if (icon != null) ...[
                 const SizedBox(width: 6),
                 Icon(icon,
-                    color: filled ? Colors.white : AppColors.ink, size: 24),
+                    color: filled ? Colors.white : AppColors.ink,
+                    size: large ? 28 : 24),
               ],
             ],
           ),
