@@ -727,6 +727,59 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
+  /// Confirm before clearing the board.
+  void _confirmReset() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.ink, width: 3),
+        ),
+        title: const Text(
+          'Reset all pieces?',
+          style: TextStyle(
+              fontWeight: FontWeight.w800, color: AppColors.ink, fontSize: 18),
+        ),
+        content: const Text(
+          'This removes everything you placed on the board.',
+          style: TextStyle(color: AppColors.textSoft),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel',
+                style: TextStyle(
+                    color: AppColors.textSoft, fontWeight: FontWeight.w700)),
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(ctx).pop();
+              _clearAll();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.coral,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.ink, width: 2.5),
+              ),
+              child: const Text(
+                'Reset',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ----- UI -----
 
   @override
@@ -781,6 +834,7 @@ class _GameScreenState extends State<GameScreen>
                         tileKeys: _toolKeys,
                         draggingTool: _dragTool,
                         onSelect: (t) => setState(() => _selected = t),
+                        onReset: _confirmReset,
                       ),
                     const SizedBox(height: 16),
                     _buildFooter(),
@@ -1102,23 +1156,14 @@ class _GameScreenState extends State<GameScreen>
     }
 
     final running = _status == GameStatus.running;
-    return Row(
-      children: [
-        _PillButton(
-          label: 'Reset',
-          filled: false,
-          onTap: running ? null : _clearAll,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _PillButton(
-            label: 'Play',
-            icon: Icons.play_arrow_rounded,
-            filled: true,
-            onTap: running ? null : _play,
-          ),
-        ),
-      ],
+    return SizedBox(
+      width: double.infinity,
+      child: _PillButton(
+        label: 'Play',
+        icon: Icons.play_arrow_rounded,
+        filled: true,
+        onTap: running ? null : _play,
+      ),
     );
   }
 

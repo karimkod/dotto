@@ -135,6 +135,38 @@ void main() {
     expect(find.text('1'), findsOneWidget); // refunded
   });
 
+  testWidgets('Reset asks for confirmation before clearing', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(2, 2));
+    expect(find.text('0'), findsOneWidget); // arrow placed
+
+    Future<void> settle() async {
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    // Tap RESET → confirmation dialog; Cancel keeps the piece.
+    await tester.tap(find.text('RESET'));
+    await settle();
+    expect(find.text('Reset all pieces?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await settle();
+    expect(find.text('0'), findsOneWidget);
+
+    // Tap RESET → confirm Reset clears the board (arrow refunded → 1).
+    await tester.tap(find.text('RESET'));
+    await settle();
+    await tester.tap(find.text('Reset'));
+    await settle();
+    expect(find.text('1'), findsOneWidget);
+  });
+
   testWidgets('Level 2 fails when no arrow is placed', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();

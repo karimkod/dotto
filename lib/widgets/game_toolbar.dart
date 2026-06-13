@@ -19,6 +19,7 @@ class GameToolbar extends StatelessWidget {
     required this.enabled,
     required this.tileKeys,
     this.draggingTool,
+    this.onReset,
   });
 
   /// Distinct tools available in this level, in display order.
@@ -35,6 +36,9 @@ class GameToolbar extends StatelessWidget {
 
   /// The tool currently being dragged (its tile is dimmed), if any.
   final ToolType? draggingTool;
+
+  /// Shows a Reset tile at the end of the row when non-null.
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +57,57 @@ class GameToolbar extends StatelessWidget {
             dragging: draggingTool == t,
             onTap: () => onSelect(t),
           ),
+        if (onReset != null) _ResetTile(enabled: enabled, onTap: onReset!),
       ],
+    );
+  }
+}
+
+/// Reset tile — looks like a toolkit item but uses a muted red outline to read
+/// as a distinct action rather than a placeable element.
+class _ResetTile extends StatelessWidget {
+  const _ResetTile({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  static const _red = Color(0xFFCF6B61);
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: BouncyButton(
+        enabled: enabled,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        rippleColor: _red,
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _red, width: 3),
+          ),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.restart_alt_rounded, color: _red, size: 24),
+              SizedBox(height: 2),
+              Text(
+                'RESET',
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: _red,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
