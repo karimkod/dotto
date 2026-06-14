@@ -67,18 +67,22 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 6 — longer route. Start top-left heading down to the bottom-right exit.
+  // 6 — the dot starts in the MIDDLE of the board heading up, then loops all
+  // the way around to the far corner. A wall blocks the short way down the right
+  // side, so the long route round the outside is the only one. Three turns.
+  // Solution: Left(0,2), Down(0,0), Right(4,0).
   6: LevelData(
     id: 6,
     size: 5,
     title: 'The Long Way',
-    tip: 'Both walls are in the way. Take the long way round.',
-    start: StartSpec(0, 0, Direction.down),
+    tip: 'The dot starts dead centre. Send it the long way round to the goal.',
+    start: StartSpec(2, 2, Direction.up),
     exit: Pos(4, 4),
-    walls: [Pos(2, 0), Pos(3, 4)],
+    walls: [Pos(2, 4), Pos(3, 2)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 
@@ -112,18 +116,22 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 9 — two walls force a zig-zag. Start top-right heading down.
+  // 9 — the dot starts in the MIDDLE heading down, then wraps around the right
+  // and top edges to the opposite corner. A wall blocks the short hop up the
+  // left side, forcing the long way around. Three turns.
+  // Solution: Right(4,2), Up(4,4), Left(0,4).
   9: LevelData(
     id: 9,
     size: 5,
     title: 'Zig Zag',
-    tip: 'The edges are blocked. Weave between the walls.',
-    start: StartSpec(0, 4, Direction.down),
-    exit: Pos(4, 0),
-    walls: [Pos(2, 4), Pos(2, 0)],
+    tip: 'Another centre start — weave it around the edge to the far corner.',
+    start: StartSpec(2, 2, Direction.down),
+    exit: Pos(0, 0),
+    walls: [Pos(2, 0), Pos(1, 2)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
