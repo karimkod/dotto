@@ -146,25 +146,30 @@ const Map<int, LevelData> levelDefinitions = {
   // at higher difficulty. Each has a distinct layout/shape. Solver-verified
   // tight (every piece required) with the forced arrows on the path. -----
 
-  // 11 — OPEN board, only a few decoy walls. The dot runs along row 0; every
-  // wrong turn drops it off an edge, so only one winding route survives. Two
-  // fixed arrows turn the far corners; the three turns in between are yours.
-  // Solution: Down(0,5), Down(2,0), Up(4,5).
+  // 11 — a spiral that winds in toward a centre exit; two fixed arrows on the
+  // outer ring, three turns are yours.
   11: LevelData(
     id: 11,
     size: 6,
     title: 'Crossroads',
-    tip: 'Lots of room, but only one route reaches the goal. Find it.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(3, 5),
-    walls: [Pos(1, 2), Pos(3, 3), Pos(5, 3)],
+    tip: 'The path spirals inward — guide it to the centre.',
+    start: StartSpec(0, 5, Direction.down),
+    exit: Pos(3, 2),
+    walls: [
+      Pos(0, 0), Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4),
+      Pos(1, 4),
+      Pos(2, 1), Pos(2, 2), Pos(2, 4),
+      Pos(3, 1), Pos(3, 4),
+      Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4),
+    ],
     forcedArrows: [
-      ForcedArrow(2, 5, Direction.left),
-      ForcedArrow(4, 0, Direction.right),
+      ForcedArrow(5, 5, Direction.left),
+      ForcedArrow(5, 0, Direction.up),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 2),
-      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
