@@ -1,30 +1,50 @@
 // ignore_for_file: avoid_print
-// Quick solver check for World 1 exam levels — run with:
+// Solver check for World 1 levels — run with:
 //   dart run tool/check_levels.dart
-// Prints solvability, solution count, min pieces vs toolkit total, and a
-// sample solution per level.
+// Uses the fast path-based solver (scales to open grids) and prints
+// solvability, distinct-solution count, min pieces vs toolkit total, and a
+// sample solution per level. Pass `--brute` to also cross-check the slow
+// brute-force solver on the smaller levels.
 
 import 'package:dotto/data/level_definitions.dart';
 import 'package:dotto/engine/level_solver.dart';
 
-void main() {
-  for (var n = 11; n <= 15; n++) {
-    final lvl = levelDataFor(n)!;
-    final sols = solveAll(lvl);
+void main(List<String> args) {
+  final brute = args.contains('--brute');
+  final from = int.tryParse(
+        args.firstWhere((a) => int.tryParse(a) != null, orElse: () => ''),
+      ) ??
+      1;
+  for (var n = from; n <= 15; n++) {
+    final lvl = levelDataFor(n);
+    if (lvl == null) continue;
     final total = toolkitTotal(lvl);
-    final minP = minSolutionPieces(lvl);
+    final minP = pathMinPieces(lvl);
+    final sols = pathSolve(lvl);
     final tight = minP == total;
+    final unique = sols.length == 1;
     print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
-        'sols=${sols.length} min=$minP total=$total '
-        '${tight ? "TIGHT" : "*** LOOSE ***"}');
+        'sols=${sols.length}${sols.length >= 256 ? "+" : ""} '
+        'min=$minP total=$total '
+        '${tight ? "TIGHT" : "*** LOOSE ***"} '
+        '${unique ? "UNIQUE" : "(${sols.length} solutions)"}');
     if (sols.isNotEmpty) {
-      final s = sols.first;
+      // Show the SHORTEST solution — reveals the unintended shortcut on a
+      // loose level.
+      final s = (sols.toList()..sort((a, b) => a.length.compareTo(b.length)))
+          .first;
       final desc = (s.entries.toList()
             ..sort((a, b) => a.key.compareTo(b.key)))
           .map((e) =>
               '(${e.key ~/ lvl.size},${e.key % lvl.size},${e.value.direction!.name})')
           .join(' ');
       print('   sample: $desc');
+    }
+    if (brute && lvl.size <= 7) {
+      final bMin = minSolutionPieces(lvl);
+      if (bMin != minP) {
+        print('   *** PATH/BRUTE MISMATCH: brute min=$bMin path min=$minP ***');
+      }
     }
   }
 }

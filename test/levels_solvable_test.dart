@@ -36,23 +36,25 @@ void main() {
     8: [(0, 0, Direction.right), (0, 4, Direction.down)],
     9: [(1, 4, Direction.left), (1, 1, Direction.down), (4, 1, Direction.left)],
     10: [(2, 3, Direction.down), (4, 3, Direction.right), (4, 5, Direction.down)],
-    11: [(1, 0, Direction.right), (1, 3, Direction.down), (3, 3, Direction.left)],
+    11: [(0, 5, Direction.down), (2, 0, Direction.down), (4, 5, Direction.up)],
     12: [(0, 4, Direction.down), (6, 2, Direction.up), (6, 6, Direction.up)],
     13: [(0, 1, Direction.down), (2, 2, Direction.right), (4, 5, Direction.down)],
-    14: [(2, 6, Direction.left), (4, 0, Direction.right), (4, 6, Direction.up)],
+    14: [(2, 6, Direction.left), (4, 0, Direction.right), (6, 6, Direction.left)],
     15: [
-      (1, 7, Direction.left),
-      (2, 5, Direction.down),
-      (4, 4, Direction.left),
-      (5, 2, Direction.down),
-      (7, 1, Direction.left),
+      (0, 7, Direction.down),
+      (1, 0, Direction.down),
+      (3, 7, Direction.down),
+      (4, 0, Direction.down),
+      (6, 7, Direction.down),
     ],
   };
 
   for (var n = 1; n <= 15; n++) {
     test('World 1 — level $n is solvable', () {
       final level = levelDataFor(n)!;
-      final solutions = solveAll(level);
+      // Path-based solver — scales to the large open exam grids where the
+      // brute-force `solveAll` would be far too slow.
+      final solutions = pathSolve(level);
       debugPrint('Level $n "${level.title}": ${solutions.length} solution(s)');
       expect(solutions, isNotEmpty,
           reason: 'level $n should have at least one solution');
@@ -69,8 +71,18 @@ void main() {
   for (var n = 2; n <= 15; n++) {
     test('World 1 — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
-      expect(minSolutionPieces(level), toolkitTotal(level),
+      expect(pathMinPieces(level), toolkitTotal(level),
           reason: 'level $n should have no solution that leaves a piece unused');
+    });
+  }
+
+  // The exam levels (11–15) are designed to have a single solution, so the
+  // player must work out the one route rather than stumble onto an alternative.
+  for (final n in [11, 12, 13, 14, 15]) {
+    test('World 1 — exam level $n has a unique solution', () {
+      final level = levelDataFor(n)!;
+      expect(pathSolve(level).length, 1,
+          reason: 'exam level $n should have exactly one solution');
     });
   }
 

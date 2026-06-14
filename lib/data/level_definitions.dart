@@ -146,30 +146,25 @@ const Map<int, LevelData> levelDefinitions = {
   // at higher difficulty. Each has a distinct layout/shape. Solver-verified
   // tight (every piece required) with the forced arrows on the path. -----
 
-  // 11 — a spiral that winds in toward a centre exit; two fixed arrows on the
-  // outer ring, three turns are yours.
+  // 11 — OPEN board, only a few decoy walls. The dot runs along row 0; every
+  // wrong turn drops it off an edge, so only one winding route survives. Two
+  // fixed arrows turn the far corners; the three turns in between are yours.
+  // Solution: Down(0,5), Down(2,0), Up(4,5).
   11: LevelData(
     id: 11,
     size: 6,
     title: 'Crossroads',
-    tip: 'The path spirals inward — guide it to the centre.',
-    start: StartSpec(0, 5, Direction.down),
-    exit: Pos(3, 2),
-    walls: [
-      Pos(0, 0), Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4),
-      Pos(1, 4),
-      Pos(2, 1), Pos(2, 2), Pos(2, 4),
-      Pos(3, 1), Pos(3, 4),
-      Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4),
-    ],
+    tip: 'Lots of room, but only one route reaches the goal. Find it.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(3, 5),
+    walls: [Pos(1, 2), Pos(3, 3), Pos(5, 3)],
     forcedArrows: [
-      ForcedArrow(5, 5, Direction.left),
-      ForcedArrow(5, 0, Direction.up),
+      ForcedArrow(2, 5, Direction.left),
+      ForcedArrow(4, 0, Direction.right),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowUp, 1),
     ],
   ),
 
@@ -232,63 +227,53 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 14 — start bottom-right; the fixed arrows send the dot the "wrong" way and
-  // you steer it back across three rows to the far corner.
+  // 14 — OPEN board with a few obstacle islands. Three fixed arrows are the
+  // only way DOWN the board, and your toolkit has no Down arrow — so you can
+  // only steer left/right onto each fixed descent. Two walls stop the dot from
+  // simply falling straight down to the exit, which pins the whole route.
+  // Solution: Left(2,6), Right(4,0), Left(6,6).
   14: LevelData(
     id: 14,
     size: 7,
     title: 'Tight Squeeze',
-    tip: 'The fixed arrows fight you. Steer around them to the corner.',
-    start: StartSpec(6, 6, Direction.left),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
-      Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6),
-    ],
+    tip: 'You have no way down — ride the fixed arrows and steer between them.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(6, 0),
+    walls: [Pos(3, 6), Pos(5, 0), Pos(3, 3), Pos(5, 4)],
     forcedArrows: [
-      ForcedArrow(6, 0, Direction.up),
-      ForcedArrow(2, 0, Direction.up),
+      ForcedArrow(0, 6, Direction.down),
+      ForcedArrow(2, 0, Direction.down),
+      ForcedArrow(4, 6, Direction.down),
     ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 2),
       ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
-  // 15 — the ultimate exam: a big 8x8 descending staircase, a dense network of
-  // fixed arrows, and five of yours to thread between them.
+  // 15 — the ultimate exam: a wide-open 8x8 with just a few obstacle islands.
+  // Four fixed arrows are the ONLY way to move sideways across the board; every
+  // descent is yours. Your whole toolkit is five Down arrows, so each row must
+  // be left by dropping at exactly the edge the next fixed arrow waits on — any
+  // other drop falls off the board. The grid looks almost empty; the entire
+  // puzzle is finding the one staircase of drops that lands on the exit.
+  // Solution: Down(0,7), Down(1,0), Down(3,7), Down(4,0), Down(6,7).
   15: LevelData(
     id: 15,
     size: 8,
     title: 'Final Exam',
-    tip: 'Everything you have learned. Thread your arrows through the network.',
-    start: StartSpec(0, 7, Direction.down),
-    exit: Pos(7, 0),
-    walls: [
-      Pos(0, 0), Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6),
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
-      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 7),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 6), Pos(3, 7),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 5), Pos(4, 6), Pos(4, 7),
-      Pos(5, 0), Pos(5, 1), Pos(5, 4), Pos(5, 5), Pos(5, 6), Pos(5, 7),
-      Pos(6, 0), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
-      Pos(7, 2), Pos(7, 3), Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
-    ],
+    tip: 'Five drops, a near-empty board. Only one staircase reaches the goal.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(7, 7),
+    walls: [Pos(2, 3), Pos(2, 5), Pos(5, 2), Pos(5, 4), Pos(7, 3)],
     forcedArrows: [
-      ForcedArrow(1, 6, Direction.down),
-      ForcedArrow(2, 6, Direction.left),
-      ForcedArrow(3, 5, Direction.left),
-      ForcedArrow(3, 4, Direction.down),
-      ForcedArrow(4, 3, Direction.down),
-      ForcedArrow(5, 3, Direction.left),
-      ForcedArrow(6, 2, Direction.left),
-      ForcedArrow(6, 1, Direction.down),
+      ForcedArrow(1, 7, Direction.left),
+      ForcedArrow(3, 0, Direction.right),
+      ForcedArrow(4, 7, Direction.left),
+      ForcedArrow(6, 0, Direction.right),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 3),
-      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowDown, 5),
     ],
   ),
 };
