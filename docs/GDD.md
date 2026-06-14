@@ -41,7 +41,7 @@ whether the plan works — a small, repeatable hit of "I solved it."
 |---|---|
 | **Genre** | Logic / routing puzzle |
 | **Players** | Single-player |
-| **Content** | 500 levels across 50 worlds (10 levels each) |
+| **Content** | 750 levels across 50 worlds (15 levels each) |
 | **Platforms** | Flutter — web first; Android (minSdk 21) & iOS (14) ready |
 | **Orientation** | Portrait, phone-sized (max content width ~460px) |
 | **Session** | Seconds-to-minutes per level; pick-up-and-play |
@@ -134,37 +134,44 @@ Each new element is introduced in its own tutorial level, then combined.
 
 ## 4. World Progression
 
-The game is structured into 50 worlds with 10 levels each (500 levels). Each world introduces or combines elements, with difficulty ramping within each world and across the game. Every world's Level 1 teaches the new mechanic in isolation.
+The game is structured into 50 worlds with 15 levels each (750 levels). Each world introduces or combines elements, with difficulty ramping within each world and across the game. Every world's Level 1 teaches the new mechanic in isolation.
 
-### Phase 1: Foundations (Worlds 1-3, 30 levels)
+### Level structure (per world, 15 levels)
+- **Levels 1–3 — Learn:** the world's new mechanic in isolation (easy).
+- **Levels 4–7 — Combine:** the new mechanic with elements from this world.
+- **Levels 8–10 — Challenge:** harder puzzles using this world's mechanics.
+- **Levels 11–15 — Exam:** combine the current world with everything from all
+  previous worlds (hardest of the world).
+
+### Phase 1: Foundations (Worlds 1-3, 45 levels)
 - **World 1:** Arrows + walls + forced arrows (tutorial world, done)
 - **World 2:** Static destroyers intro
 - **World 3:** Destroyers + walls + forced arrows combined
 
-### Phase 2: Timing (Worlds 4-6, 30 levels)
+### Phase 2: Timing (Worlds 4-6, 45 levels)
 - **World 4:** Pause blocks intro
 - **World 5:** Moving destroyers intro
 - **World 6:** Pause + moving destroyers (timing mastery)
 
-### Phase 3: Spatial (Worlds 7-10, 40 levels)
+### Phase 3: Spatial (Worlds 7-10, 60 levels)
 - **World 7:** Teleporters intro
 - **World 8:** Forced teleporters
 - **World 9:** One-time destroyers intro
 - **World 10:** Teleporters + one-time destroyers + everything so far
 
-### Phase 4: Objectives (Worlds 11-14, 40 levels)
+### Phase 4: Objectives (Worlds 11-14, 60 levels)
 - **World 11:** Key/lock exit intro
 - **World 12:** Multi-pass exit intro
 - **World 13:** Mixed objectives
 - **World 14:** All previous elements + objectives
 
-### Phase 5: Multi-dot (Worlds 15-18, 40 levels)
+### Phase 5: Multi-dot (Worlds 15-18, 60 levels)
 - **World 15:** Splitter intro
 - **World 16:** Splitter + destroyers/teleporters
 - **World 17:** Double exit intro
 - **World 18:** Double exit mastery
 
-### Phase 6: Advanced Mechanics (Worlds 19-30, 120 levels)
+### Phase 6: Advanced Mechanics (Worlds 19-30, 180 levels)
 - **Worlds 19-20:** Teleporting destroyers
 - **Worlds 21-22:** One-way gates
 - **Worlds 23-24:** Toggle switches
@@ -172,11 +179,11 @@ The game is structured into 50 worlds with 10 levels each (500 levels). Each wor
 - **Worlds 27-28:** Speed boost + slow zones
 - **Worlds 29-30:** Color gates + changers
 
-### Phase 7: Expert (Worlds 31-40, 100 levels)
+### Phase 7: Expert (Worlds 31-40, 150 levels)
 - **Worlds 31-34:** Wrap edges, timer bombs, pressure plates
 - **Worlds 35-40:** All elements mixed, large grids, minimal toolkits
 
-### Phase 8: Mastery (Worlds 41-50, 100 levels)
+### Phase 8: Mastery (Worlds 41-50, 150 levels)
 - Everything combined, 8x8-9x9 grids, ultimate challenges
 
 ---

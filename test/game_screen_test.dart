@@ -43,8 +43,9 @@ void main() {
   Future<void> runToWin(WidgetTester tester) async {
     await tester.tap(find.text('Play'));
     await tester.pump();
-    // Enough ticks for the longest World 1 path plus the ~2.2s celebration.
-    for (var i = 0; i < 24; i++) {
+    // Enough ticks for the longest World 1 path (the 8x8 exam) plus the ~2.2s
+    // celebration.
+    for (var i = 0; i < 48; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
   }
@@ -228,27 +229,27 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level shows World Complete and no Next Level',
+  testWidgets('last level (15) shows Back to Menu, not Continue',
       (tester) async {
-    const level10 = Level(
-      id: 10,
-      number: 10,
-      title: 'Grand Tour',
+    const level15 = Level(
+      id: 15,
+      number: 15,
+      title: 'Final Exam',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level10)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level15)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, 6);
-    // Solution: Down (2,3), Right (4,3), Down (4,5).
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')),
-        boardRect.topLeft + geo.center(2, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')),
-        boardRect.topLeft + geo.center(4, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')),
-        boardRect.topLeft + geo.center(4, 3));
+    final geo = GridGeometry(boardRect.width, 8);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+    // Solution: Down(1,0), Right(3,0), Down(3,7), Down(5,0), Right(7,0).
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(1, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(3, 7));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(5, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(3, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 0));
 
     await runToWin(tester);
 

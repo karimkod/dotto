@@ -36,9 +36,25 @@ void main() {
     8: [(0, 0, Direction.right), (0, 4, Direction.down)],
     9: [(1, 4, Direction.left), (1, 1, Direction.down), (4, 1, Direction.left)],
     10: [(2, 3, Direction.down), (4, 3, Direction.right), (4, 5, Direction.down)],
+    11: [(1, 0, Direction.down), (3, 0, Direction.right), (5, 5, Direction.left)],
+    12: [(2, 6, Direction.left), (4, 0, Direction.right), (6, 6, Direction.left)],
+    13: [(3, 0, Direction.right), (1, 5, Direction.left)],
+    14: [
+      (1, 0, Direction.right),
+      (3, 6, Direction.left),
+      (3, 0, Direction.down),
+      (5, 0, Direction.right),
+    ],
+    15: [
+      (1, 0, Direction.down),
+      (3, 0, Direction.right),
+      (3, 7, Direction.down),
+      (5, 0, Direction.down),
+      (7, 0, Direction.right),
+    ],
   };
 
-  for (var n = 1; n <= 10; n++) {
+  for (var n = 1; n <= 15; n++) {
     test('World 1 — level $n is solvable', () {
       final level = levelDataFor(n)!;
       final solutions = solveAll(level);
@@ -55,7 +71,7 @@ void main() {
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 10; n++) {
+  for (var n = 2; n <= 15; n++) {
     test('World 1 — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(minSolutionPieces(level), toolkitTotal(level),
@@ -64,7 +80,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15]) {
     test('World 1 — level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(level, place(level, intended[n]!));
