@@ -41,6 +41,7 @@ whether the plan works — a small, repeatable hit of "I solved it."
 |---|---|
 | **Genre** | Logic / routing puzzle |
 | **Players** | Single-player |
+| **Content** | 500 levels across 50 worlds (10 levels each) |
 | **Platforms** | Flutter — web first; Android (minSdk 21) & iOS (14) ready |
 | **Orientation** | Portrait, phone-sized (max content width ~460px) |
 | **Session** | Seconds-to-minutes per level; pick-up-and-play |
@@ -131,47 +132,52 @@ Each new element is introduced in its own tutorial level, then combined.
 
 ---
 
-## 4. World Progression (30 Worlds)
+## 4. World Progression
 
-Content is organized into **30 themed worlds** of **~10–15 levels** each
-(~300–450 levels total). Worlds gate by completion and gradually layer
-mechanics. The menu's vertical "winding climb" path represents the current
-world; a world map sits above it.
+The game is structured into 50 worlds with 10 levels each (500 levels). Each world introduces or combines elements, with difficulty ramping within each world and across the game. Every world's Level 1 teaches the new mechanic in isolation.
 
-| # | World | Theme / Focus | Introduces |
-|---|---|---|---|
-| 1 | First Steps | Tutorial basics | Start, exit, single arrow |
-| 2 | Around the Wall | Walls | Wall routing, multi-arrow |
-| 3 | Danger Zone | Static destroyers | Avoidance routing |
-| 4 | Perfect Timing | Patrolling hazards | Moving destroyer |
-| 5 | Through the Void | Teleporters | Teleporter pairs |
-| 6 | Mind the Gap | Holes | Gaps + arrows |
-| 7 | Tight Spaces | Larger grids | 6×6, denser walls |
-| 8 | Crossroads | Combination | Walls + destroyers |
-| 9 | The Long Way | Path length | Spiral routes |
-| 10 | Patience | Pauses | Pause + timing combos |
-| 11 | Double Trouble | Two hazards | Multiple movers |
-| 12 | Warp Maze | Teleporter networks | Multiple pairs |
-| 13 | Pinball | Bouncers (proposed) | Reflections |
-| 14 | Clockwork | Toggle walls (proposed) | Timed openings |
-| 15 | Split Decision | Splitter (proposed) | Two dots |
-| 16 | Locks & Keys | Keys/doors (proposed) | Ordering constraints |
-| 17 | Fast Lane | Speed pads (proposed) | Variable speed |
-| 18 | Rotary | Rotators (proposed) | Forced turns |
-| 19 | Gauntlet | Mixed hazards | Dense combination |
-| 20 | The Gallery | Aesthetic / chill | Showcase, lighter difficulty |
-| 21 | Echoes | Splitter + teleporter | Compound routing |
-| 22 | Minefield | Many destroyers | Precision |
-| 23 | Tempo | Heavy timing | Movers + pauses + toggles |
-| 24 | Labyrinth | Max walls | Long single-path solves |
-| 25 | Overload | Large kits | Many pieces, big boards |
-| 26 | Mirror, Mirror | Bouncers + warps | Reflection networks |
-| 27 | Cascade | Buttons/gates (proposed) | Sequencing |
-| 28 | The Crucible | Everything | Multi-mechanic mastery |
-| 29 | Maestro | Expert timing | Frame-perfect-ish setups |
-| 30 | Apex | Capstone | Hardest hand-designed set |
+### Phase 1: Foundations (Worlds 1-3, 30 levels)
+- **World 1:** Arrows + walls + forced arrows (tutorial world, done)
+- **World 2:** Static destroyers intro
+- **World 3:** Destroyers + walls + forced arrows combined
 
-Worlds 1–5 are implemented (as tutorial levels); 6–30 are the content roadmap.
+### Phase 2: Timing (Worlds 4-6, 30 levels)
+- **World 4:** Pause blocks intro
+- **World 5:** Moving destroyers intro
+- **World 6:** Pause + moving destroyers (timing mastery)
+
+### Phase 3: Spatial (Worlds 7-10, 40 levels)
+- **World 7:** Teleporters intro
+- **World 8:** Forced teleporters
+- **World 9:** One-time destroyers intro
+- **World 10:** Teleporters + one-time destroyers + everything so far
+
+### Phase 4: Objectives (Worlds 11-14, 40 levels)
+- **World 11:** Key/lock exit intro
+- **World 12:** Multi-pass exit intro
+- **World 13:** Mixed objectives
+- **World 14:** All previous elements + objectives
+
+### Phase 5: Multi-dot (Worlds 15-18, 40 levels)
+- **World 15:** Splitter intro
+- **World 16:** Splitter + destroyers/teleporters
+- **World 17:** Double exit intro
+- **World 18:** Double exit mastery
+
+### Phase 6: Advanced Mechanics (Worlds 19-30, 120 levels)
+- **Worlds 19-20:** Teleporting destroyers
+- **Worlds 21-22:** One-way gates
+- **Worlds 23-24:** Toggle switches
+- **Worlds 25-26:** Ice tiles + bounce walls
+- **Worlds 27-28:** Speed boost + slow zones
+- **Worlds 29-30:** Color gates + changers
+
+### Phase 7: Expert (Worlds 31-40, 100 levels)
+- **Worlds 31-34:** Wrap edges, timer bombs, pressure plates
+- **Worlds 35-40:** All elements mixed, large grids, minimal toolkits
+
+### Phase 8: Mastery (Worlds 41-50, 100 levels)
+- Everything combined, 8x8-9x9 grids, ultimate challenges
 
 ---
 
@@ -320,7 +326,7 @@ anywhere on the grid across platforms.
 - Progress persistence (SharedPreferences) and unlock flow.
 - Star ratings & piece-budget goals.
 - Daily puzzle (seeded generation).
-- 30 worlds of content + procedural generation pipeline.
+- 50 worlds of content + procedural generation pipeline.
 - Settings: sound / music / haptics toggles; colorblind-friendly palette option.
 - Hint system (spend crowns to reveal a next piece).
 - Cosmetic themes (dot skins, board styles).
@@ -387,7 +393,7 @@ lib/
 - [ ] Proposed elements: bouncer, toggle wall, splitter, keys/doors.
 
 **Later**
-- [ ] Full 30 worlds.
+- [ ] Full 50 worlds.
 - [ ] Cosmetic themes & dot skins.
 - [ ] Level editor + sharing.
 - [ ] Localization, store launch, marketing pass.
