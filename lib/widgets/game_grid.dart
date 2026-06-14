@@ -254,8 +254,6 @@ class GameGridPainter extends CustomPainter {
 
     if (winProgress > 0) _paintWinWave(canvas, geo, winProgress);
 
-    if (showStartHint) _paintStartHint(canvas, geo);
-
     // Cell glow highlights (dot entry, arrow flash, placement ripple).
     cellGlow.forEach((key, intensity) {
       _paintGlow(canvas, geo, key, intensity, cellGlowColor[key] ?? _C.arrow);
@@ -283,6 +281,10 @@ class GameGridPainter extends CustomPainter {
     if (previewKey != null && previewTool != null) {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
     }
+
+    // The start-direction indicator renders last so it is never hidden behind
+    // an adjacent forced arrow or placed piece.
+    if (showStartHint) _paintStartHint(canvas, geo);
   }
 
   /// A gold ripple that expands outward from the exit cell, lighting cells as

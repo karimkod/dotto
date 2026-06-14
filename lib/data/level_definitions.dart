@@ -143,128 +143,152 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // ----- World 1 exam levels (11–15): combine arrows + walls + forced arrows
-  // at higher difficulty. Each is a fully-walled corridor so the only solution
-  // uses every piece. -----
+  // at higher difficulty. Each has a distinct layout/shape. Solver-verified
+  // tight (every piece required) with the forced arrows on the path. -----
 
-  // 11 — start top-right; a winding 6x6 corridor with two fixed arrows.
+  // 11 — a spiral that winds in toward a centre exit; two fixed arrows on the
+  // outer ring, three turns are yours.
   11: LevelData(
     id: 11,
     size: 6,
     title: 'Crossroads',
-    tip: 'Read the whole corridor, then place your turns.',
+    tip: 'The path spirals inward — guide it to the centre.',
     start: StartSpec(0, 5, Direction.down),
-    exit: Pos(5, 0),
+    exit: Pos(3, 2),
     walls: [
       Pos(0, 0), Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4),
-      Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4),
+      Pos(1, 4),
+      Pos(2, 1), Pos(2, 2), Pos(2, 4),
+      Pos(3, 1), Pos(3, 4),
+      Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4),
     ],
     forcedArrows: [
-      ForcedArrow(1, 5, Direction.left),
-      ForcedArrow(3, 5, Direction.down),
+      ForcedArrow(5, 5, Direction.left),
+      ForcedArrow(5, 0, Direction.up),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
-  // 12 — a long 7x7 maze; three fixed arrows guide part of the path.
+  // 12 — a vertical snake (columns instead of rows); fixed arrows turn the
+  // bottom corners, you handle the rest.
   12: LevelData(
     id: 12,
     size: 7,
     title: 'The Maze',
-    tip: 'A long maze. The fixed arrows guide part of the way.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(6, 0),
+    tip: 'A tall maze — the fixed arrows turn the corners for you.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(0, 6),
     walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
-      Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5), Pos(3, 6),
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
+      Pos(0, 1), Pos(1, 1), Pos(2, 1), Pos(3, 1), Pos(4, 1), Pos(5, 1),
+      Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
+      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5),
     ],
     forcedArrows: [
-      ForcedArrow(0, 6, Direction.down),
-      ForcedArrow(2, 0, Direction.down),
-      ForcedArrow(4, 6, Direction.down),
+      ForcedArrow(6, 0, Direction.right),
+      ForcedArrow(0, 2, Direction.right),
+      ForcedArrow(6, 4, Direction.right),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
-  // 13 — start bottom-right; three fixed arrows force the route, you fill gaps.
+  // 13 — a diagonal staircase from corner to corner; most steps are fixed,
+  // you fill three gaps.
   13: LevelData(
     id: 13,
-    size: 6,
+    size: 7,
     title: 'Guided Path',
-    tip: 'The fixed arrows force the route — just fill the gaps.',
-    start: StartSpec(5, 5, Direction.left),
-    exit: Pos(0, 0),
+    tip: 'A staircase across the board — fill the gaps in the steps.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(6, 6),
     walls: [
-      Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 5),
-      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4),
-      Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5),
+      Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6),
+      Pos(1, 0), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6),
+      Pos(2, 0), Pos(2, 1), Pos(2, 4), Pos(2, 5), Pos(2, 6),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 6),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 6),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4),
+      Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5),
     ],
     forcedArrows: [
-      ForcedArrow(5, 0, Direction.up),
-      ForcedArrow(3, 5, Direction.up),
-      ForcedArrow(1, 0, Direction.up),
+      ForcedArrow(1, 1, Direction.right),
+      ForcedArrow(1, 2, Direction.down),
+      ForcedArrow(2, 3, Direction.down),
+      ForcedArrow(3, 3, Direction.right),
+      ForcedArrow(3, 4, Direction.down),
+      ForcedArrow(4, 4, Direction.right),
+      ForcedArrow(5, 5, Direction.right),
+      ForcedArrow(5, 6, Direction.down),
     ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 2),
       ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
-  // 14 — tight 7x7 routing, walls everywhere and just enough pieces.
+  // 14 — start bottom-right; the fixed arrows send the dot the "wrong" way and
+  // you steer it back across three rows to the far corner.
   14: LevelData(
     id: 14,
     size: 7,
     title: 'Tight Squeeze',
-    tip: 'Walls everywhere and just enough pieces. No room for waste.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(6, 6),
+    tip: 'The fixed arrows fight you. Steer around them to the corner.',
+    start: StartSpec(6, 6, Direction.left),
+    exit: Pos(0, 0),
     walls: [
-      Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6),
-      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5),
-      Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 5), Pos(4, 6),
-      Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5),
+      Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
+      Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6),
     ],
     forcedArrows: [
-      ForcedArrow(1, 6, Direction.down),
-      ForcedArrow(5, 6, Direction.down),
+      ForcedArrow(6, 0, Direction.up),
+      ForcedArrow(2, 0, Direction.up),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
-  // 15 — the ultimate World 1 exam: an 8x8 maze, two fixed arrows, five of
-  // yours.
+  // 15 — the ultimate exam: a big 8x8 descending staircase, a dense network of
+  // fixed arrows, and five of yours to thread between them.
   15: LevelData(
     id: 15,
     size: 8,
     title: 'Final Exam',
-    tip: 'Everything you have learned. Read the maze and route the dot home.',
+    tip: 'Everything you have learned. Thread your arrows through the network.',
     start: StartSpec(0, 7, Direction.down),
-    exit: Pos(7, 7),
+    exit: Pos(7, 0),
     walls: [
       Pos(0, 0), Pos(0, 1), Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6),
-      Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5), Pos(2, 6), Pos(2, 7),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 5), Pos(4, 6),
-      Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 7),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 6), Pos(3, 7),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 5), Pos(4, 6), Pos(4, 7),
+      Pos(5, 0), Pos(5, 1), Pos(5, 4), Pos(5, 5), Pos(5, 6), Pos(5, 7),
+      Pos(6, 0), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+      Pos(7, 2), Pos(7, 3), Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
     ],
     forcedArrows: [
-      ForcedArrow(1, 7, Direction.left),
-      ForcedArrow(5, 7, Direction.left),
+      ForcedArrow(1, 6, Direction.down),
+      ForcedArrow(2, 6, Direction.left),
+      ForcedArrow(3, 5, Direction.left),
+      ForcedArrow(3, 4, Direction.down),
+      ForcedArrow(4, 3, Direction.down),
+      ForcedArrow(5, 3, Direction.left),
+      ForcedArrow(6, 2, Direction.left),
+      ForcedArrow(6, 1, Direction.down),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 3),
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowLeft, 3),
+      ToolkitEntry(ToolType.arrowDown, 2),
     ],
   ),
 };

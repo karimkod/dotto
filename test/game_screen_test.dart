@@ -244,12 +244,12 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 8);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: Down(1,0), Right(3,0), Down(3,7), Down(5,0), Right(7,0).
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(1, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(3, 7));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(5, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(3, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 0));
+    // Solution: Left(1,7), Down(2,5), Left(4,4), Down(5,2), Left(7,1).
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(1, 7));
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(4, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(7, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(2, 5));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(5, 2));
 
     await runToWin(tester);
 
