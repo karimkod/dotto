@@ -232,53 +232,53 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 14 — OPEN board with a few obstacle islands. Three fixed arrows are the
-  // only way DOWN the board, and your toolkit has no Down arrow — so you can
-  // only steer left/right onto each fixed descent. Two walls stop the dot from
-  // simply falling straight down to the exit, which pins the whole route.
-  // Solution: Left(2,6), Right(4,0), Left(6,6).
+  // 14 — the dot starts in the MIDDLE of the board and shoots straight up, then
+  // cascades back down across the whole grid. Four fixed arrows turn it at the
+  // edges; your three Down arrows drop it onto each new row. Radiating from the
+  // centre, it looks nothing like the corner-start staircase of level 15.
+  // Solution: Down(0,6), Down(2,0), Down(4,6).
   14: LevelData(
     id: 14,
     size: 7,
     title: 'Tight Squeeze',
-    tip: 'You have no way down — ride the fixed arrows and steer between them.',
-    start: StartSpec(0, 0, Direction.right),
+    tip: 'The dot starts dead centre and shoots up. Drop it down each row.',
+    start: StartSpec(3, 3, Direction.up),
     exit: Pos(6, 0),
-    walls: [Pos(3, 6), Pos(5, 0), Pos(3, 3), Pos(5, 4)],
     forcedArrows: [
-      ForcedArrow(0, 6, Direction.down),
-      ForcedArrow(2, 0, Direction.down),
-      ForcedArrow(4, 6, Direction.down),
+      ForcedArrow(0, 3, Direction.right),
+      ForcedArrow(2, 6, Direction.left),
+      ForcedArrow(4, 0, Direction.right),
+      ForcedArrow(6, 6, Direction.left),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 3),
     ],
   ),
 
-  // 15 — the ultimate exam: a wide-open 8x8 with just a few obstacle islands.
-  // Four fixed arrows are the ONLY way to move sideways across the board; every
-  // descent is yours. Your whole toolkit is five Down arrows, so each row must
-  // be left by dropping at exactly the edge the next fixed arrow waits on — any
-  // other drop falls off the board. The grid looks almost empty; the entire
-  // puzzle is finding the one staircase of drops that lands on the exit.
-  // Solution: Down(0,7), Down(1,0), Down(3,7), Down(4,0), Down(6,7).
+  // 15 — the ultimate exam: a wide-open 8x8 that runs in VERTICAL columns, not
+  // rows. The dot plunges straight down column 0; from then on the fixed arrows
+  // flip it up and down the columns, and YOU shift it one column right each time
+  // it reaches an edge. The whole toolkit is five Right arrows, so every column
+  // must be left at exactly the corner the next fixed arrow waits on. A few
+  // walls block the tempting straight slides. The grid stands on end compared to
+  // level 14's horizontal cascade.
+  // Solution: Right(7,0), Right(0,1), Right(7,3), Right(0,4), Right(7,6).
   15: LevelData(
     id: 15,
     size: 8,
     title: 'Final Exam',
-    tip: 'Five drops, a near-empty board. Only one staircase reaches the goal.',
-    start: StartSpec(0, 0, Direction.right),
+    tip: 'This board runs in columns. Shift the dot right at each edge.',
+    start: StartSpec(0, 0, Direction.down),
     exit: Pos(7, 7),
-    walls: [Pos(2, 3), Pos(2, 5), Pos(5, 2), Pos(5, 4), Pos(7, 3)],
+    walls: [Pos(3, 2), Pos(5, 2), Pos(2, 5), Pos(4, 5), Pos(3, 7)],
     forcedArrows: [
-      ForcedArrow(1, 7, Direction.left),
-      ForcedArrow(3, 0, Direction.right),
-      ForcedArrow(4, 7, Direction.left),
-      ForcedArrow(6, 0, Direction.right),
+      ForcedArrow(7, 1, Direction.up),
+      ForcedArrow(0, 3, Direction.down),
+      ForcedArrow(7, 4, Direction.up),
+      ForcedArrow(0, 6, Direction.down),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 5),
+      ToolkitEntry(ToolType.arrowRight, 5),
     ],
   ),
 };

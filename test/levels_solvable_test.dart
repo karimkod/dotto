@@ -39,13 +39,13 @@ void main() {
     11: [(1, 0, Direction.right), (1, 3, Direction.down), (3, 3, Direction.left)],
     12: [(0, 4, Direction.down), (6, 2, Direction.up), (6, 6, Direction.up)],
     13: [(0, 1, Direction.down), (2, 2, Direction.right), (4, 5, Direction.down)],
-    14: [(2, 6, Direction.left), (4, 0, Direction.right), (6, 6, Direction.left)],
+    14: [(0, 6, Direction.down), (2, 0, Direction.down), (4, 6, Direction.down)],
     15: [
-      (0, 7, Direction.down),
-      (1, 0, Direction.down),
-      (3, 7, Direction.down),
-      (4, 0, Direction.down),
-      (6, 7, Direction.down),
+      (7, 0, Direction.right),
+      (0, 1, Direction.right),
+      (7, 3, Direction.right),
+      (0, 4, Direction.right),
+      (7, 6, Direction.right),
     ],
   };
 
