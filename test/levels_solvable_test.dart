@@ -29,13 +29,13 @@ void main() {
     1: [],
     2: [(2, 2, Direction.up)],
     3: [(2, 0, Direction.right)],
-    4: [(2, 1, Direction.up), (0, 1, Direction.right)],
-    5: [(3, 1, Direction.up), (0, 1, Direction.right)],
-    6: [(4, 1, Direction.up), (1, 1, Direction.right), (1, 4, Direction.up)],
-    7: [(0, 3, Direction.down)],
-    8: [(0, 4, Direction.left), (0, 0, Direction.down)],
-    9: [(4, 1, Direction.up), (1, 1, Direction.right), (1, 4, Direction.up)],
-    10: [(5, 1, Direction.up), (2, 1, Direction.right), (2, 5, Direction.up)],
+    4: [(2, 2, Direction.left), (2, 0, Direction.up)],
+    5: [(3, 2, Direction.up), (0, 2, Direction.left)],
+    6: [(1, 0, Direction.right), (1, 3, Direction.down), (4, 3, Direction.right)],
+    7: [(3, 1, Direction.left)],
+    8: [(0, 0, Direction.right), (0, 4, Direction.down)],
+    9: [(1, 4, Direction.left), (1, 1, Direction.down), (4, 1, Direction.left)],
+    10: [(2, 3, Direction.down), (4, 3, Direction.right), (4, 5, Direction.down)],
   };
 
   for (var n = 1; n <= 10; n++) {
@@ -53,9 +53,9 @@ void main() {
     });
   }
 
-  // Levels 8 and 10 were redesigned so no piece is wasted: every solution must
-  // use the whole toolkit.
-  for (final n in [8, 10]) {
+  // Every level (with a toolkit) must require its whole toolkit — no piece can
+  // be left unused, so the Play-gating never forces a wasted placement.
+  for (var n = 2; n <= 10; n++) {
     test('World 1 — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(minSolutionPieces(level), toolkitTotal(level),
@@ -64,13 +64,15 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  test('World 1 — level 8 forced arrow is on the solution path', () {
-    final level = levelDataFor(8)!;
-    final visited = tracePath(level, place(level, intended[8]!));
-    expect(visited, isNotNull);
-    for (final a in level.forcedArrows) {
-      expect(visited!.contains(a.r * level.size + a.c), isTrue,
-          reason: 'the dot must pass through the forced arrow');
-    }
-  });
+  for (final n in [7, 8]) {
+    test('World 1 — level $n forced arrow is on the solution path', () {
+      final level = levelDataFor(n)!;
+      final visited = tracePath(level, place(level, intended[n]!));
+      expect(visited, isNotNull);
+      for (final a in level.forcedArrows) {
+        expect(visited!.contains(a.r * level.size + a.c), isTrue,
+            reason: 'the dot must pass through the forced arrow');
+      }
+    });
+  }
 }

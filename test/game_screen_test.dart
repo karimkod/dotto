@@ -242,13 +242,13 @@ void main() {
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 6);
-    final up = tester.getCenter(find.text('UP'));
-    // Solution: Up (5,1), Up (2,5), Right (2,1).
-    await _dragArrow(tester, up, boardRect.topLeft + geo.center(5, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')),
-        boardRect.topLeft + geo.center(2, 5));
+    // Solution: Down (2,3), Right (4,3), Down (4,5).
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')),
+        boardRect.topLeft + geo.center(2, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')),
+        boardRect.topLeft + geo.center(4, 5));
     await _dragArrow(tester, tester.getCenter(find.text('RIGHT')),
-        boardRect.topLeft + geo.center(2, 1));
+        boardRect.topLeft + geo.center(4, 3));
 
     await runToWin(tester);
 
