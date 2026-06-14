@@ -36,11 +36,8 @@ List<Level> buildInitialLevels() {
 
   LevelStatus statusFor(int number) {
     if (completed.contains(number)) return LevelStatus.completed;
-    // Unlocked if it's the first level or the previous one is completed.
-    if (number == 1 || completed.contains(number - 1)) {
-      return LevelStatus.unlocked;
-    }
-    return LevelStatus.locked;
+    // Testing: every level is unlocked (no progression gating for now).
+    return LevelStatus.unlocked;
   }
 
   // World 1 has 15 levels.
