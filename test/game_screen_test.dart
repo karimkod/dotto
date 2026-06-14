@@ -257,6 +257,25 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
+  testWidgets('Level 2 shows a tutorial hand that stops on interaction',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+
+    // Hidden initially; appears after the ~2s delay.
+    expect(find.text('👆'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('👆'), findsOneWidget);
+
+    // Placing a piece stops the hand for good.
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(2, 2));
+    expect(find.text('👆'), findsNothing);
+  });
+
   testWidgets('Level 1 has no toolkit and just needs Play', (tester) async {
     const level1 = Level(
       id: 1,

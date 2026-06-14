@@ -419,21 +419,22 @@ class GameGridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A fixed arrow: light blue fill, dark "pinned" ink border, blue glyph.
+  /// A fixed arrow: solid blue-gray fill (wall family) with a white glyph, so
+  /// it reads as part of the level rather than a piece the player placed.
   void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    canvas.drawRRect(rrect, Paint()..color = _C.arrowFill);
+    canvas.drawRRect(rrect, Paint()..color = _C.wall);
     canvas.drawRRect(
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3
-        ..color = AppColors.ink,
+        ..color = const Color(0xFF5C6B73),
     );
-    _drawGlyph(canvas, center, dir.glyph, _C.arrow, geo.cell * 0.42);
+    _drawGlyph(canvas, center, dir.glyph, Colors.white, geo.cell * 0.42);
   }
 
   void _paintGlow(

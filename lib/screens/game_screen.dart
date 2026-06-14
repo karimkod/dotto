@@ -76,6 +76,12 @@ class _GameScreenState extends State<GameScreen>
   bool _celebrationDone = false;
   String _winMessage = '';
 
+  // Level-2 tutorial: a ghost hand that drags the Up arrow onto the cell.
+  late final AnimationController _handCtrl;
+  Timer? _handTimer;
+  bool _showHand = false;
+  static const _tutorialCell = (2, 2); // solution cell for level 2
+
   static const _winMessages = [
     'Nailed it!',
     'Perfect!',
@@ -158,6 +164,16 @@ class _GameScreenState extends State<GameScreen>
         setState(() => _celebrationDone = true);
       }
     });
+    // ~3 loops of the tutorial hand, then a fade.
+    _handCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 5400),
+    );
+    _handCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed && mounted) {
+        setState(() => _showHand = false);
+      }
+    });
     _level = levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
@@ -173,16 +189,38 @@ class _GameScreenState extends State<GameScreen>
       }
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
+      // Level 2 teaches drag-and-drop: show the hint hand after a beat.
+      if (_level!.id == 2) {
+        _handTimer = Timer(const Duration(seconds: 2), _startHand);
+      }
+    }
+  }
+
+  void _startHand() {
+    if (!mounted || _placed.isNotEmpty || _status != GameStatus.planning) return;
+    setState(() => _showHand = true);
+    _handCtrl.forward(from: 0);
+  }
+
+  /// Stop the tutorial hand for good once the player interacts.
+  void _stopHand() {
+    _handTimer?.cancel();
+    _handTimer = null;
+    if (_showHand) {
+      _handCtrl.stop();
+      setState(() => _showHand = false);
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _handTimer?.cancel();
     _dotCtrl.dispose();
     _glowCtrl.dispose();
     _snapCtrl.dispose();
     _winCtrl.dispose();
+    _handCtrl.dispose();
     super.dispose();
   }
 
@@ -385,6 +423,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _onPanStart(DragStartDetails d) {
     if (_status != GameStatus.planning) return;
+    _stopHand();
     final g = d.globalPosition;
 
     // Start dragging a tool out of the toolbar.
@@ -530,6 +569,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// Drop a piece onto a cell with the full landing reaction.
   void _commitPlace(int key, PlacedElement el, {required bool decrementKit}) {
+    _stopHand();
     setState(() {
       _placed[key] = el;
       if (decrementKit) _kit[el.tool] = (_kit[el.tool] ?? 1) - 1;
@@ -852,6 +892,11 @@ class _GameScreenState extends State<GameScreen>
               animation: _snapCtrl,
               builder: (_, _) => _buildGhost(),
             ),
+            if (_showHand)
+              AnimatedBuilder(
+                animation: _handCtrl,
+                builder: (_, _) => _buildTutorialHand(),
+              ),
           ],
         ),
       ),
@@ -1075,6 +1120,83 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Level-2 tutorial: a semi-transparent hand that repeatedly drags a ghost
+  /// Up arrow from the toolbar onto the target cell, then fades out.
+  Widget _buildTutorialHand() {
+    final toolBox =
+        _toolKeys[ToolType.arrowUp]?.currentContext?.findRenderObject()
+            as RenderBox?;
+    final rootBox = _rootKey.currentContext?.findRenderObject() as RenderBox?;
+    final boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (toolBox == null || rootBox == null || boardBox == null) {
+      return const SizedBox.shrink();
+    }
+
+    final src = rootBox.globalToLocal(toolBox
+        .localToGlobal(Offset(toolBox.size.width / 2, toolBox.size.height / 2)));
+    final geo = GridGeometry(boardBox.size.width, _level!.size);
+    final dst = rootBox.globalToLocal(
+        boardBox.localToGlobal(geo.center(_tutorialCell.$1, _tutorialCell.$2)));
+    final cell = geo.cell;
+
+    const cycles = 3;
+    final v = _handCtrl.value;
+    final overallFade = 1 - ((v - 0.9) / 0.1).clamp(0.0, 1.0);
+    final cv = (v * cycles) % 1.0;
+
+    // Position: glide src→dst over the first half of each cycle.
+    final moveT = ((cv - 0.05) / 0.5).clamp(0.0, 1.0);
+    final pos = Offset.lerp(src, dst, Curves.easeInOut.transform(moveT))!;
+    // A little press when it lands.
+    final press = (cv >= 0.56 && cv < 0.70) ? 0.86 : 1.0;
+    // Per-cycle visibility: appear, hold, fade before resetting to src.
+    double cycleOpacity;
+    if (cv < 0.05) {
+      cycleOpacity = cv / 0.05;
+    } else if (cv < 0.70) {
+      cycleOpacity = 1;
+    } else if (cv < 0.86) {
+      cycleOpacity = 1 - (cv - 0.70) / 0.16;
+    } else {
+      cycleOpacity = 0;
+    }
+    final opacity = (0.55 * cycleOpacity * overallFade).clamp(0.0, 1.0);
+    if (opacity <= 0.01) return const SizedBox.shrink();
+
+    final size = cell * 0.92;
+    return Positioned(
+      left: pos.dx - size / 2,
+      top: pos.dy - size / 2,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: press,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // The arrow being carried.
+                  Positioned.fill(
+                    child: DragGhost(tool: ToolType.arrowUp, size: size),
+                  ),
+                  // The pointing hand, just below the piece.
+                  Positioned(
+                    right: -size * 0.28,
+                    bottom: -size * 0.5,
+                    child: Text('👆', style: TextStyle(fontSize: size * 0.7)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
