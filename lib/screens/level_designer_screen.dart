@@ -26,10 +26,21 @@ Direction _rotate(Direction d) => _cycle[(_cycle.indexOf(d) + 1) % 4];
 
 /// A full-screen, dev-only visual level editor. It paints onto the SAME
 /// [GameGridPainter] the game uses, can launch the real [GameScreen] to test a
-/// level, reports the solver's verdict, and exports/imports the JSON shape that
-/// `level_definitions.dart` expects.
+/// level, reports the solver's verdict, exports ready-to-paste Dart for
+/// `level_definitions.dart`, and imports a level (Dart or JSON) from the
+/// clipboard.
 class LevelDesignerScreen extends StatefulWidget {
-  const LevelDesignerScreen({super.key});
+  const LevelDesignerScreen({
+    super.key,
+    this.initialLevel,
+    this.initialNumber,
+    this.initialDifficulty,
+  });
+
+  /// When set, the designer opens pre-loaded with this level (edit mode).
+  final LevelData? initialLevel;
+  final int? initialNumber;
+  final Difficulty? initialDifficulty;
 
   @override
   State<LevelDesignerScreen> createState() => _LevelDesignerScreenState();
@@ -66,7 +77,42 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   @override
   void initState() {
     super.initState();
-    _resetGrid(5);
+    if (widget.initialLevel != null) {
+      _loadFromLevel(
+        widget.initialLevel!,
+        widget.initialNumber ?? widget.initialLevel!.id,
+        widget.initialDifficulty ?? Difficulty.medium,
+      );
+    } else {
+      _resetGrid(5);
+    }
+  }
+
+  /// Populate the editor from an existing level definition (edit mode).
+  void _loadFromLevel(LevelData lvl, int number, Difficulty diff) {
+    _resetGrid(lvl.size);
+    _number = number;
+    _title = lvl.title;
+    _difficulty = diff;
+    _startKey = _key(lvl.start.r, lvl.start.c);
+    _startDir = lvl.start.dir;
+    _exitKey = _key(lvl.exit.r, lvl.exit.c);
+    for (final w in lvl.walls) {
+      _walls.add(_key(w.r, w.c));
+    }
+    for (final d in lvl.destroyers) {
+      _destroyers.add(_key(d.r, d.c));
+    }
+    for (final f in lvl.forcedArrows) {
+      _forced[_key(f.r, f.c)] = f.dir;
+    }
+    for (final k in _kit.keys.toList()) {
+      _kit[k] = 0;
+    }
+    for (final e in lvl.toolkit) {
+      if (_kit.containsKey(e.type)) _kit[e.type] = e.count;
+    }
+    _formRev++;
   }
 
   int _row(int k) => k ~/ _n;
@@ -188,112 +234,174 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ),
       };
 
-  // ----- JSON -----
-  Map<String, dynamic> _toJson() => {
-        'number': _number,
-        'title': _title,
-        'difficulty': _difficulty.name,
-        'gridSize': _n,
-        'start': {'row': _row(_startKey!), 'col': _col(_startKey!)},
-        'startDir': _startDir.name,
-        'exit': {'row': _row(_exitKey!), 'col': _col(_exitKey!)},
-        'walls': _walls.map((k) => {'row': _row(k), 'col': _col(k)}).toList(),
-        'destroyers':
-            _destroyers.map((k) => {'row': _row(k), 'col': _col(k)}).toList(),
-        'forcedArrows': _forced.entries
-            .map((e) =>
-                {'row': _row(e.key), 'col': _col(e.key), 'dir': e.value.name})
-            .toList(),
-        'toolkit': {
-          'up': _kit[ToolType.arrowUp],
-          'down': _kit[ToolType.arrowDown],
-          'left': _kit[ToolType.arrowLeft],
-          'right': _kit[ToolType.arrowRight],
-          'shield': _kit[ToolType.shield],
-        },
-      };
-
-  void _export() {
-    final text = const JsonEncoder.withIndent('  ').convert(_toJson());
-    Clipboard.setData(ClipboardData(text: text));
-    final extra = _shields.isNotEmpty
-        ? ' (note: ${_shields.length} painted shield marker(s) excluded — set the toolkit shield count instead)'
-        : '';
-    _snack('Level JSON copied to clipboard$extra');
+  // ----- export: ready-to-paste Dart for level_definitions.dart -----
+  String _toDart() {
+    String poss(Iterable<int> ks) =>
+        ks.map((k) => 'Pos(${_row(k)}, ${_col(k)})').join(', ');
+    final b = StringBuffer();
+    b.writeln(
+        '// Level $_number — ${_title.isEmpty ? 'Untitled' : _title}  (difficulty: ${_difficulty.name})');
+    b.writeln('$_number: LevelData(');
+    b.writeln('  id: $_number,');
+    b.writeln('  size: $_n,');
+    b.writeln("  title: '${_title.replaceAll("'", r"\'")}',");
+    b.writeln("  tip: '',");
+    b.writeln(
+        '  start: StartSpec(${_row(_startKey!)}, ${_col(_startKey!)}, Direction.${_startDir.name}),');
+    b.writeln('  exit: Pos(${_row(_exitKey!)}, ${_col(_exitKey!)}),');
+    b.writeln('  walls: [${poss(_walls)}],');
+    b.writeln('  destroyers: [${poss(_destroyers)}],');
+    final fa = _forced.entries
+        .map((e) =>
+            'ForcedArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
+        .join(', ');
+    b.writeln('  forcedArrows: [$fa],');
+    final kit = [
+      for (final e in _kit.entries)
+        if (e.value > 0) '    ToolkitEntry(ToolType.${e.key.name}, ${e.value}),',
+    ];
+    if (kit.isEmpty) {
+      b.writeln('  toolkit: [],');
+    } else {
+      b.writeln('  toolkit: [');
+      for (final l in kit) {
+        b.writeln(l);
+      }
+      b.writeln('  ],');
+    }
+    b.writeln('),');
+    return b.toString();
   }
 
-  void _import() {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.card,
-        title: const Text('Import level JSON'),
-        content: TextField(
-          controller: controller,
-          maxLines: 12,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-          decoration: const InputDecoration(
-            hintText: 'Paste level JSON here…',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (_applyJson(controller.text)) Navigator.pop(ctx);
-            },
-            child: const Text('Import'),
-          ),
-        ],
-      ),
-    );
+  void _export() {
+    if (_startKey == null || _exitKey == null) {
+      _snack('Need a Start and an Exit.');
+      return;
+    }
+    Clipboard.setData(ClipboardData(text: _toDart()));
+    final extra = _shields.isNotEmpty
+        ? '  (${_shields.length} painted shield marker(s) excluded — use the toolkit shield count)'
+        : '';
+    _snack('Copied!$extra');
+  }
+
+  // ----- import from clipboard (accepts the Dart we export, or JSON) -----
+  Future<void> _import() async {
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text ?? '';
+    if (text.trim().isEmpty) {
+      _snack('Clipboard is empty');
+      return;
+    }
+    if (_applyJson(text) || _applyDart(text)) {
+      _snack('Imported level $_number');
+    } else {
+      _snack('Could not parse clipboard (expected level Dart or JSON)');
+    }
   }
 
   bool _applyJson(String text) {
+    Map<String, dynamic> data;
     try {
-      final data = jsonDecode(text) as Map<String, dynamic>;
-      final n = (data['gridSize'] as num?)?.toInt() ?? 5;
-      setState(() {
-        _resetGrid(n.clamp(3, 9));
-        _number = (data['number'] as num?)?.toInt() ?? _number;
-        _title = (data['title'] as String?) ?? '';
-        _difficulty = Difficulty.values.firstWhere(
-          (d) => d.name == (data['difficulty'] as String?),
-          orElse: () => Difficulty.medium,
-        );
-        final s = data['start'] as Map<String, dynamic>?;
-        if (s != null) _startKey = _key(s['row'] as int, s['col'] as int);
-        _startDir = _dir(data['startDir'] as String?) ?? Direction.right;
-        final ex = data['exit'] as Map<String, dynamic>?;
-        if (ex != null) _exitKey = _key(ex['row'] as int, ex['col'] as int);
-        for (final w in (data['walls'] as List? ?? [])) {
-          _walls.add(_key(w['row'] as int, w['col'] as int));
-        }
-        for (final d in (data['destroyers'] as List? ?? [])) {
-          _destroyers.add(_key(d['row'] as int, d['col'] as int));
-        }
-        for (final f in (data['forcedArrows'] as List? ?? [])) {
-          _forced[_key(f['row'] as int, f['col'] as int)] =
-              _dir(f['dir'] as String?) ?? Direction.right;
-        }
-        final tk = (data['toolkit'] as Map<String, dynamic>?) ?? {};
-        _kit[ToolType.arrowUp] = (tk['up'] as num?)?.toInt() ?? 0;
-        _kit[ToolType.arrowDown] = (tk['down'] as num?)?.toInt() ?? 0;
-        _kit[ToolType.arrowLeft] = (tk['left'] as num?)?.toInt() ?? 0;
-        _kit[ToolType.arrowRight] = (tk['right'] as num?)?.toInt() ?? 0;
-        _kit[ToolType.shield] = (tk['shield'] as num?)?.toInt() ?? 0;
-        _formRev++;
-      });
-      _snack('Imported level $_number');
-      return true;
-    } catch (e) {
-      _snack('Import failed: $e');
+      final d = jsonDecode(text);
+      if (d is! Map<String, dynamic>) return false;
+      data = d;
+    } catch (_) {
       return false;
     }
+    if (!data.containsKey('start') || !data.containsKey('gridSize')) return false;
+    setState(() {
+      _resetGrid(((data['gridSize'] as num?)?.toInt() ?? 5).clamp(3, 9));
+      _number = (data['number'] as num?)?.toInt() ?? _number;
+      _title = (data['title'] as String?) ?? '';
+      _difficulty = Difficulty.values.firstWhere(
+          (d) => d.name == (data['difficulty'] as String?),
+          orElse: () => Difficulty.medium);
+      final s = data['start'] as Map<String, dynamic>?;
+      if (s != null) _startKey = _key(s['row'] as int, s['col'] as int);
+      _startDir = _dir(data['startDir'] as String?) ?? Direction.right;
+      final ex = data['exit'] as Map<String, dynamic>?;
+      if (ex != null) _exitKey = _key(ex['row'] as int, ex['col'] as int);
+      for (final w in (data['walls'] as List? ?? [])) {
+        _walls.add(_key(w['row'] as int, w['col'] as int));
+      }
+      for (final d in (data['destroyers'] as List? ?? [])) {
+        _destroyers.add(_key(d['row'] as int, d['col'] as int));
+      }
+      for (final f in (data['forcedArrows'] as List? ?? [])) {
+        _forced[_key(f['row'] as int, f['col'] as int)] =
+            _dir(f['dir'] as String?) ?? Direction.right;
+      }
+      final tk = (data['toolkit'] as Map<String, dynamic>?) ?? {};
+      _kit[ToolType.arrowUp] = (tk['up'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.arrowDown] = (tk['down'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.arrowLeft] = (tk['left'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.arrowRight] = (tk['right'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.shield] = (tk['shield'] as num?)?.toInt() ?? 0;
+      _formRev++;
+    });
+    return true;
+  }
+
+  /// Parse the Dart `LevelData(...)` snippet we export (also tolerates the
+  /// real level_definitions.dart entries).
+  bool _applyDart(String text) {
+    final sizeM = RegExp(r'(?:size|gridSize)\s*:\s*(\d+)').firstMatch(text);
+    final startM = RegExp(
+            r'StartSpec\(\s*(?:Pos\(\s*)?(\d+)\s*,\s*(\d+)\s*\)?\s*,\s*Direction\.(\w+)')
+        .firstMatch(text);
+    final exitM =
+        RegExp(r'exit\s*:\s*Pos\(\s*(\d+)\s*,\s*(\d+)\s*\)').firstMatch(text);
+    if (sizeM == null || startM == null || exitM == null) return false;
+    setState(() {
+      _resetGrid(int.parse(sizeM.group(1)!).clamp(3, 9));
+      final numM = RegExp(r'(\d+)\s*:\s*LevelData').firstMatch(text);
+      if (numM != null) _number = int.parse(numM.group(1)!);
+      final titleM = RegExp(r"title\s*:\s*'((?:[^'\\]|\\.)*)'").firstMatch(text);
+      if (titleM != null) _title = titleM.group(1)!.replaceAll(r"\'", "'");
+      final diffM = RegExp(r'difficulty\s*:\s*(\w+)').firstMatch(text);
+      if (diffM != null) {
+        _difficulty = Difficulty.values.firstWhere(
+            (d) => d.name == diffM.group(1),
+            orElse: () => _difficulty);
+      }
+      _startKey = _key(int.parse(startM.group(1)!), int.parse(startM.group(2)!));
+      _startDir = _dir(startM.group(3)) ?? Direction.right;
+      _exitKey = _key(int.parse(exitM.group(1)!), int.parse(exitM.group(2)!));
+      void posList(String label, Set<int> into) {
+        final m = RegExp('$label' r'\s*:\s*\[([^\]]*)\]').firstMatch(text);
+        if (m == null) return;
+        for (final pm
+            in RegExp(r'Pos\(\s*(\d+)\s*,\s*(\d+)\s*\)').allMatches(m.group(1)!)) {
+          into.add(_key(int.parse(pm.group(1)!), int.parse(pm.group(2)!)));
+        }
+      }
+
+      posList('walls', _walls);
+      posList('destroyers', _destroyers);
+      final fm =
+          RegExp(r'forcedArrows\s*:\s*\[([^\]]*)\]').firstMatch(text);
+      if (fm != null) {
+        for (final am in RegExp(
+                r'ForcedArrow\(\s*(?:Pos\(\s*)?(\d+)\s*,\s*(\d+)\s*\)?\s*,\s*Direction\.(\w+)')
+            .allMatches(fm.group(1)!)) {
+          _forced[_key(int.parse(am.group(1)!), int.parse(am.group(2)!))] =
+              _dir(am.group(3)) ?? Direction.right;
+        }
+      }
+      for (final k in _kit.keys.toList()) {
+        _kit[k] = 0;
+      }
+      for (final em in RegExp(r'ToolkitEntry\(\s*ToolType\.(\w+)\s*,\s*(\d+)\s*\)')
+          .allMatches(text)) {
+        final matches = ToolType.values.where((t) => t.name == em.group(1));
+        if (matches.isNotEmpty && _kit.containsKey(matches.first)) {
+          _kit[matches.first] = int.parse(em.group(2)!);
+        }
+      }
+      _formRev++;
+    });
+    return true;
   }
 
   Direction? _dir(String? s) {
@@ -697,12 +805,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         OutlinedButton.icon(
           onPressed: _export,
           icon: const Icon(Icons.copy_rounded),
-          label: const Text('Export JSON'),
+          label: const Text('Export Dart'),
         ),
         OutlinedButton.icon(
           onPressed: _import,
           icon: const Icon(Icons.paste_rounded),
-          label: const Text('Import JSON'),
+          label: const Text('Import'),
         ),
       ],
     );

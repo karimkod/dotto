@@ -1,8 +1,11 @@
-// Smoke + interaction test for the dev level designer screen.
+// Smoke + interaction tests for the dev level designer screen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dotto/models/grid_cell.dart';
+import 'package:dotto/models/level.dart';
+import 'package:dotto/models/level_data.dart';
 import 'package:dotto/screens/level_designer_screen.dart';
 
 void main() {
@@ -21,8 +24,8 @@ void main() {
     expect(find.text('◯ Shield'), findsOneWidget);
     // Action buttons.
     expect(find.text('Test'), findsOneWidget);
-    expect(find.text('Export JSON'), findsOneWidget);
-    expect(find.text('Import JSON'), findsOneWidget);
+    expect(find.text('Export Dart'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
   });
 
   testWidgets('painting a cell and opening the solver report works',
@@ -43,5 +46,32 @@ void main() {
     expect(find.text('Solver report'), findsOneWidget);
     expect(find.text('Solvable'), findsOneWidget);
     expect(find.text('Play it'), findsOneWidget);
+  });
+
+  testWidgets('opens pre-loaded for editing an existing level',
+      (tester) async {
+    const lvl = LevelData(
+      id: 7,
+      size: 4,
+      title: 'Edit Me',
+      tip: '',
+      start: StartSpec(3, 0, Direction.right),
+      exit: Pos(0, 3),
+      walls: [Pos(1, 2)],
+      destroyers: [Pos(2, 1)],
+      forcedArrows: [],
+      toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
+    );
+    await tester.pumpWidget(const MaterialApp(
+      home: LevelDesignerScreen(
+        initialLevel: lvl,
+        initialNumber: 7,
+        initialDifficulty: Difficulty.hard,
+      ),
+    ));
+    await tester.pump();
+
+    // The title field is populated from the loaded level.
+    expect(find.text('Edit Me'), findsOneWidget);
   });
 }

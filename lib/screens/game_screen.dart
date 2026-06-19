@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,7 @@ import '../widgets/feedback_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/game_toolbar.dart';
 import '../widgets/top_bar.dart';
+import 'level_designer_screen.dart';
 
 /// Milliseconds between dot movement ticks.
 const _tickMs = 400;
@@ -1034,6 +1036,15 @@ class _GameScreenState extends State<GameScreen>
             color: AppColors.ink,
           ),
         ),
+        // Dev-only: edit this level in the designer.
+        if (kDebugMode) ...[
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _openInDesigner,
+            child: const Icon(Icons.edit_rounded,
+                color: AppColors.textSoft, size: 20),
+          ),
+        ],
         const Spacer(),
         BorderedTile(
           background: AppColors.ink,
@@ -1069,6 +1080,17 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       builder: (_) => FeedbackDialog(level: _level!.id),
     );
+  }
+
+  /// Dev-only: open this level in the designer, pre-loaded for editing.
+  void _openInDesigner() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => LevelDesignerScreen(
+        initialLevel: _level,
+        initialNumber: _level!.id,
+        initialDifficulty: widget.level.difficulty,
+      ),
+    ));
   }
 
   Widget _buildBoard() {

@@ -1,5 +1,6 @@
 // Basic smoke test for the Dotto main menu.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dotto/main.dart';
@@ -15,5 +16,7 @@ void main() {
     expect(find.text('Level 2'), findsOneWidget);
     // Difficulty badge for level 2 (Easy).
     expect(find.text('Easy'), findsOneWidget);
+    // Dev-only "new level" button (tests run in debug mode).
+    expect(find.byIcon(Icons.add_rounded), findsOneWidget);
   });
 }

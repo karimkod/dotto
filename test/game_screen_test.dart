@@ -332,6 +332,12 @@ void main() {
     expect(find.text('👆'), findsNothing);
   });
 
+  testWidgets('debug build shows the edit-in-designer pencil', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+    expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
+  });
+
   testWidgets('Level 1 has no toolkit and just needs Play', (tester) async {
     const level1 = Level(
       id: 1,

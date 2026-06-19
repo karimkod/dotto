@@ -100,7 +100,32 @@ class _MenuScreenState extends State<MenuScreen> {
                 children: [
                   TopBar(hintCount: _hintCount, onHints: () {}),
                   const SizedBox(height: 18),
-                  Text('Dotto', style: AppTheme.title),
+                  // Wordmark, with a dev-only "+" (new level) balanced on the
+                  // right so the title stays centered.
+                  Row(
+                    children: [
+                      const SizedBox(width: 50),
+                      Expanded(
+                        child: Center(child: Text('Dotto', style: AppTheme.title)),
+                      ),
+                      SizedBox(
+                        width: 50,
+                        child: kDebugMode
+                            ? Align(
+                                alignment: Alignment.centerRight,
+                                child: _SideIcon(
+                                  icon: Icons.add_rounded,
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const LevelDesignerScreen(),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: Stack(
@@ -207,17 +232,6 @@ class _MenuScreenState extends State<MenuScreen> {
             _SideIcon(icon: Icons.lock_outline_rounded, locked: true),
             const SizedBox(height: 14),
             _SideIcon(icon: Icons.calendar_today_rounded, onTap: () {}),
-            // Dev-only: open the level designer (debug builds only).
-            if (kDebugMode) ...[
-              const SizedBox(height: 14),
-              _SideIcon(
-                icon: Icons.build_rounded,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const LevelDesignerScreen()),
-                ),
-              ),
-            ],
           ],
         ),
       ),
