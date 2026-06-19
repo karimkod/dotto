@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dotto — Level Designer</title>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#182133; --panel2:#212d44; --line:#2c3a55;
+    --text:#e7ecf3; --soft:#93a1ba; --accent:#FFB347; --accent2:#64B5F6;
+    --good:#66BB6A; --bad:#EF5350;
+    /* game palette */
+    --board:#FAF8F5; --cell:#ffffff; --ink:#2D2D2D;
+    --start:#81C784; --exit:#FFD54F; --wall:#78909C;
+    --destroyer:#EF5350; --arrow:#1E88E5; --shield:#38BDF8;
+    --dot:#FFB347;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;
+  }
+  h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.5px;}
+  h1 span{color:var(--accent);font-style:italic;}
+  .muted{color:var(--soft);}
+  header{
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  header .grow{flex:1;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--soft);}
+  input,select{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent2);}
+  input[type=number]{width:64px;}
+  #title{width:160px;}
+
+  main{display:flex;gap:18px;padding:18px;align-items:flex-start;flex-wrap:wrap;}
+  .col{display:flex;flex-direction:column;gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--soft);margin:0 0 10px;}
+
+  /* palette */
+  .palette{display:flex;flex-direction:column;gap:7px;min-width:190px;}
+  .pal-item{
+    display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:10px;
+    border:2px solid transparent;background:var(--panel2);cursor:pointer;user-select:none;
+  }
+  .pal-item:hover{border-color:var(--line);}
+  .pal-item.sel{border-color:var(--accent);background:#2a3650;}
+  .pal-swatch{width:26px;height:26px;border-radius:7px;border:2px solid var(--ink);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;flex:none;}
+  .pal-item .nm{flex:1;font-weight:600;}
+  .pal-item .kbd{font-size:11px;color:var(--soft);background:#0e1726;border:1px solid var(--line);
+    border-radius:5px;padding:1px 6px;}
+
+  /* board */
+  .board-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  canvas{border-radius:18px;cursor:pointer;touch-action:none;}
+  #banner{min-height:30px;font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;}
+  #banner.win{color:var(--good);}
+  #banner.lose{color:var(--bad);}
+  #banner.info{color:var(--soft);font-weight:600;}
+
+  .modebar{display:flex;gap:8px;}
+  .btn{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit;
+  }
+  .btn:hover{border-color:var(--accent2);}
+  .btn.on{background:var(--accent);color:#1a1206;border-color:var(--accent);}
+  .btn.primary{background:var(--good);color:#06210a;border-color:var(--good);}
+  .btn.warn{background:#3a2730;color:#ffb4ad;border-color:#5b3a3f;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* toolkit + test chips */
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;}
+  .row .nm{display:flex;align-items:center;gap:8px;}
+  .counter{display:flex;align-items:center;gap:8px;}
+  .counter button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-weight:800;cursor:pointer;font-size:15px;line-height:1;}
+  .counter button:hover{border-color:var(--accent2);}
+  .counter .val{width:22px;text-align:center;font-weight:800;}
+  .mini{width:20px;height:20px;border-radius:5px;border:2px solid var(--ink);display:inline-flex;
+    align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#fff;}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:9px;
+    border:2px solid var(--line);background:var(--panel2);cursor:pointer;font-weight:700;}
+  .chip.sel{border-color:var(--accent);}
+  .chip.empty{opacity:.4;}
+  .chip .cnt{color:var(--soft);font-size:12px;}
+
+  textarea{width:100%;height:300px;background:#0b1019;color:#cfe0ff;border:1px solid var(--line);
+    border-radius:10px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;resize:vertical;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .hint{font-size:12px;color:var(--soft);line-height:1.5;}
+  .export-col{min-width:320px;flex:1;}
+  kbd{background:#0e1726;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:11px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Dot<span>to</span> · Level Designer</h1>
+  <div class="field">
+    <label>Grid size</label>
+    <select id="size">
+      <option>3</option><option>4</option><option selected>5</option>
+      <option>6</option><option>7</option><option>8</option><option>9</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Level #</label>
+    <input type="number" id="number" value="16" min="1" />
+  </div>
+  <div class="field">
+    <label>Title</label>
+    <input type="text" id="title" placeholder="First Danger" />
+  </div>
+  <div class="field">
+    <label>Difficulty</label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+  </div>
+  <div class="grow"></div>
+  <div class="modebar">
+    <button class="btn on" id="modeDesign">✎ Design</button>
+    <button class="btn" id="modeTest">▶ Test</button>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: palette + toolkit -->
+  <div class="col">
+    <div class="card">
+      <h2>Palette</h2>
+      <div class="palette" id="palette"></div>
+      <div class="hint" style="margin-top:10px;">
+        Keys <kbd>1</kbd>–<kbd>7</kbd> select · <kbd>R</kbd> rotates Start/Forced ·
+        click Start/Forced again to rotate.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Toolkit (given to player)</h2>
+      <div id="toolkit"></div>
+    </div>
+  </div>
+
+  <!-- CENTER: board -->
+  <div class="col board-wrap">
+    <canvas id="board" width="560" height="560"></canvas>
+    <div id="banner" class="info">Design mode — paint the level.</div>
+    <div id="testControls" style="display:none;">
+      <div class="card" style="min-width:540px;">
+        <h2>Test — place toolkit pieces on empty cells, then Run</h2>
+        <div class="chips" id="testChips"></div>
+        <div class="btnrow">
+          <button class="btn primary" id="runBtn">▶ Run</button>
+          <button class="btn" id="clearPlaced">Clear pieces</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: export/import -->
+  <div class="col export-col">
+    <div class="card">
+      <h2>Level JSON</h2>
+      <textarea id="json" spellcheck="false"></textarea>
+      <div class="btnrow">
+        <button class="btn primary" id="exportBtn">⤓ Export (Ctrl+S)</button>
+        <button class="btn" id="copyBtn">⧉ Copy</button>
+        <button class="btn" id="importBtn">⤒ Import from box</button>
+        <button class="btn" id="downloadBtn">💾 Download .json</button>
+      </div>
+      <div class="hint" id="exportNote" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- constants ----------
+  const DIRS = ['right','down','left','up'];          // rotation cycle order
+  const DELTA = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+  const GLYPH = { up:'↑', down:'↓', left:'←', right:'→' };
+  const C = {
+    board:'#FAF8F5', cell:'#ffffff', ink:'#2D2D2D',
+    start:'#81C784', startB:'#5BA45F',
+    exit:'#FFD54F', exitB:'#E0B73C',
+    wall:'#78909C', wallB:'#5C6B73',
+    destroyer:'#EF5350', destroyerB:'#C62828',
+    arrow:'#1E88E5', arrowFill:'#E3F1FD',
+    shield:'#38BDF8', shieldFill:'#E0F4FE',
+    dot:'#FFB347',
+  };
+
+  // palette: id, label, glyph for swatch, swatch bg
+  const PALETTE = [
+    { id:'empty',     label:'Empty (erase)', g:'',  bg:'#ffffff', fg:'#2D2D2D' },
+    { id:'start',     label:'Start',         g:'▸', bg:C.start,   fg:'#fff' },
+    { id:'exit',      label:'Exit',          g:'⚑', bg:C.exit,    fg:'#fff' },
+    { id:'wall',      label:'Wall',          g:'',  bg:C.wall,    fg:'#fff' },
+    { id:'destroyer', label:'Destroyer',     g:'✸', bg:C.destroyer,fg:'#2D2D2D' },
+    { id:'forced',    label:'Forced Arrow',  g:'➜', bg:C.wall,    fg:'#fff' },
+    { id:'shield',    label:'Shield',        g:'◯', bg:C.shieldFill,fg:C.shield },
+  ];
+  const TOOLS = [
+    { id:'up',     label:'Up',     g:'↑', col:C.arrow },
+    { id:'down',   label:'Down',   g:'↓', col:C.arrow },
+    { id:'left',   label:'Left',   g:'←', col:C.arrow },
+    { id:'right',  label:'Right',  g:'→', col:C.arrow },
+    { id:'shield', label:'Shield', g:'◯', col:C.shield },
+  ];
+
+  // ---------- state ----------
+  const S = {
+    n: 5,
+    grid: [],            // length n*n: 'empty'|'start'|'exit'|'wall'|'destroyer'|'forced'|'shield'
+    startKey: null,
+    startDir: 'right',
+    exitKey: null,
+    forcedDir: {},       // key -> dir
+    toolkit: { up:0, down:0, left:0, right:0, shield:0 },
+    tool: 'wall',        // selected palette tool
+    paintDir: 'right',   // direction used when placing start/forced
+    // test
+    test: false,
+    placed: {},          // key -> tool id
+    testTool: 'up',
+    running: false,
+    frames: [],
+    frameIdx: 0,
+    result: null,
+    reason: '',
+  };
+  let timer = null;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('board'), ctx = canvas.getContext('2d');
+  const key = (r,c) => r*S.n + c;
+  const rowOf = k => Math.floor(k/S.n), colOf = k => k % S.n;
+
+  // ---------- grid setup ----------
+  function newGrid(n, keepDefaults=true){
+    S.n = n;
+    S.grid = new Array(n*n).fill('empty');
+    S.forcedDir = {};
+    S.startKey = null; S.exitKey = null;
+    S.placed = {};
+    if (keepDefaults){
+      // sensible defaults: start bottom-left → right, exit top-right
+      setStart((n-1)*n + 0); S.startDir = 'right';
+      setExit(0*n + (n-1));
+    }
+    stopRun();
+  }
+  function clearCell(k){
+    const t = S.grid[k];
+    if (t === 'start') S.startKey = null;
+    if (t === 'exit') S.exitKey = null;
+    delete S.forcedDir[k];
+    delete S.placed[k];
+    S.grid[k] = 'empty';
+  }
+  function setStart(k){
+    if (S.startKey !== null) S.grid[S.startKey] = 'empty';
+    clearCell(k);
+    S.grid[k] = 'start'; S.startKey = k;
+  }
+  function setExit(k){
+    if (S.exitKey !== null) S.grid[S.exitKey] = 'empty';
+    clearCell(k);
+    S.grid[k] = 'exit'; S.exitKey = k;
+  }
+
+  // ---------- painting ----------
+  function paint(k){
+    const t = S.tool;
+    if (t === 'empty'){ clearCell(k); return; }
+    if (t === 'start'){
+      if (S.grid[k] === 'start'){ S.startDir = rotate(S.startDir); S.paintDir = S.startDir; }
+      else { setStart(k); S.startDir = S.paintDir; }
+      return;
+    }
+    if (t === 'exit'){ if (S.grid[k] !== 'exit') setExit(k); return; }
+    if (t === 'forced'){
+      if (S.grid[k] === 'forced'){ S.forcedDir[k] = rotate(S.forcedDir[k]); S.paintDir = S.forcedDir[k]; }
+      else { clearCell(k); S.grid[k] = 'forced'; S.forcedDir[k] = S.paintDir; }
+      return;
+    }
+    // wall / destroyer / shield
+    clearCell(k); S.grid[k] = t;
+  }
+  const rotate = d => DIRS[(DIRS.indexOf(d)+1) % 4];
+
+  // ---------- test placement ----------
+  function placedCount(tool){
+    let n = 0; for (const v of Object.values(S.placed)) if (v === tool) n++; return n;
+  }
+  function remaining(tool){ return (S.toolkit[tool]||0) - placedCount(tool); }
+
+  function testClick(k){
+    if (S.running){ stopRun(); return; }
+    if (S.placed[k]){ delete S.placed[k]; renderTestChips(); return; }
+    if (S.grid[k] !== 'empty') return;          // only on empty cells
+    if (remaining(S.testTool) <= 0) return;
+    S.placed[k] = S.testTool;
+    renderTestChips();
+  }
+
+  // ---------- simulator (mirrors lib/engine/simulator.dart) ----------
+  function simulate(){
+    const n = S.n;
+    const removed = new Set();
+    const eff = (r,c) => removed.has(r*n+c) ? 'empty' : S.grid[r*n+c];
+    let r = rowOf(S.startKey), c = colOf(S.startKey);
+    let dir = S.startDir, pause = 0, shielded = false;
+    const frames = [{ r, c, dir, shielded, removed:new Set(), boom:null }];
+    const snap = boom => frames.push({ r, c, dir, shielded, removed:new Set(removed), boom });
+    const maxT = n*n*4 + 20;
+    let result = null, reason = '';
+
+    for (let t = 0; t < maxT; t++){
+      if (pause > 0){ pause--; snap(null); continue; }
+      const [dr,dc] = DELTA[dir];
+      const nr = r+dr, nc = c+dc;
+      if (nr<0||nr>=n||nc<0||nc>=n){ result='lose'; reason='Ran off the edge'; break; }
+      if (eff(nr,nc) === 'wall'){ result='lose'; reason='Hit a wall'; break; }
+      r = nr; c = nc; const k = r*n+c;
+      let base = eff(r,c);
+      let boom = null;
+      if (base === 'destroyer'){
+        if (shielded){
+          shielded = false; removed.add(k);
+          const chain = [k];
+          for (const [ar,ac] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]){
+            if (ar<0||ar>=n||ac<0||ac>=n) continue;
+            if (S.grid[ar*n+ac] === 'wall' && !removed.has(ar*n+ac)){
+              removed.add(ar*n+ac); chain.push(ar*n+ac);
+            }
+          }
+          boom = { cells:chain, fatal:false };
+          base = 'empty';
+        } else {
+          snap({ cells:[k], fatal:true }); result='lose'; reason='The dot was destroyed'; break;
+        }
+      }
+      // pickups / direction changes
+      if (base === 'shield') shielded = true;       // pre-placed shield cell
+      if (base === 'forced') dir = S.forcedDir[k];
+      const p = S.placed[k];
+      if (p){ if (p === 'shield') shielded = true; else dir = p; }
+      if (base === 'exit'){ result='win'; snap(boom); break; }
+      snap(boom);
+    }
+    if (!result){ result='lose'; reason='Looped without reaching the exit'; }
+    return { result, reason, frames };
+  }
+
+  // ---------- run / animation ----------
+  function run(){
+    if (S.startKey === null || S.exitKey === null){
+      setBanner('lose', 'Need a Start and an Exit to test.'); return;
+    }
+    const sim = simulate();
+    S.frames = sim.frames; S.result = sim.result; S.reason = sim.reason;
+    S.running = true; S.frameIdx = 0;
+    setBanner('info', 'Running…');
+    draw();
+    clearInterval(timer);
+    timer = setInterval(() => {
+      if (S.frameIdx < S.frames.length - 1){ S.frameIdx++; draw(); }
+      else {
+        clearInterval(timer); timer = null;
+        if (S.result === 'win') setBanner('win', '✓ WIN — the dot reached the exit!');
+        else setBanner('lose', '✗ FAIL — ' + S.reason + '.');
+      }
+    }, 220);
+  }
+  function stopRun(){
+    clearInterval(timer); timer = null;
+    S.running = false; S.frames = []; S.frameIdx = 0; S.result = null;
+    if (S.test) setBanner('info', 'Place toolkit pieces, then Run.');
+    draw();
+  }
+
+  // ---------- drawing ----------
+  function draw(){
+    const dpr = window.devicePixelRatio || 1;
+    const SZ = 560;
+    if (canvas.width !== SZ*dpr){
+      canvas.width = SZ*dpr; canvas.height = SZ*dpr;
+      canvas.style.width = SZ+'px'; canvas.style.height = SZ+'px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,SZ,SZ);
+    const pad = 8, n = S.n, cell = (SZ - pad*2)/n;
+
+    // board
+    roundRect(0,0,SZ,SZ,18); ctx.fillStyle = C.board; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = C.ink; ctx.stroke();
+
+    const frame = S.running ? S.frames[S.frameIdx] : null;
+    const removed = frame ? frame.removed : null;
+
+    for (let r=0;r<n;r++) for (let c=0;c<n;c++){
+      drawCell(r,c,pad,cell,removed);
+    }
+
+    // dot
+    if (frame){
+      const cx = pad + frame.c*cell + cell/2, cy = pad + frame.r*cell + cell/2;
+      if (frame.shielded){
+        ctx.beginPath(); ctx.arc(cx,cy,cell*0.34,0,7);
+        ctx.fillStyle = 'rgba(56,189,248,0.18)'; ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = C.shield; ctx.stroke();
+      }
+      const grd = ctx.createRadialGradient(cx-cell*0.06,cy-cell*0.06,1,cx,cy,cell*0.24);
+      grd.addColorStop(0,'#ffd89b'); grd.addColorStop(1,C.dot);
+      ctx.beginPath(); ctx.arc(cx,cy,cell*0.22,0,7); ctx.fillStyle = grd; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = C.ink; ctx.stroke();
+      if (frame.boom) drawBoom(frame.boom, pad, cell);
+    }
+  }
+
+  function drawCell(r,c,pad,cell,removed){
+    const k = r*S.n + c;
+    let type = (removed && removed.has(k)) ? 'empty' : S.grid[k];
+    const cx = pad + c*cell + cell/2, cy = pad + r*cell + cell/2;
+    const x = pad + c*cell + 3.5, y = pad + r*cell + 3.5, w = cell - 7;
+    roundRect(x,y,w,w,10);
+
+    let fill = C.cell, border = 'rgba(45,45,45,0.85)', glyph = null, gcol = C.ink, mine=false, shield=false, dashed=false;
+    switch(type){
+      case 'start': fill=C.start; border=C.startB; glyph=GLYPH[S.startDir]; gcol='#fff'; break;
+      case 'exit':  fill=C.exit; border=C.exitB; glyph='⚑'; gcol='#fff'; break;
+      case 'wall':  fill=C.wall; border=C.wallB; break;
+      case 'destroyer': fill=C.destroyer; border=C.destroyerB; mine=true; break;
+      case 'forced': fill=C.wall; border=C.wallB; glyph=GLYPH[S.forcedDir[k]]; gcol='#fff'; break;
+      case 'shield': fill=C.shieldFill; border=C.shield; shield=true; break;
+      default: fill=C.cell; border='rgba(45,45,45,0.85)';
+    }
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = border; ctx.stroke();
+    if (glyph) drawGlyph(glyph, cx, cy, gcol, cell*0.42);
+    if (mine) drawMine(cx, cy, cell);
+    if (shield) drawShield(cx, cy, cell*0.26, C.shield);
+
+    // test piece overlay
+    if (S.test && type==='empty' && S.placed[k]){
+      const tool = S.placed[k];
+      ctx.fillStyle = tool==='shield' ? C.shieldFill : C.arrowFill;
+      roundRect(x+3,y+3,w-6,w-6,8); ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = tool==='shield' ? C.shield : C.arrow; ctx.stroke();
+      if (tool==='shield') drawShield(cx,cy,cell*0.24,C.shield);
+      else drawGlyph(GLYPH[tool], cx, cy, C.arrow, cell*0.42);
+    }
+  }
+
+  function drawGlyph(s,cx,cy,col,size){
+    ctx.fillStyle = col; ctx.font = '900 '+size+'px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(s, cx, cy + size*0.04);
+  }
+  function drawMine(cx,cy,cell){
+    const body = cell*0.19, spike = cell*0.11;
+    ctx.strokeStyle = C.ink; ctx.lineWidth = cell*0.055; ctx.lineCap='round';
+    for (let i=0;i<8;i++){
+      const a = i/8*Math.PI*2, dx=Math.cos(a), dy=Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(cx+dx*body*0.85, cy+dy*body*0.85);
+      ctx.lineTo(cx+dx*(body+spike), cy+dy*(body+spike)); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx,cy,body,0,7); ctx.fillStyle=C.ink; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx-body*0.32,cy-body*0.32,body*0.3,0,7);
+    ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.fill();
+  }
+  function drawShield(cx,cy,rad,col){
+    ctx.beginPath(); ctx.arc(cx,cy,rad,0,7);
+    ctx.fillStyle='rgba(56,189,248,0.18)'; ctx.fill();
+    ctx.lineWidth = rad*0.22; ctx.strokeStyle=col; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,rad*0.6, Math.PI*1.05, Math.PI*1.65);
+    ctx.lineWidth = rad*0.16; ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineCap='round'; ctx.stroke();
+  }
+  function drawBoom(boom, pad, cell){
+    for (const k of boom.cells){
+      const cx = pad + colOf(k)*cell + cell/2, cy = pad + rowOf(k)*cell + cell/2;
+      ctx.beginPath(); ctx.arc(cx,cy,cell*0.42,0,7);
+      ctx.fillStyle = boom.fatal ? 'rgba(239,83,80,0.55)' : 'rgba(255,138,101,0.55)'; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      for (let i=0;i<8;i++){ const a=i/8*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*cell*0.12, cy+Math.sin(a)*cell*0.12);
+        ctx.lineTo(cx+Math.cos(a)*cell*0.4, cy+Math.sin(a)*cell*0.4); ctx.stroke(); }
+    }
+  }
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+
+  // ---------- canvas interaction ----------
+  function cellAt(ev){
+    const rect = canvas.getBoundingClientRect();
+    const pad = 8, cell = (560 - pad*2)/S.n;
+    const x = (ev.clientX - rect.left) - pad, y = (ev.clientY - rect.top) - pad;
+    const c = Math.floor(x/cell), r = Math.floor(y/cell);
+    if (r<0||r>=S.n||c<0||c>=S.n) return null;
+    return r*S.n + c;
+  }
+  let painting = false;
+  canvas.addEventListener('pointerdown', ev => {
+    const k = cellAt(ev); if (k===null) return;
+    if (S.test){ testClick(k); draw(); return; }
+    painting = true; paint(k); draw();
+  });
+  canvas.addEventListener('pointermove', ev => {
+    if (!painting || S.test) return;
+    const k = cellAt(ev); if (k===null) return;
+    // don't drag-cycle start/forced; only continuous-paint static types
+    if (['wall','destroyer','shield','empty'].includes(S.tool)){ paint(k); draw(); }
+  });
+  window.addEventListener('pointerup', () => { painting = false; });
+
+  // ---------- UI: palette ----------
+  function buildPalette(){
+    const el = $('palette'); el.innerHTML='';
+    PALETTE.forEach((p,i) => {
+      const d = document.createElement('div');
+      d.className = 'pal-item' + (S.tool===p.id?' sel':'');
+      d.innerHTML = `<div class="pal-swatch" style="background:${p.bg};color:${p.fg}">${p.g}</div>
+        <span class="nm">${p.label}</span><span class="kbd">${i+1}</span>`;
+      d.onclick = () => { S.tool = p.id; buildPalette(); };
+      el.appendChild(d);
+    });
+  }
+
+  // ---------- UI: toolkit ----------
+  function buildToolkit(){
+    const el = $('toolkit'); el.innerHTML='';
+    TOOLS.forEach(t => {
+      const row = document.createElement('div'); row.className='row';
+      row.innerHTML = `<span class="nm"><span class="mini" style="border-color:${C.ink};color:${t.col};background:#fff">${t.g}</span>${t.label}</span>`;
+      const ctr = document.createElement('div'); ctr.className='counter';
+      const minus = btn('–', () => { S.toolkit[t.id]=Math.max(0,S.toolkit[t.id]-1); buildToolkit(); renderTestChips(); });
+      const val = document.createElement('span'); val.className='val'; val.textContent = S.toolkit[t.id];
+      const plus = btn('+', () => { S.toolkit[t.id]=Math.min(99,S.toolkit[t.id]+1); buildToolkit(); renderTestChips(); });
+      ctr.append(minus,val,plus); row.appendChild(ctr); el.appendChild(row);
+    });
+  }
+  function btn(txt,fn){ const b=document.createElement('button'); b.textContent=txt; b.onclick=fn; return b; }
+
+  // ---------- UI: test chips ----------
+  function renderTestChips(){
+    const el = $('testChips'); el.innerHTML='';
+    const any = TOOLS.some(t => (S.toolkit[t.id]||0) > 0);
+    if (!any){ el.innerHTML = '<span class="hint">Toolkit is empty — add pieces on the left, or just Run (no pieces).</span>'; return; }
+    TOOLS.forEach(t => {
+      if ((S.toolkit[t.id]||0) <= 0) return;
+      const rem = remaining(t.id);
+      const c = document.createElement('div');
+      c.className = 'chip' + (S.testTool===t.id?' sel':'') + (rem<=0?' empty':'');
+      c.innerHTML = `<span class="mini" style="color:${t.col};background:#fff">${t.g}</span>${t.label} <span class="cnt">${rem} left</span>`;
+      c.onclick = () => { S.testTool = t.id; renderTestChips(); };
+      el.appendChild(c);
+    });
+  }
+
+  function setBanner(cls,msg){ const b=$('banner'); b.className=cls; b.textContent=msg; }
+
+  // ---------- mode ----------
+  function setMode(test){
+    S.test = test; stopRun(); S.placed = {};
+    $('modeDesign').classList.toggle('on', !test);
+    $('modeTest').classList.toggle('on', test);
+    $('testControls').style.display = test ? 'block' : 'none';
+    setBanner('info', test ? 'Place toolkit pieces, then Run.' : 'Design mode — paint the level.');
+    if (test){ const a=TOOLS.find(t=>(S.toolkit[t.id]||0)>0); S.testTool = a?a.id:'up'; renderTestChips(); }
+    draw();
+  }
+
+  // ---------- export / import ----------
+  function buildLevelObject(){
+    const n = S.n, walls=[], destroyers=[], forcedArrows=[];
+    let shields = 0;
+    for (let k=0;k<n*n;k++){
+      const r=rowOf(k), c=colOf(k);
+      if (S.grid[k]==='wall') walls.push({row:r,col:c});
+      else if (S.grid[k]==='destroyer') destroyers.push({row:r,col:c});
+      else if (S.grid[k]==='forced') forcedArrows.push({row:r,col:c,dir:S.forcedDir[k]});
+      else if (S.grid[k]==='shield') shields++;
+    }
+    return {
+      obj: {
+        number: parseInt($('number').value||'0',10),
+        title: $('title').value || '',
+        difficulty: $('difficulty').value,
+        gridSize: n,
+        start: S.startKey!==null ? { row:rowOf(S.startKey), col:colOf(S.startKey) } : null,
+        startDir: S.startDir,
+        exit: S.exitKey!==null ? { row:rowOf(S.exitKey), col:colOf(S.exitKey) } : null,
+        walls, destroyers, forcedArrows,
+        toolkit: { up:S.toolkit.up, down:S.toolkit.down, left:S.toolkit.left, right:S.toolkit.right, shield:S.toolkit.shield },
+      },
+      paintedShields: shields,
+    };
+  }
+  function exportJSON(){
+    const { obj, paintedShields } = buildLevelObject();
+    $('json').value = JSON.stringify(obj, null, 2);
+    let note = 'Exported in level_definitions.dart format.';
+    if (obj.start===null || obj.exit===null) note += '  ⚠ Missing Start/Exit.';
+    if (paintedShields>0) note += `  ⚠ ${paintedShields} pre-placed shield marker(s) are NOT in the export (the format has no shield cells — set the toolkit shield count instead).`;
+    $('exportNote').textContent = note;
+  }
+  function importJSON(){
+    let data;
+    try { data = JSON.parse($('json').value); }
+    catch(e){ $('exportNote').textContent = '⚠ Invalid JSON: '+e.message; return; }
+    try {
+      const n = clamp(data.gridSize||5, 3, 9);
+      $('size').value = String(n);
+      newGrid(n, false);
+      $('number').value = data.number ?? 0;
+      $('title').value = data.title ?? '';
+      $('difficulty').value = (data.difficulty||'medium').toLowerCase();
+      if (data.start){ setStart(key(data.start.row, data.start.col)); }
+      S.startDir = data.startDir || 'right';
+      if (data.exit){ setExit(key(data.exit.row, data.exit.col)); }
+      (data.walls||[]).forEach(w => { clearCell(key(w.row,w.col)); S.grid[key(w.row,w.col)]='wall'; });
+      (data.destroyers||[]).forEach(d => { clearCell(key(d.row,d.col)); S.grid[key(d.row,d.col)]='destroyer'; });
+      (data.forcedArrows||[]).forEach(f => { const k=key(f.row,f.col); clearCell(k); S.grid[k]='forced'; S.forcedDir[k]=f.dir||'right'; });
+      const tk = data.toolkit||{};
+      S.toolkit = { up:tk.up||0, down:tk.down||0, left:tk.left||0, right:tk.right||0, shield:tk.shield||0 };
+      buildToolkit(); buildPalette(); draw();
+      $('exportNote').textContent = 'Imported level '+(data.number ?? '')+'.';
+    } catch(e){ $('exportNote').textContent = '⚠ Import error: '+e.message; }
+  }
+  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+
+  function download(){
+    exportJSON();
+    const obj = JSON.parse($('json').value);
+    const blob = new Blob([$('json').value], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'level_'+(obj.number||'x')+'.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ---------- keyboard ----------
+  window.addEventListener('keydown', ev => {
+    const tag = (ev.target.tagName||'').toLowerCase();
+    if (tag==='input' || tag==='textarea' || tag==='select') return;
+    if ((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==='s'){ ev.preventDefault(); exportJSON(); return; }
+    if (ev.key>='1' && ev.key<='7'){ S.tool = PALETTE[+ev.key-1].id; buildPalette(); return; }
+    if (ev.key.toLowerCase()==='r'){
+      S.paintDir = rotate(S.paintDir);
+      if (S.tool==='start' && S.startKey!==null) S.startDir = S.paintDir;
+      draw();
+    }
+  });
+
+  // ---------- wire up ----------
+  $('size').onchange = e => { newGrid(parseInt(e.target.value,10)); draw(); };
+  $('modeDesign').onclick = () => setMode(false);
+  $('modeTest').onclick = () => setMode(true);
+  $('runBtn').onclick = run;
+  $('clearPlaced').onclick = () => { S.placed = {}; renderTestChips(); draw(); };
+  $('exportBtn').onclick = exportJSON;
+  $('copyBtn').onclick = () => { exportJSON(); navigator.clipboard && navigator.clipboard.writeText($('json').value); $('exportNote').textContent='Copied to clipboard.'; };
+  $('importBtn').onclick = importJSON;
+  $('downloadBtn').onclick = download;
+
+  // ---------- init ----------
+  newGrid(5);
+  buildPalette(); buildToolkit(); renderTestChips(); draw();
+})();
+</script>
+</body>
+</html>
