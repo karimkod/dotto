@@ -469,10 +469,14 @@ const Map<int, LevelData> levelDefinitions = {
     title: 'Break Through',
     tip: 'A shielded hit also destroys the walls beside the destroyer. Open it.',
     start: StartSpec(2, 0, Direction.right),
-    exit: Pos(2, 4),
-    destroyers: [Pos(2, 2)],
-    walls: [Pos(1, 3), Pos(2, 3), Pos(3, 3)],
-    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+    exit: Pos(0, 4),
+    walls: [Pos(0, 3), Pos(1, 3), Pos(1, 4)],
+    destroyers: [Pos(0, 2)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
   ),
 
   // 25 — Choose Your Bomb: only the destroyer beside the right wall opens a way.

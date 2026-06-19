@@ -80,7 +80,7 @@ void main() {
       (3, 1, Direction.right),
       (3, 4, Direction.down),
     ],
-    24: [],
+    24: [(0, 1, Direction.right), (2, 1, Direction.up)],
     25: [],
     26: [(5, 0, Direction.right)],
     27: [],
@@ -99,7 +99,7 @@ void main() {
     21: [(3, 2)],
     22: [(2, 2)],
     23: [(3, 2)],
-    24: [(2, 1)],
+    24: [(1, 1)],
     25: [(1, 2)],
     26: [(1, 0), (5, 1)],
     27: [(2, 1)],
@@ -170,8 +170,11 @@ void main() {
   // World 3 spot-check: the chain explosion is genuinely required.
   test('World 3 — Break Through (24) needs the shield to clear the wall', () {
     final level = levelDataFor(24)!;
-    expect(simulate(level, place(level, const [], const [(2, 1)])),
+    const arrows = [(0, 1, Direction.right), (2, 1, Direction.up)];
+    // The shield blasts the wall blocking the exit; the same arrows without it
+    // run the dot into the destroyer.
+    expect(simulate(level, place(level, arrows, const [(1, 1)])),
         SimOutcome.win);
-    expect(simulate(level, const {}), SimOutcome.lose);
+    expect(simulate(level, place(level, arrows)), SimOutcome.lose);
   });
 }

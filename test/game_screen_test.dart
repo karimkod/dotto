@@ -272,9 +272,12 @@ void main() {
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 5);
-    // The single shield goes at (2,1), before the destroyer at (2,2).
-    await _dragArrow(
-        tester, tester.getCenter(find.text('SHIELD')), boardRect.topLeft + geo.center(2, 1));
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+    // Solution: Up(2,1), Shield(1,1), Right(0,1) → the shielded hit on the
+    // destroyer at (0,2) blasts the wall (0,3) blocking the exit.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(2, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(1, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 1));
 
     await runToWin(tester);
 
