@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../data/levels.dart';
@@ -7,6 +8,7 @@ import '../widgets/level_card.dart';
 import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
 import 'game_screen.dart';
+import 'level_designer_screen.dart';
 
 /// Vertical slot height per level node on the path.
 const double _slotHeight = 116;
@@ -205,6 +207,17 @@ class _MenuScreenState extends State<MenuScreen> {
             _SideIcon(icon: Icons.lock_outline_rounded, locked: true),
             const SizedBox(height: 14),
             _SideIcon(icon: Icons.calendar_today_rounded, onTap: () {}),
+            // Dev-only: open the level designer (debug builds only).
+            if (kDebugMode) ...[
+              const SizedBox(height: 14),
+              _SideIcon(
+                icon: Icons.build_rounded,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const LevelDesignerScreen()),
+                ),
+              ),
+            ],
           ],
         ),
       ),

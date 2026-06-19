@@ -31,9 +31,14 @@ const _tickMs = 400;
 /// [GestureDetector] (no [DragTarget]) so all coordinate math is under our
 /// control — reliable across platforms including web.
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.level});
+  const GameScreen({super.key, required this.level, this.levelOverride});
 
   final Level level;
+
+  /// When set (used by the dev level designer), the screen plays this level
+  /// definition directly instead of looking it up by number. Progress is not
+  /// recorded and there is no "next level".
+  final LevelData? levelOverride;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -183,7 +188,7 @@ class _GameScreenState extends State<GameScreen>
         setState(() => _showHand = false);
       }
     });
-    _level = levelDataFor(widget.level.number);
+    _level = widget.levelOverride ?? levelDataFor(widget.level.number);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
       for (final e in _level!.toolkit) {
@@ -746,8 +751,8 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _timer = null;
     Sfx.exit();
-    // Record completion → unlocks the next level.
-    ProgressStore.markCompleted(_level!.id);
+    // Record completion → unlocks the next level (skipped for designer tests).
+    if (widget.levelOverride == null) ProgressStore.markCompleted(_level!.id);
     // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
       _status = GameStatus.won;
@@ -1433,7 +1438,8 @@ class _GameScreenState extends State<GameScreen>
   /// Post-celebration control: a single Continue (or Back to Menu on the last
   /// level). One clean action — no Replay / Menu.
   Widget _buildContinueCluster() {
-    final hasNext = levelDataFor(_level!.id + 1) != null;
+    final hasNext =
+        widget.levelOverride == null && levelDataFor(_level!.id + 1) != null;
     return SizedBox(
       width: double.infinity,
       child: _PillButton(
