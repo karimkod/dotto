@@ -407,16 +407,26 @@ const Map<int, LevelData> levelDefinitions = {
 
   // ----- Learn shields (21–23) -----
 
-  // 21 — Shield Up: grab the shield, then survive the destroyer in the way.
+  // 21 — Trapdoor: the only way into the walled-off exit is past a mine. Shield
+  // through it (which destroys it), ride the fixed arrow's drop, then climb back
+  // up through the now-clear gap to the exit.
   21: LevelData(
     id: 21,
-    size: 4,
-    title: 'Shield Up',
-    tip: 'Place the shield before the destroyer. The aura lets the dot survive.',
-    start: StartSpec(3, 0, Direction.right),
-    exit: Pos(3, 3),
-    destroyers: [Pos(3, 2)],
-    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+    size: 5,
+    title: 'Trapdoor',
+    tip: 'Shield through the mine to clear it, take the drop, then climb back up '
+        'through the gap.',
+    start: StartSpec(2, 1, Direction.right),
+    exit: Pos(0, 4),
+    walls: [Pos(0, 1), Pos(0, 2), Pos(1, 1), Pos(1, 2)],
+    destroyers: [Pos(2, 3)],
+    forcedArrows: [ForcedArrow(2, 4, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
   ),
 
   // 22 — Must Shield: the destroyer is dead ahead with no way around it.
