@@ -139,12 +139,14 @@ void paintMineIcon(Canvas canvas, Offset center, double cell, double tick) {
   );
 }
 
-/// One destroyer-explosion in progress: a cell key, a [t] (0→1 over ~0.5s)
-/// advanced by the host, and a fixed set of flying fragments.
+/// One explosion in progress: a cell key, a [t] (0→1 over ~0.5s) advanced by
+/// the host, a fixed set of flying fragments and a [tint] for its flash/ring
+/// (warm for a destroyer, gray for a shattering wall).
 class Explosion {
-  Explosion(this.cell, this.frags);
+  Explosion(this.cell, this.frags, {this.tint = const Color(0xFFFF8A65)});
   final int cell;
   final List<Frag> frags;
+  final Color tint;
   double t = 0;
 }
 
@@ -449,7 +451,7 @@ class GameGridPainter extends CustomPainter {
         center,
         fr,
         Paint()
-          ..color = Color.lerp(Colors.white, _C.destroyer, flashT)!
+          ..color = Color.lerp(Colors.white, e.tint, flashT)!
               .withValues(alpha: (1 - flashT) * 0.9)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
@@ -463,7 +465,7 @@ class GameGridPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = (1 - t) * 5 + 1
-        ..color = const Color(0xFFFF8A65).withValues(alpha: (1 - t) * 0.8),
+        ..color = e.tint.withValues(alpha: (1 - t) * 0.8),
     );
 
     // 3) Fragments: decelerate (easeOut) outward, with a little gravity.
@@ -527,9 +529,8 @@ class GameGridPainter extends CustomPainter {
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
     var base = level.baseTypeAt(r, c);
-    // A destroyer blown up by a shielded dot is rendered as an empty cell.
-    if ((base == CellType.destroyer || base == CellType.movingDestroyer) &&
-        destroyedCells.contains(r * geo.n + c)) {
+    // A destroyer or wall cleared by a chain explosion renders as empty.
+    if (destroyedCells.contains(r * geo.n + c)) {
       base = CellType.empty;
     }
 

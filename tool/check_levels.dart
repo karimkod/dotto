@@ -15,7 +15,7 @@ void main(List<String> args) {
         args.firstWhere((a) => int.tryParse(a) != null, orElse: () => ''),
       ) ??
       1;
-  for (var n = from; n <= 30; n++) {
+  for (var n = from; n <= 40; n++) {
     final lvl = levelDataFor(n);
     if (lvl == null) continue;
     final total = toolkitTotal(lvl);
@@ -36,7 +36,7 @@ void main(List<String> args) {
       final desc = (s.entries.toList()
             ..sort((a, b) => a.key.compareTo(b.key)))
           .map((e) =>
-              '(${e.key ~/ lvl.size},${e.key % lvl.size},${e.value.direction!.name})')
+              '(${e.key ~/ lvl.size},${e.key % lvl.size},${e.value.direction?.name ?? 'shield'})')
           .join(' ');
       print('   sample: $desc');
     }

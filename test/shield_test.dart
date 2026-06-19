@@ -67,4 +67,38 @@ void main() {
     );
     expect(simulate(level, {0 * 4 + 1: _shield()}), SimOutcome.lose);
   });
+
+  test('chain explosion clears the wall adjacent to the destroyer', () {
+    // start (2,0)→right, exit (2,5), destroyer (2,2) with a wall at (2,3).
+    final level = LevelData(
+      id: 903,
+      size: 6,
+      title: 'chain',
+      tip: '',
+      start: const StartSpec(2, 0, Direction.right),
+      exit: const Pos(2, 5),
+      destroyers: const [Pos(2, 2)],
+      walls: const [Pos(2, 3)],
+      toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+    );
+    // Shield at (2,1): the hit on (2,2) demolishes the adjacent wall (2,3).
+    expect(simulate(level, {2 * 6 + 1: _shield()}), SimOutcome.win);
+  });
+
+  test('chain explosion does NOT clear a non-adjacent wall', () {
+    // Same, but the wall is at (2,4) — two cells from the destroyer (2,2), so it
+    // is not demolished and the dot dies on it even when shielded.
+    final level = LevelData(
+      id: 904,
+      size: 6,
+      title: 'chain-far',
+      tip: '',
+      start: const StartSpec(2, 0, Direction.right),
+      exit: const Pos(2, 5),
+      destroyers: const [Pos(2, 2)],
+      walls: const [Pos(2, 4)],
+      toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+    );
+    expect(simulate(level, {2 * 6 + 1: _shield()}), SimOutcome.lose);
+  });
 }

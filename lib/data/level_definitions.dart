@@ -6,10 +6,15 @@ import '../models/level_data.dart';
 /// World 1 (levels 1–15): from "press Play" to multi-turn routing around walls
 /// and fixed (forced) arrows.
 ///
-/// World 2 (levels 16–30): Static Destroyers. Red cells kill the dot on contact,
-/// so the toolkit's specific arrows must thread a safe route. Every level is
-/// solver-verified tight — `pathMinPieces == toolkitTotal`, so no piece is ever
-/// wasted (see tool/check_levels.dart and test/levels_solvable_test.dart).
+/// World 2 (levels 16–25): Static Destroyers. Red cells kill the dot on contact,
+/// so the toolkit's specific arrows must thread a safe route.
+///
+/// World 3 (levels 26–40): Shields & Explosions. The Shield aura lets the dot
+/// survive one destroyer; the hit chain-explodes the walls adjacent to it,
+/// turning destroyers-next-to-walls into doors.
+///
+/// Every level is solver-verified tight — `pathMinPieces == toolkitTotal`, so no
+/// piece is ever wasted (see tool/check_levels.dart and the solver tests).
 const Map<int, LevelData> levelDefinitions = {
   // 1 — no toolkit. The dot just walks straight to the exit on Play.
   1: LevelData(
@@ -494,105 +499,246 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Exams (26–30): combine World 1 (walls, forced arrows) + World 2. -----
+  // ======================= WORLD 3 — SHIELDS & EXPLOSIONS ====================
+  // Levels 26–40. The Shield aura lets the dot survive one destroyer; the hit
+  // also CHAIN-EXPLODES every wall orthogonally adjacent to that destroyer,
+  // turning destroyers-next-to-walls into doors. All solver-verified tight.
 
-  // 26 — Switchback: a descending staircase; destroyers block the column drops,
-  // a wall island sits off the path.
+  // ----- Learn shields (26–28) -----
+
+  // 26 — Shield Up: grab the shield, then survive the destroyer in the way.
   26: LevelData(
     id: 26,
-    size: 6,
-    title: 'Switchback',
-    tip: 'Zig-zag down the board — the destroyers block every shortcut.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(5, 5),
-    walls: [Pos(4, 4)],
-    destroyers: [Pos(0, 3), Pos(3, 1), Pos(3, 2), Pos(4, 2)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
+    size: 4,
+    title: 'Shield Up',
+    tip: 'Place the shield before the destroyer. The aura lets the dot survive.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(3, 3),
+    destroyers: [Pos(3, 2)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 27 — The Gauntlet: a centre start that must spiral all the way around the
-  // outside; destroyers and wall islands seal off every shortcut.
+  // 27 — Must Shield: the destroyer is dead ahead with no way around it.
   27: LevelData(
     id: 27,
-    size: 7,
-    title: 'The Gauntlet',
-    tip: 'From the centre, spiral around the outside to the far corner.',
-    start: StartSpec(3, 3, Direction.up),
-    exit: Pos(0, 6),
-    walls: [Pos(4, 4), Pos(4, 5), Pos(2, 2)],
-    destroyers: [Pos(0, 4), Pos(2, 5), Pos(1, 5), Pos(5, 3)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowUp, 1),
-    ],
+    size: 5,
+    title: 'Must Shield',
+    tip: 'No way around — you must shield up and go straight through.',
+    start: StartSpec(4, 2, Direction.up),
+    exit: Pos(0, 2),
+    destroyers: [Pos(2, 2)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 28 — Threaded: two fixed arrows carve a partial path through a destroyer
-  // field; you fill the three remaining turns.
+  // 28 — Shield Timing: pick up the shield FIRST, then turn into the destroyer.
   28: LevelData(
     id: 28,
-    size: 7,
-    title: 'Threaded',
-    tip: 'The fixed arrows start the route. Fill the gaps through the field.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(6, 6),
-    destroyers: [Pos(5, 2), Pos(3, 4), Pos(4, 5), Pos(4, 1), Pos(1, 6)],
-    forcedArrows: [
-      ForcedArrow(2, 0, Direction.right),
-      ForcedArrow(2, 2, Direction.down),
-    ],
+    size: 5,
+    title: 'Shield Timing',
+    tip: 'Order matters: route through the shield first, then into the danger.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(4, 4),
+    destroyers: [Pos(3, 4)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
-  // 29 — No Margin: a dense 7x7 with a fixed arrow and walls; the minimal
-  // toolkit leaves no room for a wasted move.
+  // ----- Shield + path clearing (29–32) -----
+
+  // 29 — Break Through: a shielded hit blasts the wall blocking the exit.
   29: LevelData(
     id: 29,
+    size: 5,
+    title: 'Break Through',
+    tip: 'A shielded hit also destroys the walls beside the destroyer. Open it.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 4),
+    destroyers: [Pos(2, 2)],
+    walls: [Pos(1, 3), Pos(2, 3), Pos(3, 3)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+  ),
+
+  // 30 — Choose Your Bomb: only the destroyer beside the right wall opens a way.
+  30: LevelData(
+    id: 30,
+    size: 5,
+    title: 'Choose Your Bomb',
+    tip: 'One destroyer opens the path; the other is just a trap. Pick wisely.',
+    start: StartSpec(0, 2, Direction.down),
+    exit: Pos(4, 2),
+    destroyers: [Pos(2, 2), Pos(1, 4)],
+    walls: [Pos(3, 2), Pos(1, 3)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+  ),
+
+  // 31 — Double Breach: two destroyer-doors, two shields and a turn.
+  31: LevelData(
+    id: 31,
+    size: 6,
+    title: 'Double Breach',
+    tip: 'Two walls, two doors. Shield up for each blast.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(5, 5),
+    destroyers: [Pos(2, 0), Pos(5, 2)],
+    walls: [Pos(3, 0), Pos(5, 3)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 32 — Demolition: one keystone destroyer levels a whole wall cluster.
+  32: LevelData(
+    id: 32,
+    size: 6,
+    title: 'Demolition',
+    tip: 'A single shielded blast clears every wall around the destroyer.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 5),
+    destroyers: [Pos(2, 2)],
+    walls: [Pos(1, 2), Pos(1, 3), Pos(2, 3), Pos(3, 2), Pos(3, 3)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+  ),
+
+  // ----- Challenge (33–35) -----
+
+  // 33 — Detour Blast: the exit is walled off; route to the door and breach it.
+  33: LevelData(
+    id: 33,
+    size: 6,
+    title: 'Detour Blast',
+    tip: 'The exit is boxed in. Find the destroyer-door and blow it open.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(5, 5),
+    destroyers: [Pos(5, 3)],
+    walls: [Pos(4, 5), Pos(5, 4)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 34 — Pinned Breach: ride the fixed arrow, breach a wall, drop to the exit.
+  34: LevelData(
+    id: 34,
     size: 7,
-    title: 'No Margin',
-    tip: 'Tight quarters and few arrows. Every placement has to count.',
+    title: 'Pinned Breach',
+    tip: 'The fixed arrow turns the corner. Breach the wall, then drop home.',
+    start: StartSpec(6, 0, Direction.up),
+    exit: Pos(6, 6),
+    destroyers: [Pos(0, 3)],
+    walls: [Pos(0, 4)],
+    forcedArrows: [ForcedArrow(0, 0, Direction.right)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 35 — Twin Doors: two doors in series — breach, turn, breach again.
+  35: LevelData(
+    id: 35,
+    size: 7,
+    title: 'Twin Doors',
+    tip: 'Two doors, one after the other. Carry a shield into each.',
+    start: StartSpec(1, 0, Direction.right),
+    exit: Pos(5, 4),
+    destroyers: [Pos(1, 2), Pos(3, 4)],
+    walls: [Pos(1, 3), Pos(4, 4)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // ----- Exams (36–40): combine arrows, walls, forced arrows, deadly + door
+  // destroyers and shields. Open layouts, growing to 8x8. -----
+
+  // 36 — a boxed exit door, with a deadly destroyer to steer clear of.
+  36: LevelData(
+    id: 36,
+    size: 6,
+    title: 'Live Wire',
+    tip: 'Breach the door to the exit — and don\'t touch the loose destroyer.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(5, 5),
+    destroyers: [Pos(5, 3), Pos(2, 2)],
+    walls: [Pos(4, 5), Pos(5, 4)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 37 — Wall Breaker: punch through the wall on the floor, then climb.
+  37: LevelData(
+    id: 37,
+    size: 7,
+    title: 'Wall Breaker',
+    tip: 'Breach the wall across the floor, then turn up to the exit.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 6),
-    walls: [Pos(5, 5), Pos(2, 2)],
-    destroyers: [Pos(3, 3), Pos(4, 5), Pos(3, 1)],
-    forcedArrows: [ForcedArrow(6, 3, Direction.up)],
+    destroyers: [Pos(6, 2)],
+    walls: [Pos(6, 3)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.arrowUp, 1),
     ],
   ),
 
-  // 30 — Last Stand: the World 2 finale. A wide-open 8x8 strewn with destroyers
-  // and one wall; the full five-arrow staircase is the only way up.
-  30: LevelData(
-    id: 30,
-    size: 8,
-    title: 'Last Stand',
-    tip: 'Destroyers everywhere. Build the full staircase to the top corner.',
-    start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 7),
-    walls: [Pos(4, 4)],
-    destroyers: [
-      Pos(7, 3),
-      Pos(3, 2),
-      Pos(4, 6),
-      Pos(0, 5),
-      Pos(4, 1),
-      Pos(6, 4),
-      Pos(3, 7),
-      Pos(5, 5),
-    ],
+  // 38 — Boxed In: drop down, run across and breach the door to the corner.
+  38: LevelData(
+    id: 38,
+    size: 7,
+    title: 'Boxed In',
+    tip: 'The exit is sealed. Work down to the door and blast your way in.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(6, 6),
+    destroyers: [Pos(6, 4)],
+    walls: [Pos(5, 6), Pos(6, 5)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 3),
-      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 39 — The Vault: a big 8x8; reach the sealed corner, dodging a loose mine.
+  39: LevelData(
+    id: 39,
+    size: 8,
+    title: 'The Vault',
+    tip: 'Cross the board to the sealed corner and breach the vault door.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(7, 7),
+    destroyers: [Pos(7, 5), Pos(0, 3)],
+    walls: [Pos(6, 7), Pos(7, 6)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 40 — Grand Demolition: the World 3 finale. A wide 8x8 minefield with a
+  // sealed exit; thread past the loose mines and breach the vault.
+  40: LevelData(
+    id: 40,
+    size: 8,
+    title: 'Grand Demolition',
+    tip: 'Mines everywhere. Thread to the sealed corner and blow it open.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(7, 7),
+    destroyers: [Pos(7, 5), Pos(4, 1), Pos(2, 5)],
+    walls: [Pos(6, 7), Pos(7, 6)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 };

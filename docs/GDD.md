@@ -78,7 +78,9 @@ Each tick, resolved in order:
 5. Move into the next cell; record the trail; then apply the cell:
    - **Gap** → die ("fell into a hole").
    - **Destroyer** → if the dot is **shielded**, the destroyer is destroyed, the
-     shield is spent, and the dot survives; otherwise **die** (with an explosion).
+     shield is spent, every **wall orthogonally adjacent** to that destroyer is
+     **chain-exploded** (removed, opening a path), and the dot survives and
+     continues; otherwise **die** (with an explosion).
    - **Arrow** → adopt its direction.
    - **Pause** → halt for 2 ticks.
    - **Shield** → gain a one-use protective aura (only one at a time).
@@ -115,7 +117,7 @@ removing returns it. Optional star goals reward solving with fewer pieces.
 | **Arrow** (Up/Down/Left/Right) | Blue `#1E88E5` | Redirect the dot to a new heading |
 | **Pause** | Purple `#BA68C8` | Hold the dot in place for 2 ticks |
 | **Teleporter** | Orange `#FF8A65` | Placed in pairs; enter one, exit the other |
-| **Shield** | Cyan `#38BDF8` | A bubble that gives the dot a one-use protective aura. The next destroyer it touches is **destroyed** and the dot **survives** (the aura is then spent). Only one shield can be held at a time; an unshielded dot dies normally. |
+| **Shield** | Cyan `#38BDF8` | A bubble that gives the dot a one-use protective aura. The next destroyer it touches is **destroyed** and the dot **survives** (the aura is then spent), and every **wall adjacent** to that destroyer is **chain-exploded** away — turning a destroyer-next-to-a-wall into a *door*. Only one shield at a time; an unshielded dot dies normally. |
 
 ### 3.3 Proposed elements (roadmap — not yet implemented)
 | Element | Concept |
@@ -148,8 +150,9 @@ The game is structured into 50 worlds with 15 levels each (750 levels). Each wor
 
 ### Phase 1: Foundations (Worlds 1-3, 45 levels)
 - **World 1:** Arrows + walls + forced arrows (tutorial world, done)
-- **World 2:** Static destroyers intro
-- **World 3:** Destroyers + walls + forced arrows combined
+- **World 2:** Static destroyers intro (10 levels, 16–25, done)
+- **World 3:** Shields + chain explosions — shielded hits blast adjacent walls
+  into doors (15 levels, 26–40, done)
 
 ### Phase 2: Timing (Worlds 4-6, 45 levels)
 - **World 4:** Pause blocks intro
@@ -268,6 +271,8 @@ hazards red, start green, exit gold).
 - **Destroyer hit:** a ~0.5s explosion — white-hot flash, expanding shock ring,
   and red/orange/yellow fragments that fly out, decelerate, fall and fade — then
   the fail card (or, if shielded, the dot survives and the destroyer is cleared).
+- **Chain explosion:** each demolished wall shatters with its own gray fragment
+  burst, and the cleared cells render as open floor for the rest of the run.
 - **Shield aura:** a glowing cyan bubble around the dot while it is shielded.
 
 ---
@@ -335,9 +340,11 @@ anywhere on the grid across platforms.
 - Core puzzle engine (arrows, walls, edges, destroyers, gaps, pause, teleporter,
   shield).
 - **Shield** element: a one-use protective aura that destroys the next destroyer
-  the dot touches and lets it survive.
-- Destroyer explosion FX (flash + fragments + boom) on a fatal or shielded hit;
-  spiky sea-mine destroyer icon.
+  the dot touches, lets it survive, and **chain-explodes the adjacent walls**
+  (destroyer-doors). Single source of truth in the simulator + path solver.
+- Destroyer explosion FX (flash + fragments + boom) on a fatal or shielded hit,
+  plus gray wall-shatter bursts for chain explosions; spiky sea-mine icon.
+- 40 levels across 3 worlds (World 3 = Shields & Explosions, levels 26–40).
 - Drag-and-drop placement, move, and removal; tap fallback.
 - Full juice pass (animations) and Web Audio SFX.
 - Boardgame art style across menu and game; winding level path; start-direction

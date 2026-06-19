@@ -229,33 +229,56 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (30) shows Back to Menu, not Continue',
+  testWidgets('last level (40) shows Back to Menu, not Continue',
       (tester) async {
-    const level30 = Level(
-      id: 30,
-      number: 30,
-      title: 'Last Stand',
+    const level40 = Level(
+      id: 40,
+      number: 40,
+      title: 'Grand Demolition',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level30)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level40)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 8);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: Up(7,2), Right(4,2), Up(4,3), Right(1,3), Up(1,7).
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 2));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(4, 2));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(4, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(1, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(1, 7));
+    // Solution: Down(0,4), Shield(6,4), Right(7,4) → breach the vault door.
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(0, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(6, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 4));
 
     await runToWin(tester);
 
     // Last level → no Continue; the button is Back to Menu.
     expect(find.text('Continue'), findsNothing);
     expect(find.text('Back to Menu'), findsOneWidget);
+  });
+
+  testWidgets('shield + chain explosion clears the wall and wins (L29)',
+      (tester) async {
+    // Level 29: shielded hit on the destroyer blasts the wall to the exit.
+    const level29 = Level(
+      id: 29,
+      number: 29,
+      title: 'Break Through',
+      difficulty: Difficulty.medium,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level29)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    // The single shield goes at (2,1), before the destroyer at (2,2).
+    await _dragArrow(
+        tester, tester.getCenter(find.text('SHIELD')), boardRect.topLeft + geo.center(2, 1));
+
+    await runToWin(tester);
+
+    // The wall blasted open and the dot reached the exit.
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('hitting a destroyer explodes, then shows Try Again',

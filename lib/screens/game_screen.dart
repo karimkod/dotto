@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
+import '../engine/simulator.dart' show adjacentWallKeys;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -233,6 +234,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   int _idx(int r, int c) => r * _level!.size + c;
+
+  /// The cell's type accounting for chain-exploded cells (cleared walls and
+  /// destroyers read as empty/passable).
+  CellType _effBase(int r, int c) => _destroyedCells.contains(_idx(r, c))
+      ? CellType.empty
+      : _level!.baseTypeAt(r, c);
 
   int get _revision => _placed.length * 10000 + _trail.length;
 
@@ -651,7 +658,7 @@ class _GameScreenState extends State<GameScreen>
       _fail('The dot ran off the edge.');
       return;
     }
-    if (_level!.baseTypeAt(nr, nc) == CellType.wall) {
+    if (_effBase(nr, nc) == CellType.wall) {
       _fail('The dot hit a wall.');
       return;
     }
@@ -667,17 +674,17 @@ class _GameScreenState extends State<GameScreen>
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
 
-    final base = _level!.baseTypeAt(nr, nc);
+    final base = _effBase(nr, nc);
     if (base == CellType.gap) {
       _die('The dot fell into a hole.');
       return;
     }
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
       if (_dotShielded) {
-        // The shield absorbs the blow: the destroyer explodes, the dot survives
-        // and continues, and the aura is spent.
-        setState(() => _dotShielded = false);
-        _explode(newKey, fatal: false);
+        // The shield absorbs the blow: the destroyer explodes, every adjacent
+        // wall is demolished (chain explosion), and the dot survives and
+        // continues. The aura is spent.
+        _chainExplode(newKey);
         return; // survive this tick; the dot moves on next beat
       }
       _explode(newKey, fatal: true);
@@ -812,6 +819,43 @@ class _GameScreenState extends State<GameScreen>
     });
     Sfx.boom();
     HapticFeedback.heavyImpact();
+  }
+
+  /// A shielded hit: blow up the destroyer AND chain-explode every wall beside
+  /// it (each shattering with gray fragments), opening a path. The dot survives.
+  void _chainExplode(int destroyerKey) {
+    setState(() => _dotShielded = false);
+    _explode(destroyerKey, fatal: false);
+    for (final w in adjacentWallKeys(_level!, destroyerKey)) {
+      if (_destroyedCells.contains(w)) continue;
+      _explodeWall(w);
+    }
+  }
+
+  /// A wall shattering: gray fragments fly out and the cell is cleared. Silent —
+  /// the destroyer's boom covers the whole blast.
+  void _explodeWall(int cell) {
+    final rng = math.Random();
+    const colors = [
+      Color(0xFF78909C),
+      Color(0xFF90A4AE),
+      Color(0xFFB0BEC5),
+    ];
+    final frags = <Frag>[
+      for (var i = 0; i < 12; i++)
+        Frag(
+          i / 12 * 2 * math.pi + rng.nextDouble() * 0.5,
+          0.5 + rng.nextDouble() * 0.9,
+          colors[rng.nextInt(colors.length)],
+          0.7 + rng.nextDouble() * 0.8,
+        ),
+    ];
+    setState(() {
+      _explosions.add(
+          Explosion(cell, frags, tint: const Color(0xFF90A4AE)));
+      _destroyedCells.add(cell);
+      _glow(cell, const Color(0xFF90A4AE), 0.9);
+    });
   }
 
   /// Death by destroyer: stops the run and shows the fail card AFTER the ~0.5s

@@ -1,7 +1,7 @@
-// Verifies every level (World 1: 1–15, World 2: 16–30): that it is solvable,
-// that the intended hand-authored solution actually wins, and that every level
-// is "tight" (no solution leaves a toolkit piece unused). Doubles as the
-// "level solver" the design called for.
+// Verifies every level (World 1: 1–15, World 2: 16–25, World 3: 26–40): that it
+// is solvable, that the intended hand-authored solution actually wins, and that
+// every level is "tight" (no solution leaves a toolkit piece unused). Doubles
+// as the "level solver" the design called for.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +13,12 @@ import 'package:dotto/models/game_state.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level_data.dart';
 
-Map<int, PlacedElement> place(LevelData level, List<(int, int, Direction)> arrows) {
+/// Build a placement map from arrows ((r,c,dir)) and shields ((r,c)).
+Map<int, PlacedElement> place(
+  LevelData level,
+  List<(int, int, Direction)> arrows, [
+  List<(int, int)> shields = const [],
+]) {
   return {
     for (final (r, c, dir) in arrows)
       r * level.size + c: PlacedElement(
@@ -21,11 +26,17 @@ Map<int, PlacedElement> place(LevelData level, List<(int, int, Direction)> arrow
         tool: dir.arrowTool,
         direction: dir,
       ),
+    for (final (r, c) in shields)
+      r * level.size + c: const PlacedElement(
+        type: PlacedType.shield,
+        tool: ToolType.shield,
+        direction: null,
+      ),
   };
 }
 
 void main() {
-  // The intended solution for each level (empty for the no-toolkit level 1).
+  // Intended arrow placements per level (empty where the kit is shields-only).
   final intended = <int, List<(int, int, Direction)>>{
     // ----- World 1 -----
     1: [],
@@ -49,8 +60,7 @@ void main() {
       (0, 4, Direction.right),
       (7, 6, Direction.right),
     ],
-    // ----- World 2 — Static Destroyers (player arrows only; forced arrows are
-    // applied by the simulator automatically). -----
+    // ----- World 2 (16–25) -----
     16: [(3, 1, Direction.up)],
     17: [(1, 0, Direction.right), (1, 3, Direction.down)],
     18: [(0, 1, Direction.right), (4, 1, Direction.up)],
@@ -61,48 +71,67 @@ void main() {
     23: [(5, 2, Direction.up), (3, 2, Direction.right), (3, 4, Direction.up)],
     24: [(2, 5, Direction.left), (2, 3, Direction.down), (5, 3, Direction.left)],
     25: [(3, 2, Direction.right), (3, 4, Direction.up), (0, 4, Direction.right)],
-    26: [(0, 2, Direction.down), (2, 2, Direction.right), (2, 5, Direction.down)],
-    27: [
-      (0, 3, Direction.left),
-      (0, 0, Direction.down),
-      (6, 0, Direction.right),
-      (6, 6, Direction.up),
-    ],
-    28: [(4, 2, Direction.right), (4, 4, Direction.down), (6, 4, Direction.right)],
-    29: [(4, 3, Direction.right), (4, 4, Direction.up), (0, 4, Direction.right)],
-    30: [
-      (7, 2, Direction.up),
-      (4, 2, Direction.right),
-      (4, 3, Direction.up),
-      (1, 3, Direction.right),
-      (1, 7, Direction.up),
-    ],
+    // ----- World 3 (26–40): arrows here, shields in `shields` below. -----
+    26: [],
+    27: [],
+    28: [(0, 4, Direction.down)],
+    29: [],
+    30: [],
+    31: [(5, 0, Direction.right)],
+    32: [],
+    33: [(0, 2, Direction.down), (5, 2, Direction.right)],
+    34: [(0, 6, Direction.down)],
+    35: [(1, 4, Direction.down)],
+    36: [(0, 1, Direction.down), (5, 1, Direction.right)],
+    37: [(6, 6, Direction.up)],
+    38: [(0, 3, Direction.down), (6, 3, Direction.right)],
+    39: [(0, 2, Direction.down), (7, 2, Direction.right)],
+    40: [(0, 4, Direction.down), (7, 4, Direction.right)],
   };
 
-  for (var n = 1; n <= 30; n++) {
-    final world = n <= 15 ? 1 : 2;
-    test('World $world — level $n is solvable', () {
+  // Intended shield placements (World 3 only).
+  final shields = <int, List<(int, int)>>{
+    26: [(3, 1)],
+    27: [(3, 2)],
+    28: [(2, 4)],
+    29: [(2, 1)],
+    30: [(1, 2)],
+    31: [(1, 0), (5, 1)],
+    32: [(2, 1)],
+    33: [(4, 2)],
+    34: [(0, 2)],
+    35: [(1, 1), (2, 4)],
+    36: [(5, 2)],
+    37: [(6, 1)],
+    38: [(5, 3)],
+    39: [(7, 4)],
+    40: [(6, 4)],
+  };
+
+  int worldOf(int n) => n <= 15 ? 1 : (n <= 25 ? 2 : 3);
+
+  for (var n = 1; n <= 40; n++) {
+    test('World ${worldOf(n)} — level $n is solvable', () {
       final level = levelDataFor(n)!;
-      // Path-based solver — scales to the large open grids where the
-      // brute-force `solveAll` would be far too slow.
       final solutions = pathSolve(level);
       debugPrint('Level $n "${level.title}": ${solutions.length} solution(s)');
       expect(solutions, isNotEmpty,
           reason: 'level $n should have at least one solution');
     });
 
-    test('World $world — level $n intended solution wins', () {
+    test('World ${worldOf(n)} — level $n intended solution wins', () {
       final level = levelDataFor(n)!;
-      expect(simulate(level, place(level, intended[n]!)), SimOutcome.win,
+      expect(
+          simulate(level, place(level, intended[n]!, shields[n] ?? const [])),
+          SimOutcome.win,
           reason: 'the recorded solution for level $n must win');
     });
   }
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 30; n++) {
-    final world = n <= 15 ? 1 : 2;
-    test('World $world — level $n requires every toolkit piece', () {
+  for (var n = 2; n <= 40; n++) {
+    test('World ${worldOf(n)} — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(pathMinPieces(level), toolkitTotal(level),
           reason: 'level $n should have no solution that leaves a piece unused');
@@ -119,10 +148,11 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 22, 24, 25, 28, 29]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 22, 24, 25, 34]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
-      final visited = tracePath(level, place(level, intended[n]!));
+      final visited =
+          tracePath(level, place(level, intended[n]!, shields[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
         expect(visited!.contains(a.r * level.size + a.c), isTrue,
@@ -131,4 +161,13 @@ void main() {
       }
     });
   }
+
+  // A few World 3 spot-checks: the chain explosion is genuinely required.
+  test('World 3 — Break Through (29) needs the shield to clear the wall', () {
+    final level = levelDataFor(29)!;
+    // With the shield it wins; with no pieces it dies at the destroyer.
+    expect(simulate(level, place(level, const [], const [(2, 1)])),
+        SimOutcome.win);
+    expect(simulate(level, const {}), SimOutcome.lose);
+  });
 }

@@ -175,6 +175,13 @@ class _MenuScreenState extends State<MenuScreen> {
                             number: 2, subtitle: 'Static Destroyers'),
                       ]);
                     }
+                    if (level.number == kWorld3Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 3, subtitle: 'Shields & Explosions'),
+                      ]);
+                    }
                     return slot;
                   }(),
               ],
