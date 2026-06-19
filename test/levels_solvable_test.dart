@@ -73,7 +73,13 @@ void main() {
       (4, 3, Direction.up),
       (4, 4, Direction.left),
     ],
-    23: [(0, 4, Direction.down)],
+    23: [
+      (0, 1, Direction.down),
+      (0, 3, Direction.left),
+      (2, 3, Direction.up),
+      (3, 1, Direction.right),
+      (3, 4, Direction.down),
+    ],
     24: [],
     25: [],
     26: [(5, 0, Direction.right)],
@@ -92,7 +98,7 @@ void main() {
   final shields = <int, List<(int, int)>>{
     21: [(3, 2)],
     22: [(2, 2)],
-    23: [(2, 4)],
+    23: [(3, 2)],
     24: [(2, 1)],
     25: [(1, 2)],
     26: [(1, 0), (5, 1)],
