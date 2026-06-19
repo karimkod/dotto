@@ -82,6 +82,8 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
         return SimOutcome.lose;
       }
     }
+    // The start cell acts as a permanent forced arrow on every visit.
+    if (base == CellType.start) dir = level.start.dir;
 
     final piece = pieceAt(key);
     if (piece != null) {
@@ -158,6 +160,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
       }
     }
     visited.add(r * n + c);
+    if (base == CellType.start) dir = level.start.dir; // permanent redirector
     final piece = pieceAt(r * n + c);
     if (piece != null && piece.type == PlacedType.arrow) {
       dir = piece.direction!;

@@ -699,6 +699,15 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
+    // The start cell acts as a permanent forced arrow on every visit.
+    if (base == CellType.start) {
+      setState(() {
+        _dot.dir = _level!.start.dir;
+        _glow(newKey, const Color(0xFF1E88E5), 1.0);
+      });
+      Sfx.arrow();
+    }
+
     final piece = _pieceAt(newKey);
     if (piece != null) {
       switch (piece.type) {

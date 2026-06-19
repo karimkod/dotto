@@ -138,7 +138,10 @@ int pathMinPieces(LevelData level) {
     if (seen.contains(st)) return;
     seen.add(st);
     if (!(bt == CellType.empty && !clearedHere)) {
-      advance(nr, nc, dir, shielded, removed); // cleared / start cell — straight
+      // A cleared wall/destroyer passes straight; the start cell permanently
+      // redirects to the launch direction (like a forced arrow).
+      advance(nr, nc, bt == CellType.start ? level.start.dir : dir, shielded,
+          removed);
     } else {
       final forcedDir = forced[key];
       final here = placed[key];
@@ -218,7 +221,8 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
     if (seen.contains(st)) return;
     seen.add(st);
     if (!(bt == CellType.empty && !clearedHere)) {
-      advance(nr, nc, dir, shielded, removed);
+      advance(nr, nc, bt == CellType.start ? level.start.dir : dir, shielded,
+          removed);
     } else {
       final forcedDir = forced[key];
       final here = placed[key];
