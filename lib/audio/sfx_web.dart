@@ -132,6 +132,20 @@ void playTeleport() =>
 
 void playDie() => _noise(dur: 0.20, gain: 0.22, cutoff: 900, decay: true);
 
+/// Explosion: a punchy low-pass noise blast plus a descending sub "boom" body
+/// and a short square "crack" for the transient.
+void playBoom() {
+  _noise(dur: 0.40, gain: 0.38, cutoff: 800, decay: true);
+  _tone(150, dur: 0.36, gain: 0.34, freqEnd: 40); // sub body, pitch-drops
+  _tone(220, dur: 0.10, gain: 0.20, type: 'square', freqEnd: 70); // crack
+}
+
+/// Shield pickup: a soft cyan-feeling rising shimmer (two quick tones).
+void playShield() {
+  _tone(620, dur: 0.16, gain: 0.13, freqEnd: 1180);
+  _tone(940, dur: 0.12, gain: 0.10, delay: 0.06);
+}
+
 void playExit() {
   _tone(523.25, dur: 0.10, gain: 0.18); // C5
   _tone(659.25, dur: 0.10, gain: 0.18, delay: 0.10); // E5

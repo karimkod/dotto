@@ -29,6 +29,9 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
   var c = level.start.c;
   var dir = level.start.dir;
   var pause = 0;
+  // The dot carries at most one shield aura at a time. Passing a shield cell
+  // grants it; the next destroyer it hits is destroyed and the aura is spent.
+  var shielded = false;
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
@@ -46,10 +49,13 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
     r = nr;
     c = nc;
     final base = level.baseTypeAt(r, c);
-    if (base == CellType.gap ||
-        base == CellType.destroyer ||
-        base == CellType.movingDestroyer) {
-      return SimOutcome.lose;
+    if (base == CellType.gap) return SimOutcome.lose;
+    if (base == CellType.destroyer || base == CellType.movingDestroyer) {
+      if (shielded) {
+        shielded = false; // the shield absorbs the hit; the dot survives
+      } else {
+        return SimOutcome.lose;
+      }
     }
 
     final key = r * n + c;
@@ -60,6 +66,8 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
           dir = piece.direction!;
         case PlacedType.pause:
           pause = 2;
+        case PlacedType.shield:
+          shielded = true;
         case PlacedType.teleporter:
           for (final e in placed.entries) {
             if (e.value.type == PlacedType.teleporter && e.key != key) {
@@ -95,6 +103,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   var c = level.start.c;
   var dir = level.start.dir;
   var pause = 0;
+  var shielded = false;
   final visited = <int>{r * n + c};
   final maxTicks = n * n * 4 + 20;
 
@@ -111,10 +120,13 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     r = nr;
     c = nc;
     final base = level.baseTypeAt(r, c);
-    if (base == CellType.gap ||
-        base == CellType.destroyer ||
-        base == CellType.movingDestroyer) {
-      return null;
+    if (base == CellType.gap) return null;
+    if (base == CellType.destroyer || base == CellType.movingDestroyer) {
+      if (shielded) {
+        shielded = false;
+      } else {
+        return null;
+      }
     }
     visited.add(r * n + c);
     final piece = pieceAt(r * n + c);
@@ -122,6 +134,8 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
       dir = piece.direction!;
     } else if (piece != null && piece.type == PlacedType.pause) {
       pause = 2;
+    } else if (piece != null && piece.type == PlacedType.shield) {
+      shielded = true;
     }
     if (level.baseTypeAt(r, c) == CellType.exit) return visited;
   }

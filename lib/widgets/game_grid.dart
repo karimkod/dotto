@@ -19,7 +19,12 @@ class _C {
   static const pause = Color(0xFFBA68C8);
   static const teleFill = Color(0xFFFFE7DD);
   static const tele = Color(0xFFFF8A65);
+  static const shield = Color(0xFF38BDF8);
+  static const shieldFill = Color(0xFFE0F4FE);
 }
+
+/// Cyan used for the shield bubble and the shielded-dot aura.
+const Color kShieldColor = _C.shield;
 
 /// Solid accent color used when a tool's cell glows.
 Color toolGlowColor(ToolType tool) {
@@ -30,7 +35,127 @@ Color toolGlowColor(ToolType tool) {
       return _C.pause;
     case PlacedType.teleporter:
       return _C.tele;
+    case PlacedType.shield:
+      return _C.shield;
   }
+}
+
+/// Draws the shield "bubble" icon centered at [center] with the given [radius].
+/// A glowing cyan ring with a translucent fill and a soft top highlight — used
+/// on the board, in the toolbar tile and in the drag ghost so it reads the same
+/// everywhere.
+void paintShieldIcon(Canvas canvas, Offset center, double radius,
+    {Color color = _C.shield, double opacity = 1.0}) {
+  // Soft outer glow.
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()
+      ..color = color.withValues(alpha: 0.25 * opacity)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+  );
+  // Translucent bubble fill.
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()..color = color.withValues(alpha: 0.18 * opacity),
+  );
+  // Bright bubble rim.
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.22
+      ..color = color.withValues(alpha: opacity),
+  );
+  // Crescent highlight (top-left) for a glassy look.
+  final hl = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = radius * 0.14
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.white.withValues(alpha: 0.85 * opacity);
+  final arcRect = Rect.fromCircle(center: center, radius: radius * 0.6);
+  canvas.drawArc(arcRect, math.pi * 1.05, math.pi * 0.6, false, hl);
+}
+
+/// A standalone shield bubble for widget contexts (toolbar tile, drag ghost).
+class ShieldGlyph extends StatelessWidget {
+  const ShieldGlyph({super.key, required this.size, this.color = _C.shield});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _ShieldGlyphPainter(color)),
+    );
+  }
+}
+
+class _ShieldGlyphPainter extends CustomPainter {
+  _ShieldGlyphPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    paintShieldIcon(
+        canvas, size.center(Offset.zero), size.width * 0.42, color: color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShieldGlyphPainter old) => old.color != color;
+}
+
+/// A spiky sea-mine destroyer icon, drawn centered in a cell of side [cell].
+/// [tick] (0..1, looping) drives a subtle size pulse.
+void paintMineIcon(Canvas canvas, Offset center, double cell, double tick) {
+  final pulse = 1 + 0.06 * math.sin(tick * 2 * math.pi); // subtle breathing
+  final body = cell * 0.19 * pulse;
+  final spike = cell * 0.11 * pulse;
+  const dark = Color(0xFF2D2D2D);
+
+  // Eight spikes radiating from the body.
+  final spikePaint = Paint()
+    ..color = dark
+    ..strokeWidth = cell * 0.055
+    ..strokeCap = StrokeCap.round;
+  for (var i = 0; i < 8; i++) {
+    final a = i / 8 * 2 * math.pi;
+    final dir = Offset(math.cos(a), math.sin(a));
+    canvas.drawLine(
+        center + dir * (body * 0.85), center + dir * (body + spike), spikePaint);
+  }
+  // Body.
+  canvas.drawCircle(center, body, Paint()..color = dark);
+  // Specular highlight (top-left) so it reads as a metal sphere.
+  canvas.drawCircle(
+    center - Offset(body * 0.32, body * 0.32),
+    body * 0.30,
+    Paint()..color = Colors.white.withValues(alpha: 0.65),
+  );
+}
+
+/// One destroyer-explosion in progress: a cell key, a [t] (0→1 over ~0.5s)
+/// advanced by the host, and a fixed set of flying fragments.
+class Explosion {
+  Explosion(this.cell, this.frags);
+  final int cell;
+  final List<Frag> frags;
+  double t = 0;
+}
+
+/// A single explosion fragment, described by a launch [angle], [speed] (in cell
+/// widths), [color] and relative [sizeMul].
+class Frag {
+  const Frag(this.angle, this.speed, this.color, this.sizeMul);
+  final double angle;
+  final double speed;
+  final Color color;
+  final double sizeMul;
 }
 
 /// A placed piece in the middle of its shrink-out (removal) animation.
@@ -105,6 +230,9 @@ class DragGhost extends StatelessWidget {
       case PlacedType.teleporter:
         fill = _C.teleFill;
         color = _C.tele;
+      case PlacedType.shield:
+        fill = _C.shieldFill;
+        color = _C.shield;
     }
     return Material(
       color: Colors.transparent,
@@ -127,15 +255,17 @@ class DragGhost extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(
-            tool.glyph,
-            style: TextStyle(
-              fontSize: size * 0.42,
-              height: 1,
-              fontWeight: FontWeight.w900,
-              color: color,
-            ),
-          ),
+          child: tool.placedType == PlacedType.shield
+              ? ShieldGlyph(size: size * 0.7, color: color)
+              : Text(
+                  tool.glyph,
+                  style: TextStyle(
+                    fontSize: size * 0.42,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
+                ),
         ),
       ),
     );
@@ -181,6 +311,8 @@ class GameGridPainter extends CustomPainter {
     required this.cellGlow,
     required this.cellGlowColor,
     required this.cellPulse,
+    required this.explosions,
+    required this.destroyedCells,
     required this.glowTick,
     required this.showStartHint,
     required this.winProgress,
@@ -211,6 +343,13 @@ class GameGridPainter extends CustomPainter {
 
   /// Per-cell ripple-pulse progress (0→1) for neighbor reactions.
   final Map<int, double> cellPulse;
+
+  /// Destroyer explosions currently animating (drawn above the cells).
+  final List<Explosion> explosions;
+
+  /// Destroyer cells that have been blown up (by a shielded dot) — drawn as
+  /// cleared/empty so the mine doesn't reappear after the blast.
+  final Set<int> destroyedCells;
 
   /// Continuously-changing value so the painter repaints every frame while
   /// effects are running.
@@ -282,9 +421,65 @@ class GameGridPainter extends CustomPainter {
       _paintPreview(canvas, geo, previewKey!, previewTool!);
     }
 
+    // Explosions on top of everything (the dot overlay is hidden while one of
+    // these plays for a fatal hit).
+    for (final e in explosions) {
+      _paintExplosion(canvas, geo, e);
+    }
+
     // The start-direction indicator renders last so it is never hidden behind
     // an adjacent forced arrow or placed piece.
     if (showStartHint) _paintStartHint(canvas, geo);
+  }
+
+  /// A destroyer blowing up: a white-hot flash, an expanding shock ring and a
+  /// burst of red/orange fragments that fly out, decelerate, fall and fade.
+  void _paintExplosion(Canvas canvas, GridGeometry geo, Explosion e) {
+    final r = e.cell ~/ geo.n;
+    final c = e.cell % geo.n;
+    final center = geo.center(r, c);
+    final cell = geo.cell;
+    final t = e.t.clamp(0.0, 1.0);
+
+    // 1) White-hot core flash, fading over the first ~35%.
+    final flashT = (t / 0.35).clamp(0.0, 1.0);
+    if (flashT < 1) {
+      final fr = cell * (0.32 + 0.55 * flashT);
+      canvas.drawCircle(
+        center,
+        fr,
+        Paint()
+          ..color = Color.lerp(Colors.white, _C.destroyer, flashT)!
+              .withValues(alpha: (1 - flashT) * 0.9)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+    }
+
+    // 2) Expanding shock ring.
+    final ringR = cell * (0.18 + 0.85 * t);
+    canvas.drawCircle(
+      center,
+      ringR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (1 - t) * 5 + 1
+        ..color = const Color(0xFFFF8A65).withValues(alpha: (1 - t) * 0.8),
+    );
+
+    // 3) Fragments: decelerate (easeOut) outward, with a little gravity.
+    final out = 1 - (1 - t) * (1 - t);
+    for (final f in e.frags) {
+      final dist = f.speed * cell * out;
+      final px = center.dx + math.cos(f.angle) * dist;
+      final py = center.dy + math.sin(f.angle) * dist + cell * 0.4 * t * t;
+      final sz = cell * 0.09 * f.sizeMul * (1 - t);
+      if (sz <= 0) continue;
+      canvas.drawCircle(
+        Offset(px, py),
+        sz,
+        Paint()..color = f.color.withValues(alpha: (1 - t).clamp(0.0, 1.0)),
+      );
+    }
   }
 
   /// A gold ripple that expands outward from the exit cell, lighting cells as
@@ -331,7 +526,12 @@ class GameGridPainter extends CustomPainter {
   void _paintBase(Canvas canvas, GridGeometry geo, int r, int c) {
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    final base = level.baseTypeAt(r, c);
+    var base = level.baseTypeAt(r, c);
+    // A destroyer blown up by a shielded dot is rendered as an empty cell.
+    if ((base == CellType.destroyer || base == CellType.movingDestroyer) &&
+        destroyedCells.contains(r * geo.n + c)) {
+      base = CellType.empty;
+    }
 
     // Neighbor ripple: briefly scale the cell around its center.
     final pulse = cellPulse[r * geo.n + c];
@@ -347,6 +547,7 @@ class GameGridPainter extends CustomPainter {
     String? glyph;
     Color glyphColor = AppColors.ink;
     bool dashedBorder = false;
+    bool mine = false;
 
     switch (base) {
       case CellType.start:
@@ -366,8 +567,7 @@ class GameGridPainter extends CustomPainter {
       case CellType.movingDestroyer:
         fill = _C.destroyer;
         border = const Color(0xFFC62828);
-        glyph = '✕';
-        glyphColor = Colors.white;
+        mine = true; // a spiky mine icon instead of the old "✕"
       case CellType.gap:
         fill = AppColors.background;
         border = AppColors.textSoft;
@@ -390,6 +590,9 @@ class GameGridPainter extends CustomPainter {
 
     if (glyph != null) {
       _drawGlyph(canvas, center, glyph, glyphColor, geo.cell * 0.42);
+    }
+    if (mine) {
+      paintMineIcon(canvas, center, geo.cell, glowTick);
     }
 
     if (pulse != null) canvas.restore();
@@ -417,7 +620,11 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = borderWidth
         ..color = color,
     );
-    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    if (tool.placedType == PlacedType.shield) {
+      paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+    } else {
+      _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    }
     canvas.restore();
   }
 
@@ -553,8 +760,13 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5
         ..color = color.withValues(alpha: 0.85),
     );
-    _drawGlyph(canvas, center, glyph,
-        color.withValues(alpha: 0.85), geo.cell * 0.42);
+    if (tool.placedType == PlacedType.shield) {
+      paintShieldIcon(canvas, center, geo.cell * 0.28,
+          color: color, opacity: 0.85);
+    } else {
+      _drawGlyph(canvas, center, glyph,
+          color.withValues(alpha: 0.85), geo.cell * 0.42);
+    }
     canvas.restore();
   }
 
@@ -567,6 +779,8 @@ class GameGridPainter extends CustomPainter {
         return (_C.pauseFill, _C.pause, '❚❚');
       case PlacedType.teleporter:
         return (_C.teleFill, _C.tele, '◎');
+      case PlacedType.shield:
+        return (_C.shieldFill, _C.shield, ''); // icon drawn separately
     }
   }
 

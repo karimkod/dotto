@@ -7,6 +7,8 @@ void playArrow() {}
 void playPause() {}
 void playTeleport() {}
 void playDie() {}
+void playBoom() {}
+void playShield() {}
 void playExit() {}
 void playLevelComplete() {}
 void playClick() {}

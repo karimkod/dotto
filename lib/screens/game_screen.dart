@@ -70,6 +70,14 @@ class _GameScreenState extends State<GameScreen>
   final Map<int, double> _cellGlow = {}; // cell → glow intensity
   final Map<int, Color> _cellGlowColor = {};
   final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
+  final List<Explosion> _explosions = []; // destroyer blasts in progress
+  final Set<int> _destroyedCells = {}; // destroyers cleared by a shielded dot
+
+  /// True once the dot has the protective shield aura (consumed by a destroyer).
+  bool _dotShielded = false;
+
+  /// True once the dot has been blown up (hidden during the fatal explosion).
+  bool _dotGone = false;
 
   // Win celebration: grid fades out, a full celebration screen fades in.
   late final AnimationController _winCtrl;
@@ -271,6 +279,14 @@ class _GameScreenState extends State<GameScreen>
         _cellGlowColor.remove(k);
       }
     }
+    if (_explosions.isNotEmpty) {
+      // ~0.5s blast. The board AnimatedBuilder repaints every frame (glowTick),
+      // so mutating progress here is enough — no setState needed.
+      _explosions.removeWhere((e) {
+        e.t += dt / 0.5;
+        return e.t >= 1;
+      });
+    }
   }
 
   void _glow(int key, Color color, [double intensity = 0.85]) {
@@ -306,6 +322,10 @@ class _GameScreenState extends State<GameScreen>
     _cellGlowColor.clear();
     _cellPulse.clear();
     _removing.clear();
+    _explosions.clear();
+    _destroyedCells.clear();
+    _dotShielded = false;
+    _dotGone = false;
     _winCtrl.value = 0;
     _celebrationDone = false;
     _animFrom = (s.r, s.c);
@@ -653,7 +673,15 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
-      _die('The dot was destroyed!');
+      if (_dotShielded) {
+        // The shield absorbs the blow: the destroyer explodes, the dot survives
+        // and continues, and the aura is spent.
+        setState(() => _dotShielded = false);
+        _explode(newKey, fatal: false);
+        return; // survive this tick; the dot moves on next beat
+      }
+      _explode(newKey, fatal: true);
+      _failExploded('The dot was destroyed!');
       return;
     }
 
@@ -672,6 +700,12 @@ class _GameScreenState extends State<GameScreen>
             _glow(newKey, const Color(0xFFBA68C8), 1.0);
           });
           Sfx.pause();
+        case PlacedType.shield:
+          setState(() {
+            _dotShielded = true; // gain the protective aura (one at a time)
+            _glow(newKey, kShieldColor, 1.0);
+          });
+          Sfx.shield();
         case PlacedType.teleporter:
           _teleport();
       }
@@ -746,6 +780,47 @@ class _GameScreenState extends State<GameScreen>
     _failReason = msg;
     Sfx.die();
     Future.delayed(const Duration(milliseconds: 280), () {
+      if (!mounted) return;
+      setState(() => _status = GameStatus.lost);
+    });
+  }
+
+  /// Spawn a destroyer explosion at [cell]: a cell flash, flying fragments, a
+  /// "boom" and a heavy haptic. When [fatal] the dot is hidden (it poofs into
+  /// the blast); otherwise (a shielded survival) the dot keeps moving.
+  void _explode(int cell, {required bool fatal}) {
+    final rng = math.Random();
+    const colors = [
+      Color(0xFFEF5350), // red
+      Color(0xFFFF8A65), // orange
+      Color(0xFFFFD54F), // yellow
+    ];
+    final frags = <Frag>[
+      for (var i = 0; i < 14; i++)
+        Frag(
+          i / 14 * 2 * math.pi + rng.nextDouble() * 0.5,
+          0.6 + rng.nextDouble() * 1.0,
+          colors[rng.nextInt(colors.length)],
+          0.7 + rng.nextDouble() * 0.8,
+        ),
+    ];
+    setState(() {
+      _explosions.add(Explosion(cell, frags));
+      _destroyedCells.add(cell); // the destroyer is gone after the blast
+      _glow(cell, const Color(0xFFEF5350), 1.0); // bright red cell flash
+      if (fatal) _dotGone = true;
+    });
+    Sfx.boom();
+    HapticFeedback.heavyImpact();
+  }
+
+  /// Death by destroyer: stops the run and shows the fail card AFTER the ~0.5s
+  /// explosion has played out.
+  void _failExploded(String msg) {
+    _timer?.cancel();
+    _timer = null;
+    _failReason = msg;
+    Future.delayed(const Duration(milliseconds: 520), () {
       if (!mounted) return;
       setState(() => _status = GameStatus.lost);
     });
@@ -992,6 +1067,8 @@ class _GameScreenState extends State<GameScreen>
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,
+                        explosions: _explosions,
+                        destroyedCells: _destroyedCells,
                         glowTick: _glowCtrl.value,
                         showStartHint: _status == GameStatus.planning,
                         winProgress:
@@ -1006,6 +1083,8 @@ class _GameScreenState extends State<GameScreen>
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_dotCtrl, _glowCtrl]),
                     builder: (_, _) {
+                      // Hidden once the dot has been blown up by a destroyer.
+                      if (_dotGone) return const SizedBox.shrink();
                       final from = geo.center(_animFrom.$1, _animFrom.$2);
                       final to = geo.center(_animTo.$1, _animTo.$2);
                       final t = Curves.easeInOutCubic.transform(_dotCtrl.value);
@@ -1024,6 +1103,7 @@ class _GameScreenState extends State<GameScreen>
                               size: d,
                               paused: _dot.pause > 0,
                               glow: glow,
+                              shielded: _dotShielded,
                             ),
                           ),
                         ),
@@ -1441,13 +1521,22 @@ class _GameScreenState extends State<GameScreen>
   }
 }
 
-/// The animated dot, with a subtle pulsing glow ([glow] in 0..1).
+/// The animated dot, with a subtle pulsing glow ([glow] in 0..1). When
+/// [shielded] it wears a glowing cyan protective aura.
 class _Dot extends StatelessWidget {
-  const _Dot({required this.size, required this.paused, this.glow = 0.5});
+  const _Dot({
+    required this.size,
+    required this.paused,
+    this.glow = 0.5,
+    this.shielded = false,
+  });
 
   final double size;
   final bool paused;
   final double glow;
+  final bool shielded;
+
+  static const _shield = Color(0xFF38BDF8);
 
   @override
   Widget build(BuildContext context) {
@@ -1455,7 +1544,7 @@ class _Dot extends StatelessWidget {
     final span = paused ? 0.10 : 0.30;
     final alpha = base + span * glow;
     final blur = (paused ? 5.0 : 9.0) + 7.0 * glow;
-    return Container(
+    final dot = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -1472,6 +1561,44 @@ class _Dot extends StatelessWidget {
             blurRadius: blur,
             spreadRadius: 1 + 1.5 * glow,
           ),
+        ],
+      ),
+    );
+
+    if (!shielded) return dot;
+
+    // Protective cyan bubble around the dot, breathing with the glow pulse.
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: -size * 0.30,
+            right: -size * 0.30,
+            top: -size * 0.30,
+            bottom: -size * 0.30,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _shield.withValues(alpha: 0.12 + 0.06 * glow),
+                border: Border.all(
+                  color: _shield.withValues(alpha: 0.85),
+                  width: 2.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _shield.withValues(alpha: 0.35 + 0.25 * glow),
+                    blurRadius: 10 + 8 * glow,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          dot,
         ],
       ),
     );

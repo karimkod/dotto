@@ -258,6 +258,37 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
+  testWidgets('hitting a destroyer explodes, then shows Try Again',
+      (tester) async {
+    // Level 16: 4x4, start (3,0)→right, exit (0,1), destroyer at (3,2), 1× Up.
+    const level16 = Level(
+      id: 16,
+      number: 16,
+      title: 'First Danger',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level16)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+    // Place the Up arrow OFF the dot's path so it still runs into the destroyer.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(0, 0));
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    // Run past the destroyer hit (~2 ticks) and the ~0.5s explosion delay.
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    // The explosion resolved into the fail card (not a win).
+    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Continue'), findsNothing);
+  });
+
   testWidgets('Level 2 shows a tutorial hand that stops on interaction',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));

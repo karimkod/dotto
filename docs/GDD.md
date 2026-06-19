@@ -77,9 +77,11 @@ Each tick, resolved in order:
    - Into a wall → **fail** ("hit a wall").
 5. Move into the next cell; record the trail; then apply the cell:
    - **Gap** → die ("fell into a hole").
-   - **Destroyer** → die.
+   - **Destroyer** → if the dot is **shielded**, the destroyer is destroyed, the
+     shield is spent, and the dot survives; otherwise **die** (with an explosion).
    - **Arrow** → adopt its direction.
    - **Pause** → halt for 2 ticks.
+   - **Shield** → gain a one-use protective aura (only one at a time).
    - **Teleporter** → jump to its pair (instant).
 6. If the current cell is the **exit** → **win**.
 
@@ -103,7 +105,7 @@ removing returns it. Optional star goals reward solving with fewer pieces.
 | **Start** | Green `#81C784` | Dot origin; fixed launch direction (shown by a subtle pulsing hint arrow + lead dots) |
 | **Exit** | Gold `#FFD54F` | The goal — reaching it wins |
 | **Wall** | Blue-gray `#78909C` | Solid; the dot fails if it would enter |
-| **Destroyer** | Red `#EF5350` | Deadly static cell |
+| **Destroyer** | Red `#EF5350` | Deadly static cell — drawn as a spiky sea-mine that pulses subtly; blows up on contact |
 | **Moving Destroyer** | Red (patrolling) | Deadly hazard sliding along a line each tick (timing puzzles) |
 | **Gap / Hole** | Dashed outline | The dot falls in and dies |
 
@@ -113,6 +115,7 @@ removing returns it. Optional star goals reward solving with fewer pieces.
 | **Arrow** (Up/Down/Left/Right) | Blue `#1E88E5` | Redirect the dot to a new heading |
 | **Pause** | Purple `#BA68C8` | Hold the dot in place for 2 ticks |
 | **Teleporter** | Orange `#FF8A65` | Placed in pairs; enter one, exit the other |
+| **Shield** | Cyan `#38BDF8` | A bubble that gives the dot a one-use protective aura. The next destroyer it touches is **destroyed** and the dot **survives** (the aura is then spent). Only one shield can be held at a time; an unshielded dot dies normally. |
 
 ### 3.3 Proposed elements (roadmap — not yet implemented)
 | Element | Concept |
@@ -262,6 +265,10 @@ hazards red, start green, exit gold).
   a magnet-snap of the dropped ghost into the cell.
 - **Start hint:** small semi-transparent orange arrow with a gentle breathing
   pulse + faint lead dots — a hint, not a focal point.
+- **Destroyer hit:** a ~0.5s explosion — white-hot flash, expanding shock ring,
+  and red/orange/yellow fragments that fly out, decelerate, fall and fade — then
+  the fail card (or, if shielded, the dot survives and the destroyer is cleared).
+- **Shield aura:** a glowing cyan bubble around the dot while it is shielded.
 
 ---
 
@@ -279,7 +286,9 @@ on the first user interaction (browser autoplay policy).
 | Dot hits arrow | Satisfying two-note ping (880→1200Hz) |
 | Dot hits pause | Low hum (200Hz) |
 | Dot enters teleporter | Frequency sweep (400→1600Hz) "zzip" |
-| Dot dies | Noise-burst "poof" with decay |
+| Dot dies (edge / wall / gap) | Noise-burst "poof" with decay |
+| Dot hits destroyer | Explosion "boom" (low-pass noise blast + descending sub + square crack) |
+| Dot gains a shield | Soft rising cyan shimmer |
 | Dot reaches exit | Rising chime (C5→E5→G5 arpeggio) |
 | Level complete | Celebratory major chord |
 | Play button | Subtle click |
@@ -323,7 +332,12 @@ anywhere on the grid across platforms.
 ## 10. Features
 
 **Implemented**
-- Core puzzle engine (arrows, walls, edges, destroyers, gaps, pause, teleporter).
+- Core puzzle engine (arrows, walls, edges, destroyers, gaps, pause, teleporter,
+  shield).
+- **Shield** element: a one-use protective aura that destroys the next destroyer
+  the dot touches and lets it survive.
+- Destroyer explosion FX (flash + fragments + boom) on a fatal or shielded hit;
+  spiky sea-mine destroyer icon.
 - Drag-and-drop placement, move, and removal; tap fallback.
 - Full juice pass (animations) and Web Audio SFX.
 - Boardgame art style across menu and game; winding level path; start-direction

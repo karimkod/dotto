@@ -14,6 +14,13 @@ class Sfx {
   static void pause() => impl.playPause();
   static void teleport() => impl.playTeleport();
   static void die() => impl.playDie();
+
+  /// Loud explosion for a destroyer hit.
+  static void boom() => impl.playBoom();
+
+  /// Soft shimmer when the dot picks up a shield aura.
+  static void shield() => impl.playShield();
+
   static void exit() => impl.playExit();
   static void levelComplete() => impl.playLevelComplete();
   static void click() => impl.playClick();

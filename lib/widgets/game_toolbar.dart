@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/grid_cell.dart';
 import '../theme/app_theme.dart';
 import 'bouncy_button.dart';
+import 'game_grid.dart';
 
 /// Horizontal row of selectable toolkit items, each a thick-bordered tile with
 /// a glyph, label and remaining-count badge.
@@ -148,7 +149,10 @@ class _ToolTile extends StatelessWidget {
   }
 
   Widget _buildContent() {
-    final glyphColor = _isArrow ? const Color(0xFF1E88E5) : AppColors.ink;
+    final isShield = tool.placedType == PlacedType.shield;
+    final glyphColor = _isArrow
+        ? const Color(0xFF1E88E5)
+        : (isShield ? kShieldColor : AppColors.ink);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -169,15 +173,18 @@ class _ToolTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                tool.glyph,
-                style: TextStyle(
-                  fontSize: 22,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                  color: glyphColor,
+              if (isShield)
+                const ShieldGlyph(size: 26, color: kShieldColor)
+              else
+                Text(
+                  tool.glyph,
+                  style: TextStyle(
+                    fontSize: 22,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    color: glyphColor,
+                  ),
                 ),
-              ),
               const SizedBox(height: 2),
               Text(
                 tool.label,

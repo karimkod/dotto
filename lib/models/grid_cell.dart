@@ -49,10 +49,18 @@ extension DirectionX on Direction {
 enum CellType { empty, start, exit, wall, destroyer, movingDestroyer, gap }
 
 /// A piece the player places on the board.
-enum PlacedType { arrow, pause, teleporter }
+enum PlacedType { arrow, pause, teleporter, shield }
 
 /// Selectable toolkit item kinds.
-enum ToolType { arrowUp, arrowDown, arrowLeft, arrowRight, pause, teleporter }
+enum ToolType {
+  arrowUp,
+  arrowDown,
+  arrowLeft,
+  arrowRight,
+  pause,
+  teleporter,
+  shield,
+}
 
 extension ToolTypeX on ToolType {
   PlacedType get placedType {
@@ -61,6 +69,8 @@ extension ToolTypeX on ToolType {
         return PlacedType.pause;
       case ToolType.teleporter:
         return PlacedType.teleporter;
+      case ToolType.shield:
+        return PlacedType.shield;
       case ToolType.arrowUp:
       case ToolType.arrowDown:
       case ToolType.arrowLeft:
@@ -81,6 +91,7 @@ extension ToolTypeX on ToolType {
         return Direction.right;
       case ToolType.pause:
       case ToolType.teleporter:
+      case ToolType.shield:
         return null;
     }
   }
@@ -99,6 +110,8 @@ extension ToolTypeX on ToolType {
         return '❚❚';
       case ToolType.teleporter:
         return '◎';
+      case ToolType.shield:
+        return '🛡';
     }
   }
 
@@ -116,6 +129,8 @@ extension ToolTypeX on ToolType {
         return 'PAUSE';
       case ToolType.teleporter:
         return 'WARP';
+      case ToolType.shield:
+        return 'SHIELD';
     }
   }
 }

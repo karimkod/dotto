@@ -1,0 +1,70 @@
+// Verifies the Shield mechanic in the authoritative simulator: a shielded dot
+// survives one destroyer (which is consumed), an unshielded dot dies, and the
+// shield is strictly single-use.
+
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:dotto/engine/simulator.dart';
+import 'package:dotto/models/game_state.dart';
+import 'package:dotto/models/grid_cell.dart';
+import 'package:dotto/models/level_data.dart';
+
+PlacedElement _shield() => const PlacedElement(
+      type: PlacedType.shield,
+      tool: ToolType.shield,
+      direction: null,
+    );
+
+void main() {
+  // start (0,0)→right, exit (0,3), a destroyer at (0,2).
+  LevelData oneDestroyer() => LevelData(
+        id: 900,
+        size: 4,
+        title: 'shield-1',
+        tip: '',
+        start: const StartSpec(0, 0, Direction.right),
+        exit: const Pos(0, 3),
+        destroyers: const [Pos(0, 2)],
+        toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+      );
+
+  test('a shielded dot survives the destroyer and reaches the exit', () {
+    final level = oneDestroyer();
+    expect(simulate(level, {0 * 4 + 1: _shield()}), SimOutcome.win);
+  });
+
+  test('without a shield the dot dies on the destroyer', () {
+    final level = oneDestroyer();
+    expect(simulate(level, {}), SimOutcome.lose);
+  });
+
+  test('the shield is single-use — a second destroyer still kills', () {
+    // start (0,0)→right, exit (0,4), destroyers at (0,2) and (0,3).
+    final level = LevelData(
+      id: 901,
+      size: 5,
+      title: 'shield-2',
+      tip: '',
+      start: const StartSpec(0, 0, Direction.right),
+      exit: const Pos(0, 4),
+      destroyers: const [Pos(0, 2), Pos(0, 3)],
+      toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+    );
+    // Shield at (0,1) saves the dot at (0,2) but it dies at (0,3).
+    expect(simulate(level, {0 * 5 + 1: _shield()}), SimOutcome.lose);
+  });
+
+  test('a shield does not protect against a gap', () {
+    final level = LevelData(
+      id: 902,
+      size: 4,
+      title: 'shield-gap',
+      tip: '',
+      start: const StartSpec(0, 0, Direction.right),
+      exit: const Pos(0, 3),
+      gaps: const [Pos(0, 2)],
+      toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+    );
+    expect(simulate(level, {0 * 4 + 1: _shield()}), SimOutcome.lose);
+  });
+}
