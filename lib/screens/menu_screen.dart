@@ -147,17 +147,35 @@ class _MenuScreenState extends State<MenuScreen> {
               child: CustomPaint(painter: _DashedLinePainter()),
             ),
             Column(
-              // Level 1 sits at the bottom, level 20 at the top — climb upward.
-              // Cards stay centered on the dashed line.
+              // Level 1 sits at the bottom, the last level at the top — climb
+              // upward. A world banner marks the start of each world as you
+              // climb past it. Cards stay centered on the dashed line.
               children: [
                 for (var i = 0; i < _levels.length; i++)
                   () {
                     final level = _levels[_levels.length - 1 - i];
-                    return _LevelSlot(
+                    final slot = _LevelSlot(
                       level: level,
                       isCurrent: level.id == current.id,
                       onTap: () => _openLevel(level),
                     );
+                    // Place a world banner just below the first level of each
+                    // world (so it reads "entering World N" while climbing up).
+                    if (level.number == 1) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 1, subtitle: 'Getting Started'),
+                      ]);
+                    }
+                    if (level.number == kWorld2Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 2, subtitle: 'Static Destroyers'),
+                      ]);
+                    }
+                    return slot;
                   }(),
               ],
             ),
@@ -208,6 +226,56 @@ class _LevelSlot extends StatelessWidget {
           level: level,
           isCurrent: isCurrent,
           onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+/// A banner marking the start of a world on the path. Sits centered on the
+/// dashed line as a rounded pill with the world number and theme name.
+class _WorldBanner extends StatelessWidget {
+  const _WorldBanner({required this.number, required this.subtitle});
+
+  final int number;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.ink, width: 3),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'WORLD $number',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  letterSpacing: 1.5,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                  color: AppColors.textSoft,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

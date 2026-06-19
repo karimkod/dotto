@@ -1,9 +1,15 @@
 import '../models/grid_cell.dart';
 import '../models/level_data.dart';
 
-/// Playable level definitions, keyed by level number — World 1 (levels 1–10).
-/// Each teaches one idea, building from "press Play" to multi-turn routing
-/// around walls and fixed (forced) arrows.
+/// Playable level definitions, keyed by level number.
+///
+/// World 1 (levels 1–15): from "press Play" to multi-turn routing around walls
+/// and fixed (forced) arrows.
+///
+/// World 2 (levels 16–30): Static Destroyers. Red cells kill the dot on contact,
+/// so the toolkit's specific arrows must thread a safe route. Every level is
+/// solver-verified tight — `pathMinPieces == toolkitTotal`, so no piece is ever
+/// wasted (see tool/check_levels.dart and test/levels_solvable_test.dart).
 const Map<int, LevelData> levelDefinitions = {
   // 1 — no toolkit. The dot just walks straight to the exit on Play.
   1: LevelData(
@@ -287,6 +293,306 @@ const Map<int, LevelData> levelDefinitions = {
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowRight, 5),
+    ],
+  ),
+
+  // ======================= WORLD 2 — STATIC DESTROYERS =======================
+  // Levels 16–30. Red destroyer cells are lethal on contact. Open layouts where
+  // possible: destroyers eliminate the wrong routes instead of walls building
+  // corridors. All solver-verified tight (every toolkit piece required).
+
+  // ----- Learn (16–18) -----
+
+  // 16 — First Danger: a destroyer sits in the straight path; turn up before it.
+  16: LevelData(
+    id: 16,
+    size: 4,
+    title: 'First Danger',
+    tip: 'The red cell destroys the dot. Turn up before you reach it.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(0, 1),
+    destroyers: [Pos(3, 2)],
+    toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
+  ),
+
+  // 17 — Two Threats: two destroyers; route between them to the far corner.
+  17: LevelData(
+    id: 17,
+    size: 4,
+    title: 'Two Threats',
+    tip: 'Two red cells lie ahead. Steer the dot safely between them.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(3, 3),
+    destroyers: [Pos(2, 0), Pos(2, 2)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 18 — Destroyer Wall: three destroyers form a barrier; go up and over it.
+  18: LevelData(
+    id: 18,
+    size: 5,
+    title: 'Destroyer Wall',
+    tip: 'A wall of destroyers blocks the way. Climb up and over the top.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 4),
+    destroyers: [Pos(2, 2), Pos(3, 2), Pos(4, 2)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // ----- Combine (19–22) -----
+
+  // 19 — Trap Arrow: the fixed arrow aims the dot straight at a destroyer.
+  // Redirect with your Up arrow before it gets there, then run home.
+  19: LevelData(
+    id: 19,
+    size: 5,
+    title: 'Trap Arrow',
+    tip: 'The fixed arrow points the dot toward a destroyer. Save it in time.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(0, 4),
+    walls: [Pos(2, 3), Pos(3, 3)],
+    destroyers: [Pos(4, 2), Pos(1, 4)],
+    forcedArrows: [ForcedArrow(4, 0, Direction.right)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 20 — Crossfire: a centre start with destroyers on the approaches. Several
+  // routes look open, but only the long way round survives.
+  20: LevelData(
+    id: 20,
+    size: 5,
+    title: 'Crossfire',
+    tip: 'Many ways look open — destroyers block all but one. Take the long way.',
+    start: StartSpec(2, 2, Direction.up),
+    exit: Pos(4, 4),
+    destroyers: [Pos(0, 4), Pos(1, 4), Pos(3, 2), Pos(1, 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 21 — Minefield: an open board scattered with destroyers; thread the one
+  // safe staircase up to the corner.
+  21: LevelData(
+    id: 21,
+    size: 6,
+    title: 'Minefield',
+    tip: 'Thread the staircase between the destroyers to the top corner.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 5),
+    destroyers: [
+      Pos(5, 4),
+      Pos(2, 1),
+      Pos(2, 2),
+      Pos(1, 3),
+      Pos(4, 4),
+      Pos(3, 4),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 22 — Safe Passage: ride the fixed arrow up and across, then slip down the
+  // one gap in the destroyer line before sliding home along the bottom.
+  22: LevelData(
+    id: 22,
+    size: 6,
+    title: 'Safe Passage',
+    tip: 'Follow the fixed arrow, then find the one safe drop past the red line.',
+    start: StartSpec(5, 0, Direction.up),
+    exit: Pos(5, 5),
+    destroyers: [
+      Pos(0, 3),
+      Pos(1, 1),
+      Pos(1, 5),
+      Pos(2, 5),
+      Pos(3, 5),
+      Pos(4, 5),
+    ],
+    forcedArrows: [ForcedArrow(0, 0, Direction.right)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // ----- Challenge (23–25) -----
+
+  // 23 — Needle's Eye: a dense destroyer field with one threading path.
+  23: LevelData(
+    id: 23,
+    size: 6,
+    title: "Needle's Eye",
+    tip: 'A dense field of destroyers. There is only one way through.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 4),
+    destroyers: [
+      Pos(5, 3),
+      Pos(2, 1),
+      Pos(2, 2),
+      Pos(1, 3),
+      Pos(2, 5),
+      Pos(0, 3),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 24 — Into the Fire: the fixed arrow plunges the dot toward a destroyer.
+  // Escape left across the board, then drop down to the corner.
+  24: LevelData(
+    id: 24,
+    size: 6,
+    title: 'Into the Fire',
+    tip: 'The fixed arrow drops you toward danger. Escape left and find the exit.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(5, 0),
+    destroyers: [
+      Pos(3, 5),
+      Pos(2, 2),
+      Pos(1, 1),
+      Pos(1, 3),
+      Pos(1, 4),
+    ],
+    forcedArrows: [ForcedArrow(0, 5, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 25 — Long Detour: a big open 7x7. The fixed arrow starts the climb; you
+  // build the rest of the staircase around the destroyers and a wall.
+  25: LevelData(
+    id: 25,
+    size: 7,
+    title: 'Long Detour',
+    tip: 'The fixed arrow starts the climb. Build the staircase to the corner.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [Pos(5, 4)],
+    destroyers: [Pos(2, 1), Pos(6, 3), Pos(2, 2), Pos(3, 5), Pos(4, 4)],
+    forcedArrows: [ForcedArrow(6, 2, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowUp, 1),
+    ],
+  ),
+
+  // ----- Exams (26–30): combine World 1 (walls, forced arrows) + World 2. -----
+
+  // 26 — Switchback: a descending staircase; destroyers block the column drops,
+  // a wall island sits off the path.
+  26: LevelData(
+    id: 26,
+    size: 6,
+    title: 'Switchback',
+    tip: 'Zig-zag down the board — the destroyers block every shortcut.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(5, 5),
+    walls: [Pos(4, 4)],
+    destroyers: [Pos(0, 3), Pos(3, 1), Pos(3, 2), Pos(4, 2)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 27 — The Gauntlet: a centre start that must spiral all the way around the
+  // outside; destroyers and wall islands seal off every shortcut.
+  27: LevelData(
+    id: 27,
+    size: 7,
+    title: 'The Gauntlet',
+    tip: 'From the centre, spiral around the outside to the far corner.',
+    start: StartSpec(3, 3, Direction.up),
+    exit: Pos(0, 6),
+    walls: [Pos(4, 4), Pos(4, 5), Pos(2, 2)],
+    destroyers: [Pos(0, 4), Pos(2, 5), Pos(1, 5), Pos(5, 3)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
+    ],
+  ),
+
+  // 28 — Threaded: two fixed arrows carve a partial path through a destroyer
+  // field; you fill the three remaining turns.
+  28: LevelData(
+    id: 28,
+    size: 7,
+    title: 'Threaded',
+    tip: 'The fixed arrows start the route. Fill the gaps through the field.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(6, 6),
+    destroyers: [Pos(5, 2), Pos(3, 4), Pos(4, 5), Pos(4, 1), Pos(1, 6)],
+    forcedArrows: [
+      ForcedArrow(2, 0, Direction.right),
+      ForcedArrow(2, 2, Direction.down),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 29 — No Margin: a dense 7x7 with a fixed arrow and walls; the minimal
+  // toolkit leaves no room for a wasted move.
+  29: LevelData(
+    id: 29,
+    size: 7,
+    title: 'No Margin',
+    tip: 'Tight quarters and few arrows. Every placement has to count.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [Pos(5, 5), Pos(2, 2)],
+    destroyers: [Pos(3, 3), Pos(4, 5), Pos(3, 1)],
+    forcedArrows: [ForcedArrow(6, 3, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowUp, 1),
+    ],
+  ),
+
+  // 30 — Last Stand: the World 2 finale. A wide-open 8x8 strewn with destroyers
+  // and one wall; the full five-arrow staircase is the only way up.
+  30: LevelData(
+    id: 30,
+    size: 8,
+    title: 'Last Stand',
+    tip: 'Destroyers everywhere. Build the full staircase to the top corner.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [Pos(4, 4)],
+    destroyers: [
+      Pos(7, 3),
+      Pos(3, 2),
+      Pos(4, 6),
+      Pos(0, 5),
+      Pos(4, 1),
+      Pos(6, 4),
+      Pos(3, 7),
+      Pos(5, 5),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 3),
+      ToolkitEntry(ToolType.arrowRight, 2),
     ],
   ),
 };

@@ -229,27 +229,27 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (15) shows Back to Menu, not Continue',
+  testWidgets('last level (30) shows Back to Menu, not Continue',
       (tester) async {
-    const level15 = Level(
-      id: 15,
-      number: 15,
-      title: 'Final Exam',
+    const level30 = Level(
+      id: 30,
+      number: 30,
+      title: 'Last Stand',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level15)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level30)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 8);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: five Right arrows at (7,0), (0,1), (7,3), (0,4), (7,6).
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 4));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(7, 6));
+    // Solution: Up(7,2), Right(4,2), Up(4,3), Right(1,3), Up(1,7).
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 2));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(4, 2));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(4, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(1, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(1, 7));
 
     await runToWin(tester);
 
