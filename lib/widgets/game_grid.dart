@@ -552,10 +552,10 @@ class GameGridPainter extends CustomPainter {
 
     switch (base) {
       case CellType.start:
+        // Plain green cell — the direction is shown only by the external
+        // pulsing hint (see _paintStartHint), not an internal chevron.
         fill = _C.start;
         border = const Color(0xFF5BA45F);
-        glyph = level.start.dir.glyph;
-        glyphColor = Colors.white;
       case CellType.exit:
         fill = _C.exit;
         border = const Color(0xFFE0B73C);
