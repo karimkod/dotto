@@ -150,9 +150,9 @@ The game is structured into 50 worlds with 15 levels each (750 levels). Each wor
 
 ### Phase 1: Foundations (Worlds 1-3, 45 levels)
 - **World 1:** Arrows + walls + forced arrows (tutorial world, done)
-- **World 2:** Static destroyers intro (10 levels, 16–25, done)
+- **World 2:** Static destroyers intro (5 levels, 16–20, done)
 - **World 3:** Shields + chain explosions — shielded hits blast adjacent walls
-  into doors (15 levels, 26–40, done)
+  into doors (15 levels, 21–35, done)
 
 ### Phase 2: Timing (Worlds 4-6, 45 levels)
 - **World 4:** Pause blocks intro
@@ -344,7 +344,7 @@ anywhere on the grid across platforms.
   (destroyer-doors). Single source of truth in the simulator + path solver.
 - Destroyer explosion FX (flash + fragments + boom) on a fatal or shielded hit,
   plus gray wall-shatter bursts for chain explosions; spiky sea-mine icon.
-- 40 levels across 3 worlds (World 3 = Shields & Explosions, levels 26–40).
+- 35 levels across 3 worlds (World 3 = Shields & Explosions, levels 21–35).
 - Drag-and-drop placement, move, and removal; tap fallback.
 - Full juice pass (animations) and Web Audio SFX.
 - Boardgame art style across menu and game; winding level path; start-direction

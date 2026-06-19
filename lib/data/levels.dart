@@ -3,16 +3,16 @@ import '../progress/progress_store.dart';
 import 'level_definitions.dart';
 
 /// Total number of built, playable levels:
-/// World 1 (1–15) + World 2 (16–25) + World 3 (26–40).
-const int kLevelCount = 40;
+/// World 1 (1–15) + World 2 (16–20) + World 3 (21–35).
+const int kLevelCount = 35;
 
 /// The level number at which World 2 (Static Destroyers) begins.
 const int kWorld2Start = 16;
 
 /// The level number at which World 3 (Shields & Explosions) begins.
-const int kWorld3Start = 26;
+const int kWorld3Start = 21;
 
-/// Hardcoded menu level list — World 1 (1–15), World 2 (16–25), World 3 (26–40).
+/// Hardcoded menu level list — World 1 (1–15), World 2 (16–20), World 3 (21–35).
 ///
 /// Progression is gated: level 1 is the completed baseline, and completing a
 /// level unlocks the next one (persisted via [ProgressStore]).
@@ -25,14 +25,14 @@ List<Level> buildInitialLevels() {
     if (number <= 4) return Difficulty.easy;
     if (number <= 7) return Difficulty.medium;
     if (number <= 15) return Difficulty.hard; // 8–15 (incl. exams 11–15)
-    // World 2 (16–25).
-    if (number <= 18) return Difficulty.easy; // learn (16–18)
-    if (number <= 22) return Difficulty.medium; // combine (19–22)
-    if (number <= 25) return Difficulty.hard; // challenge (23–25)
-    // World 3 (26–40).
-    if (number <= 28) return Difficulty.easy; // learn shields (26–28)
-    if (number <= 32) return Difficulty.medium; // path clearing (29–32)
-    return Difficulty.hard; // challenge + exams (33–40)
+    // World 2 (16–20).
+    if (number <= 16) return Difficulty.easy;
+    if (number <= 17) return Difficulty.medium;
+    if (number <= 20) return Difficulty.hard;
+    // World 3 (21–35).
+    if (number <= 23) return Difficulty.easy; // learn shields (21–23)
+    if (number <= 27) return Difficulty.medium; // path clearing (24–27)
+    return Difficulty.hard; // challenge + exams (28–35)
   }
 
   LevelStatus statusFor(int number) {

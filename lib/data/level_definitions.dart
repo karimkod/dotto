@@ -6,10 +6,10 @@ import '../models/level_data.dart';
 /// World 1 (levels 1–15): from "press Play" to multi-turn routing around walls
 /// and fixed (forced) arrows.
 ///
-/// World 2 (levels 16–25): Static Destroyers. Red cells kill the dot on contact,
+/// World 2 (levels 16–20): Static Destroyers. Red cells kill the dot on contact,
 /// so the toolkit's specific arrows must thread a safe route.
 ///
-/// World 3 (levels 26–40): Shields & Explosions. The Shield aura lets the dot
+/// World 3 (levels 21–35): Shields & Explosions. The Shield aura lets the dot
 /// survive one destroyer; the hit chain-explodes the walls adjacent to it,
 /// turning destroyers-next-to-walls into doors.
 ///
@@ -302,11 +302,10 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // ======================= WORLD 2 — STATIC DESTROYERS =======================
-  // Levels 16–30. Red destroyer cells are lethal on contact. Open layouts where
-  // possible: destroyers eliminate the wrong routes instead of walls building
-  // corridors. All solver-verified tight (every toolkit piece required).
-
-  // ----- Learn (16–18) -----
+  // Levels 16–20. Red destroyer cells are lethal on contact. Five hand-picked,
+  // distinct patterns (a 4x4 intro, a 5x5 centre-start spiral, a 6x6 minefield,
+  // a 6x6 forced-arrow escape and a 7x7 forced staircase). All solver-verified
+  // tight (every toolkit piece required).
 
   // 16 — First Danger: a destroyer sits in the straight path; turn up before it.
   16: LevelData(
@@ -320,60 +319,10 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
   ),
 
-  // 17 — Two Threats: two destroyers; route between them to the far corner.
+  // 17 — Crossfire: a centre start with destroyers on the approaches. Several
+  // routes look open, but only the long way round survives.
   17: LevelData(
     id: 17,
-    size: 4,
-    title: 'Two Threats',
-    tip: 'Two red cells lie ahead. Steer the dot safely between them.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(3, 3),
-    destroyers: [Pos(2, 0), Pos(2, 2)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-    ],
-  ),
-
-  // 18 — Destroyer Wall: three destroyers form a barrier; go up and over it.
-  18: LevelData(
-    id: 18,
-    size: 5,
-    title: 'Destroyer Wall',
-    tip: 'A wall of destroyers blocks the way. Climb up and over the top.',
-    start: StartSpec(4, 0, Direction.right),
-    exit: Pos(0, 4),
-    destroyers: [Pos(2, 2), Pos(3, 2), Pos(4, 2)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // ----- Combine (19–22) -----
-
-  // 19 — Trap Arrow: the fixed arrow aims the dot straight at a destroyer.
-  // Redirect with your Up arrow before it gets there, then run home.
-  19: LevelData(
-    id: 19,
-    size: 5,
-    title: 'Trap Arrow',
-    tip: 'The fixed arrow points the dot toward a destroyer. Save it in time.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(0, 4),
-    walls: [Pos(2, 3), Pos(3, 3)],
-    destroyers: [Pos(4, 2), Pos(1, 4)],
-    forcedArrows: [ForcedArrow(4, 0, Direction.right)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 20 — Crossfire: a centre start with destroyers on the approaches. Several
-  // routes look open, but only the long way round survives.
-  20: LevelData(
-    id: 20,
     size: 5,
     title: 'Crossfire',
     tip: 'Many ways look open — destroyers block all but one. Take the long way.',
@@ -387,10 +336,10 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 21 — Minefield: an open board scattered with destroyers; thread the one
+  // 18 — Minefield: an open board scattered with destroyers; thread the one
   // safe staircase up to the corner.
-  21: LevelData(
-    id: 21,
+  18: LevelData(
+    id: 18,
     size: 6,
     title: 'Minefield',
     tip: 'Thread the staircase between the destroyers to the top corner.',
@@ -410,58 +359,10 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 22 — Safe Passage: ride the fixed arrow up and across, then slip down the
-  // one gap in the destroyer line before sliding home along the bottom.
-  22: LevelData(
-    id: 22,
-    size: 6,
-    title: 'Safe Passage',
-    tip: 'Follow the fixed arrow, then find the one safe drop past the red line.',
-    start: StartSpec(5, 0, Direction.up),
-    exit: Pos(5, 5),
-    destroyers: [
-      Pos(0, 3),
-      Pos(1, 1),
-      Pos(1, 5),
-      Pos(2, 5),
-      Pos(3, 5),
-      Pos(4, 5),
-    ],
-    forcedArrows: [ForcedArrow(0, 0, Direction.right)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // ----- Challenge (23–25) -----
-
-  // 23 — Needle's Eye: a dense destroyer field with one threading path.
-  23: LevelData(
-    id: 23,
-    size: 6,
-    title: "Needle's Eye",
-    tip: 'A dense field of destroyers. There is only one way through.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 4),
-    destroyers: [
-      Pos(5, 3),
-      Pos(2, 1),
-      Pos(2, 2),
-      Pos(1, 3),
-      Pos(2, 5),
-      Pos(0, 3),
-    ],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 24 — Into the Fire: the fixed arrow plunges the dot toward a destroyer.
+  // 19 — Into the Fire: the fixed arrow plunges the dot toward a destroyer.
   // Escape left across the board, then drop down to the corner.
-  24: LevelData(
-    id: 24,
+  19: LevelData(
+    id: 19,
     size: 6,
     title: 'Into the Fire',
     tip: 'The fixed arrow drops you toward danger. Escape left and find the exit.',
@@ -481,10 +382,10 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 25 — Long Detour: a big open 7x7. The fixed arrow starts the climb; you
+  // 20 — Long Detour: a big open 7x7. The fixed arrow starts the climb; you
   // build the rest of the staircase around the destroyers and a wall.
-  25: LevelData(
-    id: 25,
+  20: LevelData(
+    id: 20,
     size: 7,
     title: 'Long Detour',
     tip: 'The fixed arrow starts the climb. Build the staircase to the corner.',
@@ -500,15 +401,15 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // ======================= WORLD 3 — SHIELDS & EXPLOSIONS ====================
-  // Levels 26–40. The Shield aura lets the dot survive one destroyer; the hit
+  // Levels 21–35. The Shield aura lets the dot survive one destroyer; the hit
   // also CHAIN-EXPLODES every wall orthogonally adjacent to that destroyer,
   // turning destroyers-next-to-walls into doors. All solver-verified tight.
 
-  // ----- Learn shields (26–28) -----
+  // ----- Learn shields (21–23) -----
 
-  // 26 — Shield Up: grab the shield, then survive the destroyer in the way.
-  26: LevelData(
-    id: 26,
+  // 21 — Shield Up: grab the shield, then survive the destroyer in the way.
+  21: LevelData(
+    id: 21,
     size: 4,
     title: 'Shield Up',
     tip: 'Place the shield before the destroyer. The aura lets the dot survive.',
@@ -518,9 +419,9 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 27 — Must Shield: the destroyer is dead ahead with no way around it.
-  27: LevelData(
-    id: 27,
+  // 22 — Must Shield: the destroyer is dead ahead with no way around it.
+  22: LevelData(
+    id: 22,
     size: 5,
     title: 'Must Shield',
     tip: 'No way around — you must shield up and go straight through.',
@@ -530,9 +431,9 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 28 — Shield Timing: pick up the shield FIRST, then turn into the destroyer.
-  28: LevelData(
-    id: 28,
+  // 23 — Shield Timing: pick up the shield FIRST, then turn into the destroyer.
+  23: LevelData(
+    id: 23,
     size: 5,
     title: 'Shield Timing',
     tip: 'Order matters: route through the shield first, then into the danger.',
@@ -545,11 +446,11 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Shield + path clearing (29–32) -----
+  // ----- Shield + path clearing (24–27) -----
 
-  // 29 — Break Through: a shielded hit blasts the wall blocking the exit.
-  29: LevelData(
-    id: 29,
+  // 24 — Break Through: a shielded hit blasts the wall blocking the exit.
+  24: LevelData(
+    id: 24,
     size: 5,
     title: 'Break Through',
     tip: 'A shielded hit also destroys the walls beside the destroyer. Open it.',
@@ -560,9 +461,9 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 30 — Choose Your Bomb: only the destroyer beside the right wall opens a way.
-  30: LevelData(
-    id: 30,
+  // 25 — Choose Your Bomb: only the destroyer beside the right wall opens a way.
+  25: LevelData(
+    id: 25,
     size: 5,
     title: 'Choose Your Bomb',
     tip: 'One destroyer opens the path; the other is just a trap. Pick wisely.',
@@ -573,9 +474,9 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // 31 — Double Breach: two destroyer-doors, two shields and a turn.
-  31: LevelData(
-    id: 31,
+  // 26 — Double Breach: two destroyer-doors, two shields and a turn.
+  26: LevelData(
+    id: 26,
     size: 6,
     title: 'Double Breach',
     tip: 'Two walls, two doors. Shield up for each blast.',
@@ -589,9 +490,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 32 — Demolition: one keystone destroyer levels a whole wall cluster.
-  32: LevelData(
-    id: 32,
+  // 27 — Demolition: one keystone destroyer levels a whole wall cluster.
+  27: LevelData(
+    id: 27,
     size: 6,
     title: 'Demolition',
     tip: 'A single shielded blast clears every wall around the destroyer.',
@@ -602,11 +503,11 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
-  // ----- Challenge (33–35) -----
+  // ----- Challenge (28–30) -----
 
-  // 33 — Detour Blast: the exit is walled off; route to the door and breach it.
-  33: LevelData(
-    id: 33,
+  // 28 — Detour Blast: the exit is walled off; route to the door and breach it.
+  28: LevelData(
+    id: 28,
     size: 6,
     title: 'Detour Blast',
     tip: 'The exit is boxed in. Find the destroyer-door and blow it open.',
@@ -621,9 +522,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 34 — Pinned Breach: ride the fixed arrow, breach a wall, drop to the exit.
-  34: LevelData(
-    id: 34,
+  // 29 — Pinned Breach: ride the fixed arrow, breach a wall, drop to the exit.
+  29: LevelData(
+    id: 29,
     size: 7,
     title: 'Pinned Breach',
     tip: 'The fixed arrow turns the corner. Breach the wall, then drop home.',
@@ -638,9 +539,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 35 — Twin Doors: two doors in series — breach, turn, breach again.
-  35: LevelData(
-    id: 35,
+  // 30 — Twin Doors: two doors in series — breach, turn, breach again.
+  30: LevelData(
+    id: 30,
     size: 7,
     title: 'Twin Doors',
     tip: 'Two doors, one after the other. Carry a shield into each.',
@@ -654,12 +555,12 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Exams (36–40): combine arrows, walls, forced arrows, deadly + door
+  // ----- Exams (31–35): combine arrows, walls, forced arrows, deadly + door
   // destroyers and shields. Open layouts, growing to 8x8. -----
 
-  // 36 — a boxed exit door, with a deadly destroyer to steer clear of.
-  36: LevelData(
-    id: 36,
+  // 31 — Live Wire: a boxed exit door, with a deadly destroyer to steer clear of.
+  31: LevelData(
+    id: 31,
     size: 6,
     title: 'Live Wire',
     tip: 'Breach the door to the exit — and don\'t touch the loose destroyer.',
@@ -674,9 +575,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 37 — Wall Breaker: punch through the wall on the floor, then climb.
-  37: LevelData(
-    id: 37,
+  // 32 — Wall Breaker: punch through the wall on the floor, then climb.
+  32: LevelData(
+    id: 32,
     size: 7,
     title: 'Wall Breaker',
     tip: 'Breach the wall across the floor, then turn up to the exit.',
@@ -690,9 +591,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 38 — Boxed In: drop down, run across and breach the door to the corner.
-  38: LevelData(
-    id: 38,
+  // 33 — Boxed In: drop down, run across and breach the door to the corner.
+  33: LevelData(
+    id: 33,
     size: 7,
     title: 'Boxed In',
     tip: 'The exit is sealed. Work down to the door and blast your way in.',
@@ -707,9 +608,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 39 — The Vault: a big 8x8; reach the sealed corner, dodging a loose mine.
-  39: LevelData(
-    id: 39,
+  // 34 — The Vault: a big 8x8; reach the sealed corner, dodging a loose mine.
+  34: LevelData(
+    id: 34,
     size: 8,
     title: 'The Vault',
     tip: 'Cross the board to the sealed corner and breach the vault door.',
@@ -724,10 +625,10 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 40 — Grand Demolition: the World 3 finale. A wide 8x8 minefield with a
+  // 35 — Grand Demolition: the World 3 finale. A wide 8x8 minefield with a
   // sealed exit; thread past the loose mines and breach the vault.
-  40: LevelData(
-    id: 40,
+  35: LevelData(
+    id: 35,
     size: 8,
     title: 'Grand Demolition',
     tip: 'Mines everywhere. Thread to the sealed corner and blow it open.',

@@ -229,16 +229,16 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (40) shows Back to Menu, not Continue',
+  testWidgets('last level (35) shows Back to Menu, not Continue',
       (tester) async {
-    const level40 = Level(
-      id: 40,
-      number: 40,
+    const level35 = Level(
+      id: 35,
+      number: 35,
       title: 'Grand Demolition',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level40)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level35)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
@@ -256,17 +256,17 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
-  testWidgets('shield + chain explosion clears the wall and wins (L29)',
+  testWidgets('shield + chain explosion clears the wall and wins (L24)',
       (tester) async {
-    // Level 29: shielded hit on the destroyer blasts the wall to the exit.
-    const level29 = Level(
-      id: 29,
-      number: 29,
+    // Level 24: shielded hit on the destroyer blasts the wall to the exit.
+    const level24 = Level(
+      id: 24,
+      number: 24,
       title: 'Break Through',
       difficulty: Difficulty.medium,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level29)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level24)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
