@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +15,7 @@ import '../models/level.dart';
 import '../models/level_data.dart';
 import '../progress/progress_store.dart';
 import '../theme/app_theme.dart';
+import '../utils/dev_mode.dart';
 import '../widgets/bouncy_button.dart';
 import '../widgets/feedback_dialog.dart';
 import '../widgets/game_grid.dart';
@@ -1037,7 +1037,7 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
         // Dev-only: edit this level in the designer.
-        if (kDebugMode) ...[
+        if (isDevMode) ...[
           const SizedBox(width: 8),
           GestureDetector(
             onTap: _openInDesigner,

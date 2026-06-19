@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../data/levels.dart';
 import '../models/level.dart';
 import '../theme/app_theme.dart';
+import '../utils/dev_mode.dart';
 import '../widgets/level_card.dart';
 import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
@@ -110,7 +110,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
                       SizedBox(
                         width: 50,
-                        child: kDebugMode
+                        child: isDevMode
                             ? Align(
                                 alignment: Alignment.centerRight,
                                 child: _SideIcon(
