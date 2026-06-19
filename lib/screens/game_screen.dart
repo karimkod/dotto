@@ -969,17 +969,6 @@ class _GameScreenState extends State<GameScreen>
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 14),
-                    Text(
-                      _level!.tip,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.3,
-                        color: AppColors.textSoft,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     Expanded(child: _buildPlayArea()),
                     const SizedBox(height: 16),
                     // Hide the toolkit during the win celebration.
