@@ -441,11 +441,11 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 23 — Shield Timing: pick up the shield FIRST, then turn into the destroyer.
+  // 23 — Shield Around: pick up the shield FIRST, then turn into the destroyer.
   23: LevelData(
     id: 23,
     size: 5,
-    title: 'Shield Timing',
+    title: 'Shield Around',
     tip: 'Order matters: route through the shield first, then into the danger.',
     start: StartSpec(2, 4, Direction.left),
     exit: Pos(4, 4),
