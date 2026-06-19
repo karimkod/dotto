@@ -200,7 +200,8 @@ void main() {
     expect(find.text('Try Again'), findsNothing);
     expect(find.text('Continue'), findsNothing);
 
-    // Place the arrow → the hint disappears (Play is now enabled).
+    // Place the arrow → the hint switches to "Ready!" (Play is now enabled),
+    // keeping the same space so the button doesn't shift.
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, gridN);
     await _dragArrow(tester, tester.getCenter(find.text('UP')),

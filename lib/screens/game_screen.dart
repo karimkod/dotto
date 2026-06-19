@@ -1409,20 +1409,25 @@ class _GameScreenState extends State<GameScreen>
     // no-toolkit Level 1, whose kit is already empty).
     final remaining = _remainingPieces;
     final canPlay = remaining == 0;
+    // The hint line is always present (its space is reserved) so the Play button
+    // never shifts; only the message changes.
+    final hint = running
+        ? 'Go!'
+        : (canPlay ? 'Ready! Hit Play' : 'Place all elements ($remaining left)');
+    final hintColor =
+        (canPlay && !running) ? AppColors.completed : AppColors.textSoft;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!running && !canPlay) ...[
-          Text(
-            'Place all elements ($remaining left)',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSoft,
-            ),
+        Text(
+          hint,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: hintColor,
           ),
-          const SizedBox(height: 8),
-        ],
+        ),
+        const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
           child: _PillButton(
