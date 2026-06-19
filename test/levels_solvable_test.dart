@@ -67,12 +67,12 @@ void main() {
     19: [(2, 5, Direction.left), (2, 3, Direction.down), (5, 3, Direction.left)],
     20: [(3, 2, Direction.right), (3, 4, Direction.up), (0, 4, Direction.right)],
     // ----- World 3 (21–35): arrows here, shields in `shields` below. -----
-    21: [
+    21: [],
+    22: [
       (0, 3, Direction.right),
       (4, 3, Direction.up),
       (4, 4, Direction.left),
     ],
-    22: [],
     23: [(0, 4, Direction.down)],
     24: [],
     25: [],
@@ -90,8 +90,8 @@ void main() {
 
   // Intended shield placements (World 3 only).
   final shields = <int, List<(int, int)>>{
-    21: [(2, 2)],
-    22: [(3, 2)],
+    21: [(3, 2)],
+    22: [(2, 2)],
     23: [(2, 4)],
     24: [(2, 1)],
     25: [(1, 2)],
@@ -147,7 +147,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 21, 29]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 29]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited =

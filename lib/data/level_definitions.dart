@@ -407,11 +407,23 @@ const Map<int, LevelData> levelDefinitions = {
 
   // ----- Learn shields (21–23) -----
 
-  // 21 — Trapdoor: the only way into the walled-off exit is past a mine. Shield
-  // through it (which destroys it), ride the fixed arrow's drop, then climb back
-  // up through the now-clear gap to the exit.
+  // 21 — Must Shield: the destroyer is dead ahead with no way around it.
   21: LevelData(
     id: 21,
+    size: 5,
+    title: 'Must Shield',
+    tip: 'No way around — you must shield up and go straight through.',
+    start: StartSpec(4, 2, Direction.up),
+    exit: Pos(0, 2),
+    destroyers: [Pos(2, 2)],
+    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+  ),
+
+  // 22 — Trapdoor: the only way into the walled-off exit is past a mine. Shield
+  // through it (which destroys it), ride the fixed arrow's drop, then climb back
+  // up through the now-clear gap to the exit.
+  22: LevelData(
+    id: 22,
     size: 5,
     title: 'Trapdoor',
     tip: 'Shield through the mine to clear it, take the drop, then climb back up '
@@ -427,18 +439,6 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.arrowRight, 1),
       ToolkitEntry(ToolType.shield, 1),
     ],
-  ),
-
-  // 22 — Must Shield: the destroyer is dead ahead with no way around it.
-  22: LevelData(
-    id: 22,
-    size: 5,
-    title: 'Must Shield',
-    tip: 'No way around — you must shield up and go straight through.',
-    start: StartSpec(4, 2, Direction.up),
-    exit: Pos(0, 2),
-    destroyers: [Pos(2, 2)],
-    toolkit: [ToolkitEntry(ToolType.shield, 1)],
   ),
 
   // 23 — Shield Timing: pick up the shield FIRST, then turn into the destroyer.
