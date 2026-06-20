@@ -524,17 +524,36 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 27 — Demolition: one keystone destroyer levels a whole wall cluster.
+  // 27 — Demolition: blast through the stacked destroyer-doors between two wall
+  // barriers to climb out to the exit.
   27: LevelData(
     id: 27,
     size: 6,
     title: 'Demolition',
-    tip: 'A single shielded blast clears every wall around the destroyer.',
+    tip: '',
     start: StartSpec(2, 0, Direction.right),
-    exit: Pos(2, 5),
-    destroyers: [Pos(2, 2)],
-    walls: [Pos(1, 2), Pos(1, 3), Pos(2, 3), Pos(3, 2), Pos(3, 3)],
-    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+    exit: Pos(0, 3),
+    walls: [
+      Pos(1, 0),
+      Pos(1, 1),
+      Pos(1, 2),
+      Pos(1, 3),
+      Pos(1, 4),
+      Pos(1, 5),
+      Pos(4, 4),
+      Pos(4, 3),
+      Pos(4, 2),
+      Pos(4, 1),
+      Pos(4, 5),
+    ],
+    destroyers: [Pos(3, 3), Pos(2, 3)],
+    forcedArrows: [ForcedArrow(5, 3, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
+    ],
   ),
 
   // ----- Challenge (28–30) -----
