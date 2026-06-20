@@ -1551,23 +1551,23 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Emoji, headline and accent color for each death cause, so the fail overlay
-  /// tells the player exactly why the dot died.
-  static ({String emoji, String label, Color color}) _deathInfo(
-      DeathCause? cause) {
+  /// Headline and accent color for each death cause, so the fail overlay tells
+  /// the player exactly why the dot died. The matching icon is drawn by
+  /// [_FailIconPainter] in the board's thick-outline style.
+  static ({String label, Color color}) _deathInfo(DeathCause? cause) {
     switch (cause) {
       case DeathCause.edge:
-        return (emoji: '🏃', label: 'Ran off the edge!', color: Color(0xFFF59E0B));
+        return (label: 'Ran off the edge!', color: Color(0xFFF59E0B));
       case DeathCause.wall:
-        return (emoji: '🧱', label: 'Hit a wall!', color: Color(0xFF607D8B));
+        return (label: 'Hit a wall!', color: Color(0xFF607D8B));
       case DeathCause.destroyer:
-        return (emoji: '💥', label: 'Destroyed!', color: Color(0xFFEF5350));
+        return (label: 'Destroyed!', color: Color(0xFFEF5350));
       case DeathCause.patrol:
-        return (emoji: '🚨', label: 'Caught by patrol!', color: Color(0xFFE53935));
+        return (label: 'Caught by patrol!', color: Color(0xFFE53935));
       case DeathCause.gap:
-        return (emoji: '🕳️', label: 'Fell in a gap!', color: Color(0xFF6D4C41));
+        return (label: 'Fell in a gap!', color: Color(0xFF6D4C41));
       case null:
-        return (emoji: '💥', label: 'Try Again', color: AppColors.ink);
+        return (label: 'Try Again', color: AppColors.ink);
     }
   }
 
@@ -1590,7 +1590,12 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(info.emoji, style: const TextStyle(fontSize: 48)),
+              // The hazard that killed the dot, drawn in the board's icon style.
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CustomPaint(painter: _FailIconPainter(_deathCause)),
+              ),
               const SizedBox(height: 10),
               // The death reason — prominent, in its matching color.
               Text(
@@ -2027,4 +2032,168 @@ class _MoverPainter extends CustomPainter {
       old.glowTick != glowTick ||
       old.movers != movers ||
       old.planning != planning;
+}
+
+/// Draws the fail-overlay icon for each [DeathCause] in the board's thick-
+/// outline, rounded-cell style — reusing the very hazards seen on the grid (the
+/// spiky mine, the gray wall block, the dashed gap) so the player connects the
+/// death to the thing that caused it.
+class _FailIconPainter extends CustomPainter {
+  _FailIconPainter(this.cause);
+
+  final DeathCause? cause;
+
+  // Grid-matched cell colors (see game_grid `_C` / `_paintBase`).
+  static const _wallFill = Color(0xFF78909C);
+  static const _wallBorder = Color(0xFF5C6B73);
+  static const _mineFill = Color(0xFFEF5350);
+  static const _mineBorder = Color(0xFFC62828);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide;
+    final c = Offset(size.width / 2, size.height / 2);
+    final pad = s * 0.08;
+    final box = Rect.fromLTWH(pad, pad, s - pad * 2, s - pad * 2);
+
+    switch (cause) {
+      case DeathCause.destroyer:
+        _cell(canvas, box, _mineFill, _mineBorder);
+        paintMineIcon(canvas, c, s * 1.35, 0);
+      case DeathCause.patrol:
+        _cell(canvas, box, _mineFill, _mineBorder);
+        paintMineIcon(canvas, c, s * 1.25, 0);
+        _patrolArrows(canvas, c, s); // a moving mine — patrol axis badge
+      case DeathCause.wall:
+        _cell(canvas, box, _wallFill, _wallBorder);
+        _crack(canvas, box);
+      case DeathCause.gap:
+        _cell(canvas, box, AppColors.background, AppColors.textSoft,
+            dashed: true);
+        _downArrow(canvas, c, s, const Color(0xFF6D4C41));
+      case DeathCause.edge:
+      case null:
+        _edge(canvas, box, s);
+    }
+  }
+
+  /// A rounded, thick-outlined cell — the board's signature look.
+  void _cell(Canvas canvas, Rect rect, Color fill, Color border,
+      {bool dashed = false}) {
+    final rrect =
+        RRect.fromRectAndRadius(rect, Radius.circular(rect.width * 0.22));
+    canvas.drawRRect(rrect, Paint()..color = fill);
+    final bp = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = rect.width * 0.075
+      ..strokeJoin = StrokeJoin.round
+      ..color = border;
+    if (dashed) {
+      _dashRRect(canvas, rrect, bp);
+    } else {
+      canvas.drawRRect(rrect, bp);
+    }
+  }
+
+  void _dashRRect(Canvas canvas, RRect rrect, Paint p) {
+    final path = Path()..addRRect(rrect);
+    const dash = 5.0, gap = 4.0;
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, math.min(d + dash, m.length)), p);
+        d += dash + gap;
+      }
+    }
+  }
+
+  /// A jagged lightning crack across a wall block.
+  void _crack(Canvas canvas, Rect box) {
+    final w = box.width, h = box.height;
+    final p = Path()
+      ..moveTo(box.left + w * 0.52, box.top + h * 0.16)
+      ..lineTo(box.left + w * 0.38, box.top + h * 0.46)
+      ..lineTo(box.left + w * 0.56, box.top + h * 0.52)
+      ..lineTo(box.left + w * 0.40, box.top + h * 0.86);
+    canvas.drawPath(
+      p,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = box.width * 0.09
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF37474F),
+    );
+  }
+
+  /// A small red double-headed horizontal arrow under the mine — "this one
+  /// moves" (the patrol axis), echoing the planning-phase hint.
+  void _patrolArrows(Canvas canvas, Offset c, double s) {
+    final y = c.dy + s * 0.30;
+    final half = s * 0.26;
+    final p = Paint()
+      ..color = _mineBorder
+      ..strokeWidth = s * 0.05
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final left = Offset(c.dx - half, y);
+    final right = Offset(c.dx + half, y);
+    canvas.drawLine(left, right, p);
+    final head = s * 0.10;
+    canvas.drawLine(left, left + Offset(head, -head), p);
+    canvas.drawLine(left, left + Offset(head, head), p);
+    canvas.drawLine(right, right + Offset(-head, -head), p);
+    canvas.drawLine(right, right + Offset(-head, head), p);
+  }
+
+  /// A downward arrow falling into the (dashed) gap.
+  void _downArrow(Canvas canvas, Offset c, double s, Color color) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = s * 0.09
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final top = Offset(c.dx, c.dy - s * 0.22);
+    final tip = Offset(c.dx, c.dy + s * 0.20);
+    canvas.drawLine(top, tip, p);
+    final head = s * 0.16;
+    canvas.drawLine(tip, tip + Offset(-head, -head), p);
+    canvas.drawLine(tip, tip + Offset(head, -head), p);
+  }
+
+  /// The dot leaving the board: a ball inside the cell and an arrow piercing out
+  /// through the right edge.
+  void _edge(Canvas canvas, Rect box, double s) {
+    // Cell sits on the left, leaving room for the arrow to exit on the right.
+    final cellRect =
+        Rect.fromLTWH(box.left, box.top, box.width * 0.66, box.height);
+    _cell(canvas, cellRect, AppColors.card, AppColors.ink);
+
+    final cy = cellRect.center.dy;
+    // The dot.
+    canvas.drawCircle(
+      Offset(cellRect.left + cellRect.width * 0.40, cy),
+      s * 0.11,
+      Paint()..color = AppColors.accent,
+    );
+    // Arrow shaft + head crossing the cell's right wall and exiting.
+    const amber = Color(0xFFF59E0B);
+    final p = Paint()
+      ..color = amber
+      ..strokeWidth = s * 0.085
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final shaftStart = Offset(cellRect.right - s * 0.06, cy);
+    final tip = Offset(box.right + s * 0.04, cy);
+    canvas.drawLine(shaftStart, tip, p);
+    final head = s * 0.14;
+    canvas.drawLine(tip, tip + Offset(-head, -head), p);
+    canvas.drawLine(tip, tip + Offset(-head, head), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FailIconPainter old) => old.cause != cause;
 }
