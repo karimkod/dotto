@@ -1,7 +1,9 @@
-// Verifies every level (World 1: 1–15, World 2: 16–20, World 3: 21–35): that it
-// is solvable, that the intended hand-authored solution actually wins, and that
-// every level is "tight" (no solution leaves a toolkit piece unused). Doubles
-// as the "level solver" the design called for.
+// Verifies every level (World 1: 1–15, World 2: 16–20, World 3: 21–30,
+// World 4: 31–45): that it is solvable, that the intended hand-authored
+// solution actually wins, and that every level is "tight" (no solution leaves a
+// toolkit piece unused). World 4 has moving destroyers, so it uses the
+// timing-aware brute solver. Doubles as the "level solver" the design called
+// for.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,11 +15,13 @@ import 'package:dotto/models/game_state.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level_data.dart';
 
-/// Build a placement map from arrows ((r,c,dir)) and shields ((r,c)).
+/// Build a placement map from arrows ((r,c,dir)), shields ((r,c)) and pauses
+/// ((r,c)).
 Map<int, PlacedElement> place(
   LevelData level,
   List<(int, int, Direction)> arrows, [
   List<(int, int)> shields = const [],
+  List<(int, int)> pauses = const [],
 ]) {
   return {
     for (final (r, c, dir) in arrows)
@@ -30,6 +34,12 @@ Map<int, PlacedElement> place(
       r * level.size + c: const PlacedElement(
         type: PlacedType.shield,
         tool: ToolType.shield,
+        direction: null,
+      ),
+    for (final (r, c) in pauses)
+      r * level.size + c: const PlacedElement(
+        type: PlacedType.pause,
+        tool: ToolType.pause,
         direction: null,
       ),
   };
@@ -107,9 +117,38 @@ void main() {
       (5, 2, Direction.down),
       (5, 5, Direction.left),
     ],
+    // ----- World 4 (31–45): arrows here, pauses/shields below. -----
+    31: [(0, 4, Direction.left), (4, 4, Direction.up)],
+    32: [(4, 0, Direction.right), (4, 4, Direction.up)],
+    33: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    34: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    35: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    36: [],
+    37: [],
+    38: [(5, 5, Direction.up)],
+    39: [(5, 5, Direction.up)],
+    40: [(5, 5, Direction.up)],
+    41: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    42: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    43: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    44: [(0, 6, Direction.left), (6, 6, Direction.up)],
+    45: [(0, 6, Direction.left), (6, 6, Direction.up)],
   };
 
-  // Intended shield placements (World 3 only).
+  // Intended pause placements (World 4).
+  final pauses = <int, List<(int, int)>>{
+    36: [(4, 1)],
+    37: [(2, 1)],
+    38: [(5, 4)],
+    39: [(3, 5), (5, 4)],
+    40: [(5, 4)],
+    41: [(5, 4)],
+    43: [(5, 4)],
+    44: [(6, 5)],
+    45: [(6, 5)],
+  };
+
+  // Intended shield placements (World 3, plus World 4's shield exam 42).
   final shields = <int, List<(int, int)>>{
     21: [(3, 2)],
     22: [(2, 2)],
@@ -121,14 +160,23 @@ void main() {
     28: [(0, 2)],
     29: [(1, 2), (3, 3)],
     30: [(1, 3), (3, 4), (5, 3)],
+    42: [(5, 4)],
   };
 
-  int worldOf(int n) => n <= 15 ? 1 : (n <= 20 ? 2 : 3);
+  int worldOf(int n) =>
+      n <= 15 ? 1 : (n <= 20 ? 2 : (n <= 30 ? 3 : 4));
 
-  for (var n = 1; n <= 30; n++) {
+  // World 4 (31+) has moving destroyers, so timing matters — only the
+  // brute-force, simulate-based solver is reliable there.
+  List<Map<int, PlacedElement>> solveFor(LevelData lvl) =>
+      lvl.movers.isNotEmpty ? solveAll(lvl) : pathSolve(lvl);
+  int minPiecesFor(LevelData lvl) =>
+      lvl.movers.isNotEmpty ? minSolutionPieces(lvl) : pathMinPieces(lvl);
+
+  for (var n = 1; n <= 45; n++) {
     test('World ${worldOf(n)} — level $n is solvable', () {
       final level = levelDataFor(n)!;
-      final solutions = pathSolve(level);
+      final solutions = solveFor(level);
       debugPrint('Level $n "${level.title}": ${solutions.length} solution(s)');
       expect(solutions, isNotEmpty,
           reason: 'level $n should have at least one solution');
@@ -137,7 +185,10 @@ void main() {
     test('World ${worldOf(n)} — level $n intended solution wins', () {
       final level = levelDataFor(n)!;
       expect(
-          simulate(level, place(level, intended[n]!, shields[n] ?? const [])),
+          simulate(
+              level,
+              place(level, intended[n]!, shields[n] ?? const [],
+                  pauses[n] ?? const [])),
           SimOutcome.win,
           reason: 'the recorded solution for level $n must win');
     });
@@ -145,10 +196,10 @@ void main() {
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 30; n++) {
+  for (var n = 2; n <= 45; n++) {
     test('World ${worldOf(n)} — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
-      expect(pathMinPieces(level), toolkitTotal(level),
+      expect(minPiecesFor(level), toolkitTotal(level),
           reason: 'level $n should have no solution that leaves a piece unused');
     });
   }
@@ -163,11 +214,13 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 35, 40]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
-      final visited =
-          tracePath(level, place(level, intended[n]!, shields[n] ?? const []));
+      final visited = tracePath(
+          level,
+          place(level, intended[n]!, shields[n] ?? const [],
+              pauses[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
         expect(visited!.contains(a.r * level.size + a.c), isTrue,

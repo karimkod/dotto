@@ -641,6 +641,318 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
+
+  // ======================= WORLD 4 — MOVING DESTROYERS + PAUSE ===============
+  // Levels 31–45. Moving destroyers patrol a row/column, advancing one cell per
+  // beat and bouncing at their bounds; they kill on contact and a shield does
+  // NOT stop one — they are pure timing hazards. The Pause block holds the dot
+  // for 2 beats so it can let a patrol pass. All solver-verified tight via the
+  // brute-force (mover-aware) simulator.
+
+  // ----- Moving destroyers (31–35) -----
+
+  // 31 — First Patrol: a wall corridor right→up→left; a patrol sweeps row 2,
+  // crossing the climb. Time the route around it.
+  31: LevelData(
+    id: 31,
+    size: 5,
+    title: 'First Patrol',
+    tip: 'The red mine moves! Route around its patrol.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3),
+    ],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 32 — Sidestep: down→right→up around a central wall block, past a patrol.
+  32: LevelData(
+    id: 32,
+    size: 5,
+    title: 'Sidestep',
+    tip: 'Drop, cross and climb — slip past the patrol.',
+    start: StartSpec(0, 0, Direction.down),
+    exit: Pos(0, 4),
+    walls: [
+      Pos(1, 1), Pos(1, 2), Pos(1, 3),
+      Pos(2, 1), Pos(2, 2), Pos(2, 3),
+      Pos(3, 1), Pos(3, 2), Pos(3, 3),
+    ],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
+    ],
+  ),
+
+  // 33 — Double Patrol: two patrols (rows 2 & 4) cross the climb. Time both.
+  33: LevelData(
+    id: 33,
+    size: 6,
+    title: 'Double Patrol',
+    tip: 'Two patrols guard the climb. Thread between them.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    movers: [
+      MovingDestroyer(2, 0, horizontal: true, dir: 1),
+      MovingDestroyer(4, 5, horizontal: true, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 34 — Patrolled Gap: a patrol guards the lone gap the corridor must cross.
+  34: LevelData(
+    id: 34,
+    size: 6,
+    title: 'Patrolled Gap',
+    tip: 'A patrol guards the only way up. Pick your moment.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 35 — Pinned Patrol: a fixed arrow on the route plus a patrol to dodge.
+  35: LevelData(
+    id: 35,
+    size: 6,
+    title: 'Pinned Patrol',
+    tip: 'The fixed arrow guides you home — just dodge the patrol.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    destroyers: [],
+    forcedArrows: [ForcedArrow(0, 3, Direction.left)],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // ----- Pause blocks (36–40) -----
+
+  // 36 — Freeze Frame: a vertical patrol crosses the straight run. Place a
+  // pause so the dot waits for it to pass.
+  36: LevelData(
+    id: 36,
+    size: 5,
+    title: 'Freeze Frame',
+    tip: 'Pause = wait. Let the patrol cross, then go.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(4, 4),
+    movers: [MovingDestroyer(2, 2, horizontal: false, dir: 1)],
+    toolkit: [ToolkitEntry(ToolType.pause, 1)],
+  ),
+
+  // 37 — Slip Through: two vertical patrols across the run; pause to slip
+  // between them.
+  37: LevelData(
+    id: 37,
+    size: 5,
+    title: 'Slip Through',
+    tip: 'Two patrols. Pause to slip through the gap.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 4),
+    movers: [
+      MovingDestroyer(0, 2, horizontal: false, dir: 1),
+      MovingDestroyer(2, 3, horizontal: false, dir: 1),
+    ],
+    toolkit: [ToolkitEntry(ToolType.pause, 1)],
+  ),
+
+  // 38 — Wait For It: climb a corridor that a patrol blocks; pause to let it
+  // clear the gap.
+  38: LevelData(
+    id: 38,
+    size: 6,
+    title: 'Wait For It',
+    tip: 'The patrol blocks the climb. Wait for it to swing away.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    movers: [MovingDestroyer(2, 4, horizontal: true, dir: 1, lo: 3, hi: 5)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 39 — Double Wait: two patrols on the climb; two pauses to thread both.
+  39: LevelData(
+    id: 39,
+    size: 6,
+    title: 'Double Wait',
+    tip: 'Two patrols, two waits. Time each one.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    movers: [
+      MovingDestroyer(2, 3, horizontal: true, dir: 1, lo: 3, hi: 5),
+      MovingDestroyer(4, 3, horizontal: true, dir: 1, lo: 3, hi: 5),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 2),
+    ],
+  ),
+
+  // 40 — Pinned Wait: a fixed arrow finishes the route; pause past the patrol.
+  40: LevelData(
+    id: 40,
+    size: 6,
+    title: 'Pinned Wait',
+    tip: 'Ride the fixed arrow — but pause for the patrol first.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    forcedArrows: [ForcedArrow(0, 5, Direction.left)],
+    movers: [MovingDestroyer(2, 3, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // ----- Exams (41–45): combine everything. -----
+
+  // 41 — a static mine to avoid + a patrol + a pause on the climb.
+  41: LevelData(
+    id: 41,
+    size: 6,
+    title: 'Mind the Mine',
+    tip: 'Dodge the still mine, time the moving one.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    destroyers: [Pos(2, 2)],
+    movers: [MovingDestroyer(4, 1, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 42 — shield through a static door + dodge a patrol.
+  42: LevelData(
+    id: 42,
+    size: 6,
+    title: 'Shielded Sprint',
+    tip: 'Shield the still mine; the moving one needs timing.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    destroyers: [Pos(0, 3)],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // 43 — Patrol Climb: a full corridor with a patrol and a pause.
+  43: LevelData(
+    id: 43,
+    size: 6,
+    title: 'Patrol Climb',
+    tip: 'Climb and turn home, pausing for the patrol.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    ],
+    movers: [MovingDestroyer(2, 3, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 44 — Long Watch: a tall 7x7 corridor with a patrol and a pause.
+  44: LevelData(
+    id: 44,
+    size: 7,
+    title: 'Long Watch',
+    tip: 'A long climb past a patrol. Time it well.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
+    ],
+    movers: [MovingDestroyer(2, 4, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 45 — Last Patrol: the World 4 finale — a 7x7 corridor with a static mine
+  // to dodge and a patrol to time.
+  45: LevelData(
+    id: 45,
+    size: 7,
+    title: 'Last Patrol',
+    tip: 'Everything at once: a still mine, a patrol and a pause.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
+    ],
+    destroyers: [Pos(4, 2)],
+    movers: [MovingDestroyer(4, 2, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

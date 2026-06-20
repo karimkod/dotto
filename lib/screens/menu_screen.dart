@@ -209,6 +209,13 @@ class _MenuScreenState extends State<MenuScreen> {
                             number: 3, subtitle: 'Shields & Explosions'),
                       ]);
                     }
+                    if (level.number == kWorld4Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 4, subtitle: 'Patrols & Pause'),
+                      ]);
+                    }
                     return slot;
                   }(),
               ],

@@ -230,29 +230,26 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (30) shows Back to Menu, not Continue',
+  testWidgets('last level (45) shows Back to Menu, not Continue',
       (tester) async {
-    const level30 = Level(
-      id: 30,
-      number: 30,
-      title: 'Grand Demolition',
+    const level45 = Level(
+      id: 45,
+      number: 45,
+      title: 'Last Patrol',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level30)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level45)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, 8);
+    final geo = GridGeometry(boardRect.width, 7);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: shield through all three doors while weaving down to the corner.
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(1, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(3, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(3, 4));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(3, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(5, 2));
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(5, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(5, 5));
+    // Solution: pause to let the patrol pass, climb the last column, turn left
+    // across the top to the corner exit.
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(0, 6));
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(6, 5));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(6, 6));
 
     await runToWin(tester);
 

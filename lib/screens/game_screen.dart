@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
-import '../engine/simulator.dart' show adjacentWallKeys;
+import '../engine/simulator.dart' show adjacentWallKeys, buildMovers, MoverState;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -68,6 +68,7 @@ class _GameScreenState extends State<GameScreen>
   Timer? _timer;
   late final AnimationController _dotCtrl; // per-step glide + squish
   late final Animation<double> _dotScale; // arrival squish
+  late final AnimationController _moverCtrl; // patrol glide (every beat)
   late final AnimationController _glowCtrl; // continuous fx driver
   (int, int) _animFrom = (0, 0);
   (int, int) _animTo = (0, 0);
@@ -86,6 +87,10 @@ class _GameScreenState extends State<GameScreen>
 
   /// True once the dot has been blown up (hidden during the fatal explosion).
   bool _dotGone = false;
+
+  /// Runtime patrol (moving destroyer) state + their pre-step cells (for glide).
+  List<MoverState> _movers = [];
+  List<(int, int)> _moverFrom = [];
 
   // Win celebration: grid fades out, a full celebration screen fades in.
   late final AnimationController _winCtrl;
@@ -141,6 +146,10 @@ class _GameScreenState extends State<GameScreen>
       vsync: this,
       duration: const Duration(milliseconds: 320),
     );
+    _moverCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    )..value = 1;
     // Brief squish: stays at 1.0, then pops to 1.15 and settles on arrival.
     _dotScale = TweenSequence<double>([
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 60),
@@ -233,6 +242,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _handTimer?.cancel();
     _dotCtrl.dispose();
+    _moverCtrl.dispose();
     _glowCtrl.dispose();
     _snapCtrl.dispose();
     _winCtrl.dispose();
@@ -340,6 +350,9 @@ class _GameScreenState extends State<GameScreen>
     _destroyedCells.clear();
     _dotShielded = false;
     _dotGone = false;
+    _movers = buildMovers(_level!);
+    _moverFrom = [for (final m in _movers) (m.row, m.col)];
+    _moverCtrl.value = 1;
     _winCtrl.value = 0;
     _celebrationDone = false;
     _animFrom = (s.r, s.c);
@@ -648,9 +661,28 @@ class _GameScreenState extends State<GameScreen>
         Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
+  bool _moverOn(int r, int c) =>
+      _movers.any((m) => m.row == r && m.col == c);
+
   void _beat() {
     if (_status != GameStatus.running) return;
     final size = _level!.size;
+
+    // 1. Patrols advance (and may catch the stationary dot).
+    if (_movers.isNotEmpty) {
+      setState(() {
+        _moverFrom = [for (final m in _movers) (m.row, m.col)];
+        for (final m in _movers) {
+          m.step();
+        }
+      });
+      _moverCtrl.forward(from: 0);
+      if (_moverOn(_dot.r, _dot.c)) {
+        _explode(_idx(_dot.r, _dot.c), fatal: true);
+        _failExploded('A patrol caught the dot!');
+        return;
+      }
+    }
 
     if (_dot.pause > 0) {
       setState(() => _dot.pause--);
@@ -680,6 +712,13 @@ class _GameScreenState extends State<GameScreen>
     });
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
+
+    // The dot stepped onto a patrol.
+    if (_moverOn(nr, nc)) {
+      _explode(newKey, fatal: true);
+      _failExploded('A patrol caught the dot!');
+      return;
+    }
 
     final base = _effBase(nr, nc);
     if (base == CellType.gap) {
@@ -1180,6 +1219,26 @@ class _GameScreenState extends State<GameScreen>
                     },
                   ),
                 ),
+                // Moving destroyers: red mines gliding between cells, visible
+                // while planning AND running so the player can read the patrol.
+                if (_movers.isNotEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([_moverCtrl, _glowCtrl]),
+                        builder: (_, _) => CustomPaint(
+                          size: Size.square(side),
+                          painter: _MoverPainter(
+                            movers: _movers,
+                            from: _moverFrom,
+                            t: Curves.easeInOut.transform(_moverCtrl.value),
+                            geo: geo,
+                            glowTick: _glowCtrl.value,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -1832,4 +1891,48 @@ class _BgGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BgGridPainter oldDelegate) => false;
+}
+
+/// Draws the moving destroyers as red-tinted mines, gliding from their previous
+/// cell to their current cell over one beat ([t] 0→1). Used as an overlay above
+/// the board so movers animate independently of the grid repaint.
+class _MoverPainter extends CustomPainter {
+  _MoverPainter({
+    required this.movers,
+    required this.from,
+    required this.t,
+    required this.geo,
+    required this.glowTick,
+  });
+
+  final List<MoverState> movers;
+  final List<(int, int)> from;
+  final double t;
+  final GridGeometry geo;
+  final double glowTick;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < movers.length; i++) {
+      final m = movers[i];
+      final prev = i < from.length ? from[i] : (m.row, m.col);
+      final a = geo.center(prev.$1, prev.$2);
+      final b = geo.center(m.row, m.col);
+      final c = Offset.lerp(a, b, t)!;
+      // Red danger halo so a moving mine reads differently from a static one.
+      final pulse = 0.5 + 0.5 * math.sin(glowTick * 2 * math.pi);
+      canvas.drawCircle(
+        c,
+        geo.cell * (0.34 + 0.05 * pulse),
+        Paint()
+          ..color = const Color(0xFFE53935).withValues(alpha: 0.22 + 0.12 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      paintMineIcon(canvas, c, geo.cell, glowTick);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MoverPainter old) =>
+      old.t != t || old.glowTick != glowTick || old.movers != movers;
 }

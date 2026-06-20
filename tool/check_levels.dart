@@ -1,50 +1,44 @@
 // ignore_for_file: avoid_print
-// Solver check for all levels (World 1: 1–15, World 2: 16–30) — run with:
-//   dart run tool/check_levels.dart
-// Uses the fast path-based solver (scales to open grids) and prints
-// solvability, distinct-solution count, min pieces vs toolkit total, and a
-// sample solution per level. Pass `--brute` to also cross-check the slow
-// brute-force solver on the smaller levels.
+// Solver check for all 45 levels — run with: dart run tool/check_levels.dart
+// Levels with moving destroyers (World 4) need the timing-aware BRUTE-FORCE
+// solver; the rest use the fast path-based solver. Prints distinct-solution
+// count, min pieces vs toolkit total, tightness, and a sample solution.
 
 import 'package:dotto/data/level_definitions.dart';
 import 'package:dotto/engine/level_solver.dart';
 
 void main(List<String> args) {
-  final brute = args.contains('--brute');
   final from = int.tryParse(
         args.firstWhere((a) => int.tryParse(a) != null, orElse: () => ''),
       ) ??
       1;
-  for (var n = from; n <= 30; n++) {
+  for (var n = from; n <= 45; n++) {
     final lvl = levelDataFor(n);
     if (lvl == null) continue;
     final total = toolkitTotal(lvl);
-    final minP = pathMinPieces(lvl);
-    final sols = pathSolve(lvl);
+    // Moving destroyers => timing matters => brute solver is the source of truth.
+    final usesBrute = lvl.movers.isNotEmpty;
+    final sols = usesBrute ? solveAll(lvl) : pathSolve(lvl);
+    final minP = sols.isEmpty
+        ? -1
+        : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
     final tight = minP == total;
     final unique = sols.length == 1;
     print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
+        '${usesBrute ? "[brute] " : ""}'
         'sols=${sols.length}${sols.length >= 256 ? "+" : ""} '
         'min=$minP total=$total '
-        '${tight ? "TIGHT" : "*** LOOSE ***"} '
+        '${sols.isEmpty ? "*** UNSOLVABLE ***" : (tight ? "TIGHT" : "*** LOOSE ***")} '
         '${unique ? "UNIQUE" : "(${sols.length} solutions)"}');
     if (sols.isNotEmpty) {
-      // Show the SHORTEST solution — reveals the unintended shortcut on a
-      // loose level.
       final s = (sols.toList()..sort((a, b) => a.length.compareTo(b.length)))
           .first;
       final desc = (s.entries.toList()
             ..sort((a, b) => a.key.compareTo(b.key)))
           .map((e) =>
-              '(${e.key ~/ lvl.size},${e.key % lvl.size},${e.value.direction?.name ?? 'shield'})')
+              '(${e.key ~/ lvl.size},${e.key % lvl.size},${e.value.direction?.name ?? e.value.type.name})')
           .join(' ');
       print('   sample: $desc');
-    }
-    if (brute && lvl.size <= 7) {
-      final bMin = minSolutionPieces(lvl);
-      if (bMin != minP) {
-        print('   *** PATH/BRUTE MISMATCH: brute min=$bMin path min=$minP ***');
-      }
     }
   }
 }

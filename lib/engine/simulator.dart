@@ -20,11 +20,54 @@ List<int> adjacentWallKeys(LevelData level, int key) {
   return out;
 }
 
+/// Mutable runtime state of a patrolling (moving) destroyer.
+class MoverState {
+  MoverState(this.fixed, this.pos, this.dir, this.lo, this.hi, this.horizontal);
+  final int fixed;
+  int pos;
+  int dir;
+  final int lo;
+  final int hi;
+  final bool horizontal;
+
+  int get row => horizontal ? fixed : pos;
+  int get col => horizontal ? pos : fixed;
+
+  /// Advance one cell, bouncing at the patrol bounds.
+  void step() {
+    if (lo >= hi) return; // degenerate (single cell) — stays put
+    var next = pos + dir;
+    if (next < lo || next > hi) {
+      dir = -dir;
+      next = pos + dir;
+    }
+    pos = next;
+  }
+}
+
+/// Build the runtime mover list for a level (positions reset to their starts).
+List<MoverState> buildMovers(LevelData level) {
+  final n = level.size;
+  return [
+    for (final m in level.movers)
+      MoverState(
+        m.horizontal ? m.r : m.c,
+        m.horizontal ? m.c : m.r,
+        m.dir,
+        m.lo ?? 0,
+        m.hi ?? (n - 1),
+        m.horizontal,
+      ),
+  ];
+}
+
 /// Headless, deterministic run of a level with the given player-placed pieces.
 /// Mirrors the tick rules used by the game screen, so it is the single source
 /// of truth for verifying that a level is solvable.
 ///
-/// (World 1 uses no moving hazards, so movers are not simulated here.)
+/// Tick order: moving destroyers advance (and may catch the dot), then — unless
+/// paused — the dot steps and its new cell is resolved. Moving destroyers are
+/// pure timing hazards: a shield does NOT save the dot from one.
 SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
 
@@ -52,9 +95,17 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
   final removed = <int>{};
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
+  final movers = buildMovers(level);
+  bool moverHit(int rr, int cc) =>
+      movers.any((mv) => mv.row == rr && mv.col == cc);
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
+    for (final mv in movers) {
+      mv.step();
+    }
+    if (moverHit(r, c)) return SimOutcome.lose; // a mover stepped onto the dot
+
     if (pause > 0) {
       pause--;
       continue;
@@ -68,6 +119,7 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
 
     r = nr;
     c = nc;
+    if (moverHit(r, c)) return SimOutcome.lose; // the dot stepped onto a mover
     final key = r * n + c;
     final base = effBase(r, c);
     if (base == CellType.gap) return SimOutcome.lose;
@@ -133,10 +185,17 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final removed = <int>{};
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
+  final movers = buildMovers(level);
+  bool moverHit(int rr, int cc) =>
+      movers.any((mv) => mv.row == rr && mv.col == cc);
   final visited = <int>{r * n + c};
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
+    for (final mv in movers) {
+      mv.step();
+    }
+    if (moverHit(r, c)) return null;
     if (pause > 0) {
       pause--;
       continue;
@@ -148,6 +207,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     if (effBase(nr, nc) == CellType.wall) return null;
     r = nr;
     c = nc;
+    if (moverHit(r, c)) return null;
     final base = effBase(r, c);
     if (base == CellType.gap) return null;
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {

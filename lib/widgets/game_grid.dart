@@ -320,6 +320,7 @@ class GameGridPainter extends CustomPainter {
     required this.winProgress,
     this.previewKey,
     this.previewTool,
+    this.movers = const [],
   });
 
   final LevelData level;
@@ -365,6 +366,10 @@ class GameGridPainter extends CustomPainter {
 
   final int? previewKey;
   final ToolType? previewTool;
+
+  /// Static preview of moving destroyers (designer only). The live game draws
+  /// these as gliding overlay widgets, so it passes an empty list.
+  final List<MovingDestroyer> movers;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -429,9 +434,45 @@ class GameGridPainter extends CustomPainter {
       _paintExplosion(canvas, geo, e);
     }
 
+    // Moving destroyers (designer preview): a mine with a patrol-axis hint.
+    for (final m in movers) {
+      _paintMover(canvas, geo, m);
+    }
+
     // The start-direction indicator renders last so it is never hidden behind
     // an adjacent forced arrow or placed piece.
     if (showStartHint) _paintStartHint(canvas, geo);
+  }
+
+  /// A moving destroyer as it appears in the editor: a red danger halo, the
+  /// mine icon, and a double-headed arrow showing the patrol axis.
+  void _paintMover(Canvas canvas, GridGeometry geo, MovingDestroyer m) {
+    final center = geo.center(m.r, m.c);
+    final cell = geo.cell;
+    canvas.drawCircle(
+      center,
+      cell * 0.36,
+      Paint()
+        ..color = const Color(0xFFE53935).withValues(alpha: 0.20)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    paintMineIcon(canvas, center, cell, glowTick);
+    // Patrol-axis indicator: a thin double arrow through the cell.
+    final axis = Paint()
+      ..color = const Color(0xFFE53935)
+      ..strokeWidth = cell * 0.05
+      ..strokeCap = StrokeCap.round;
+    final len = cell * 0.40;
+    final head = cell * 0.08;
+    final dir = m.horizontal ? const Offset(1, 0) : const Offset(0, 1);
+    final perp = m.horizontal ? const Offset(0, 1) : const Offset(1, 0);
+    final a = center - dir * len;
+    final b = center + dir * len;
+    canvas.drawLine(a, b, axis);
+    for (final (tip, back) in [(a, dir), (b, -dir)]) {
+      canvas.drawLine(tip, tip + back * head + perp * head, axis);
+      canvas.drawLine(tip, tip + back * head - perp * head, axis);
+    }
   }
 
   /// A destroyer blowing up: a white-hot flash, an expanding shock ring and a

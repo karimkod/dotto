@@ -13,7 +13,7 @@ import '../widgets/game_grid.dart';
 import 'game_screen.dart';
 
 /// The palette cell types the designer can paint.
-enum DesignTool { empty, start, exit, wall, destroyer, forced, shield }
+enum DesignTool { empty, start, exit, wall, destroyer, forced, shield, mover }
 
 /// Rotation cycle for Start / Forced arrow directions.
 const _cycle = [
@@ -55,6 +55,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   final Set<int> _destroyers = {};
   final Map<int, Direction> _forced = {};
   final Set<int> _shields = {}; // painted shield markers (design only)
+  // Moving destroyers keyed by cell. Tapping again cycles the patrol axis.
+  final Map<int, MovingDestroyer> _movers = {};
 
   final Map<ToolType, int> _kit = {
     ToolType.arrowUp: 0,
@@ -62,6 +64,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     ToolType.arrowLeft: 0,
     ToolType.arrowRight: 0,
     ToolType.shield: 0,
+    ToolType.pause: 0,
   };
 
   DesignTool _tool = DesignTool.wall;
@@ -106,6 +109,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     for (final f in lvl.forcedArrows) {
       _forced[_key(f.r, f.c)] = f.dir;
     }
+    for (final m in lvl.movers) {
+      _movers[_key(m.r, m.c)] = m;
+    }
     for (final k in _kit.keys.toList()) {
       _kit[k] = 0;
     }
@@ -125,6 +131,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.clear();
     _forced.clear();
     _shields.clear();
+    _movers.clear();
     _startKey = _key(n - 1, 0); // bottom-left, heading right
     _startDir = Direction.right;
     _exitKey = _key(0, n - 1); // top-right
@@ -137,6 +144,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_destroyers.contains(k)) return 'destroyer';
     if (_forced.containsKey(k)) return 'forced';
     if (_shields.contains(k)) return 'shield';
+    if (_movers.containsKey(k)) return 'mover';
     return null;
   }
 
@@ -145,6 +153,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.remove(k);
     _forced.remove(k);
     _shields.remove(k);
+    _movers.remove(k);
   }
 
   void _paintCell(int r, int c) {
@@ -192,6 +201,26 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             _clearMovable(k);
             _shields.add(k);
           }
+        case DesignTool.mover:
+          if (occ == 'mover') {
+            // Cycle: horizontal dir+1 → horizontal dir-1 → vertical dir+1 →
+            // vertical dir-1 → (back to start).
+            final m = _movers[k]!;
+            final r = _row(k), c = _col(k);
+            if (m.horizontal && m.dir == 1) {
+              _movers[k] = MovingDestroyer(r, c, horizontal: true, dir: -1);
+            } else if (m.horizontal && m.dir == -1) {
+              _movers[k] = MovingDestroyer(r, c, horizontal: false, dir: 1);
+            } else if (!m.horizontal && m.dir == 1) {
+              _movers[k] = MovingDestroyer(r, c, horizontal: false, dir: -1);
+            } else {
+              _movers[k] = MovingDestroyer(r, c, horizontal: true, dir: 1);
+            }
+          } else if (occ != 'start' && occ != 'exit') {
+            _clearMovable(k);
+            _movers[k] =
+                MovingDestroyer(_row(k), _col(k), horizontal: true, dir: 1);
+          }
       }
     });
   }
@@ -209,6 +238,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         forcedArrows: _forced.entries
             .map((e) => ForcedArrow(_row(e.key), _col(e.key), e.value))
             .toList(),
+        movers: _movers.values.toList(),
         toolkit: [
           for (final e in _kit.entries)
             if (e.value > 0) ToolkitEntry(e.key, e.value),
@@ -256,6 +286,13 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             'ForcedArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
         .join(', ');
     b.writeln('  forcedArrows: [$fa],');
+    if (_movers.isNotEmpty) {
+      final md = _movers.values
+          .map((m) =>
+              'MovingDestroyer(${m.r}, ${m.c}, horizontal: ${m.horizontal}, dir: ${m.dir}${m.lo != null ? ', lo: ${m.lo}' : ''}${m.hi != null ? ', hi: ${m.hi}' : ''})')
+          .join(', ');
+      b.writeln('  movers: [$md],');
+    }
     final kit = [
       for (final e in _kit.entries)
         if (e.value > 0) '    ToolkitEntry(ToolType.${e.key.name}, ${e.value}),',
@@ -389,6 +426,23 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
               _dir(am.group(3)) ?? Direction.right;
         }
       }
+      final mm = RegExp(r'movers\s*:\s*\[([^\]]*)\]').firstMatch(text);
+      if (mm != null) {
+        for (final dm in RegExp(
+                r'MovingDestroyer\(\s*(\d+)\s*,\s*(\d+)\s*,\s*horizontal:\s*(true|false)\s*(?:,\s*dir:\s*(-?\d+))?\s*(?:,\s*lo:\s*(\d+))?\s*(?:,\s*hi:\s*(\d+))?')
+            .allMatches(mm.group(1)!)) {
+          final r = int.parse(dm.group(1)!);
+          final c = int.parse(dm.group(2)!);
+          _movers[_key(r, c)] = MovingDestroyer(
+            r,
+            c,
+            horizontal: dm.group(3) == 'true',
+            dir: dm.group(4) != null ? int.parse(dm.group(4)!) : 1,
+            lo: dm.group(5) != null ? int.parse(dm.group(5)!) : null,
+            hi: dm.group(6) != null ? int.parse(dm.group(6)!) : null,
+          );
+        }
+      }
       for (final k in _kit.keys.toList()) {
         _kit[k] = 0;
       }
@@ -419,8 +473,14 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       return;
     }
     final level = _buildLevel();
-    final sols = pathSolve(level);
-    final minP = pathMinPieces(level);
+    // Moving destroyers make timing matter — only the brute solver is reliable.
+    final usesBrute = level.movers.isNotEmpty;
+    final sols = usesBrute ? solveAll(level) : pathSolve(level);
+    final minP = usesBrute
+        ? (sols.isEmpty
+            ? -1
+            : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b))
+        : pathMinPieces(level);
     final total = toolkitTotal(level);
     final solvable = sols.isNotEmpty;
     final tight = minP == total;
@@ -532,7 +592,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              _sectionLabel('Palette  ·  tap Start/Forced again to rotate'),
+              _sectionLabel(
+                  'Palette  ·  tap Start/Forced to rotate, Patrol to cycle axis'),
               const SizedBox(height: 8),
               _palette(),
               const SizedBox(height: 16),
@@ -644,10 +705,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             placed: {..._shieldPieces()},
             forced: _forcedPieces(),
             trail: const [],
+            movers: _movers.values.toList(),
             revision: _walls.length * 1000 +
                 _destroyers.length * 100 +
                 _forced.length * 10 +
-                _shields.length,
+                _shields.length +
+                _movers.length * 10000,
             placeAnim: const {},
             removing: const [],
             cellGlow: const {},
@@ -673,6 +736,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (DesignTool.destroyer, 'Destroyer', Icons.dangerous_rounded),
       (DesignTool.forced, 'Forced', Icons.double_arrow_rounded),
       (DesignTool.shield, 'Shield', Icons.shield_rounded),
+      (DesignTool.mover, 'Patrol', Icons.sync_alt_rounded),
     ];
     return Wrap(
       spacing: 8,
@@ -692,6 +756,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.destroyer: Color(0xFFEF5350),
     DesignTool.forced: Color(0xFF607D8B),
     DesignTool.shield: Color(0xFF38BDF8),
+    DesignTool.mover: Color(0xFFE53935),
   };
 
   Widget _paletteChip(DesignTool tool, String label, IconData icon) {
@@ -730,6 +795,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (ToolType.arrowLeft, '← Left'),
       (ToolType.arrowRight, '→ Right'),
       (ToolType.shield, '◯ Shield'),
+      (ToolType.pause, '⏸ Pause'),
     ];
     return Wrap(
       spacing: 10,
