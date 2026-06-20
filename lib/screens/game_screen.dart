@@ -8,7 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
-import '../engine/simulator.dart' show adjacentWallKeys, buildMovers, MoverState;
+import '../engine/simulator.dart'
+    show adjacentWallKeys, buildMovers, DeathCause, MoverState;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -63,7 +64,9 @@ class _GameScreenState extends State<GameScreen>
 
   /// Ordered list of visited cells (most recent last) for the fading trail.
   final List<int> _trail = [];
-  String? _failReason;
+
+  /// Why the dot died, shown prominently on the fail overlay.
+  DeathCause? _deathCause;
 
   Timer? _timer;
   late final AnimationController _dotCtrl; // per-step glide + squish
@@ -686,7 +689,7 @@ class _GameScreenState extends State<GameScreen>
       // The dot held still — a patrol that ends on it still catches it.
       if (_moverOn(_dot.r, _dot.c)) {
         _explode(_idx(_dot.r, _dot.c), fatal: true);
-        _failExploded('A patrol caught the dot!');
+        _failExploded(DeathCause.patrol);
       }
       return;
     }
@@ -696,11 +699,11 @@ class _GameScreenState extends State<GameScreen>
     final nc = _dot.c + dc;
 
     if (nr < 0 || nr >= size || nc < 0 || nc >= size) {
-      _fail('The dot ran off the edge.');
+      _fail(DeathCause.edge);
       return;
     }
     if (_effBase(nr, nc) == CellType.wall) {
-      _fail('The dot hit a wall.');
+      _fail(DeathCause.wall);
       return;
     }
 
@@ -719,13 +722,13 @@ class _GameScreenState extends State<GameScreen>
     // Crossing paths (swapping cells) is safe.
     if (_moverOn(nr, nc)) {
       _explode(newKey, fatal: true);
-      _failExploded('A patrol caught the dot!');
+      _failExploded(DeathCause.patrol);
       return;
     }
 
     final base = _effBase(nr, nc);
     if (base == CellType.gap) {
-      _die('The dot fell into a hole.');
+      _die(DeathCause.gap);
       return;
     }
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
@@ -737,7 +740,7 @@ class _GameScreenState extends State<GameScreen>
         return; // survive this tick; the dot moves on next beat
       }
       _explode(newKey, fatal: true);
-      _failExploded('The dot was destroyed!');
+      _failExploded(DeathCause.destroyer);
       return;
     }
 
@@ -839,10 +842,10 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  void _die(String msg) {
+  void _die(DeathCause cause) {
     _timer?.cancel();
     _timer = null;
-    _failReason = msg;
+    _deathCause = cause;
     Sfx.die();
     Future.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
@@ -918,20 +921,20 @@ class _GameScreenState extends State<GameScreen>
 
   /// Death by destroyer: stops the run and shows the fail card AFTER the ~0.5s
   /// explosion has played out.
-  void _failExploded(String msg) {
+  void _failExploded(DeathCause cause) {
     _timer?.cancel();
     _timer = null;
-    _failReason = msg;
+    _deathCause = cause;
     Future.delayed(const Duration(milliseconds: 520), () {
       if (!mounted) return;
       setState(() => _status = GameStatus.lost);
     });
   }
 
-  void _fail(String msg) {
+  void _fail(DeathCause cause) {
     _timer?.cancel();
     _timer = null;
-    _failReason = msg;
+    _deathCause = cause;
     setState(() => _status = GameStatus.lost);
   }
 
@@ -1548,8 +1551,30 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Fail-only overlay ("Try Again"). Wins celebrate on the grid instead.
+  /// Emoji, headline and accent color for each death cause, so the fail overlay
+  /// tells the player exactly why the dot died.
+  static ({String emoji, String label, Color color}) _deathInfo(
+      DeathCause? cause) {
+    switch (cause) {
+      case DeathCause.edge:
+        return (emoji: '🏃', label: 'Ran off the edge!', color: Color(0xFFF59E0B));
+      case DeathCause.wall:
+        return (emoji: '🧱', label: 'Hit a wall!', color: Color(0xFF607D8B));
+      case DeathCause.destroyer:
+        return (emoji: '💥', label: 'Destroyed!', color: Color(0xFFEF5350));
+      case DeathCause.patrol:
+        return (emoji: '🚨', label: 'Caught by patrol!', color: Color(0xFFE53935));
+      case DeathCause.gap:
+        return (emoji: '🕳️', label: 'Fell in a gap!', color: Color(0xFF6D4C41));
+      case null:
+        return (emoji: '💥', label: 'Try Again', color: AppColors.ink);
+    }
+  }
+
+  /// Fail-only overlay — shows WHY the dot died, then "Try Again". Wins
+  /// celebrate on the grid instead.
   Widget _buildOverlay() {
+    final info = _deathInfo(_deathCause);
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: 0.32),
@@ -1565,26 +1590,29 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('💥', style: TextStyle(fontSize: 48)),
-              const SizedBox(height: 8),
-              const Text(
-                'Try Again',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              const SizedBox(height: 6),
+              Text(info.emoji, style: const TextStyle(fontSize: 48)),
+              const SizedBox(height: 10),
+              // The death reason — prominent, in its matching color.
               Text(
-                _failReason ?? '',
+                info.label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSoft,
-                  fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: info.color,
                 ),
               ),
+              if (_deathCause != null) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'Try Again',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSoft,
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               _PillButton(
                 label: 'Retry',

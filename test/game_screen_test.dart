@@ -185,6 +185,8 @@ void main() {
     }
 
     expect(find.text('Try Again'), findsOneWidget);
+    // The fail overlay names why the dot died.
+    expect(find.text('Ran off the edge!'), findsOneWidget);
   });
 
   testWidgets('Play is disabled until every piece is placed', (tester) async {
@@ -312,8 +314,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    // The explosion resolved into the fail card (not a win).
+    // The explosion resolved into the fail card (not a win), naming the cause.
     expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Destroyed!'), findsOneWidget);
     expect(find.text('Continue'), findsNothing);
   });
 

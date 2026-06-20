@@ -5,6 +5,32 @@ import '../models/level_data.dart';
 /// Outcome of running a level configuration to completion.
 enum SimOutcome { win, lose }
 
+/// Why the dot died, for showing the player a clear fail reason.
+enum DeathCause {
+  /// Stepped off the grid boundary.
+  edge,
+
+  /// Ran into a wall.
+  wall,
+
+  /// Hit a static mine / destroyer.
+  destroyer,
+
+  /// Caught by a moving destroyer (patrol).
+  patrol,
+
+  /// Fell into a gap.
+  gap,
+}
+
+/// A simulation outcome with — when the dot loses — the reason it died. [cause]
+/// is null for a win, or when the run simply looped without reaching the exit.
+class SimResult {
+  const SimResult(this.outcome, [this.cause]);
+  final SimOutcome outcome;
+  final DeathCause? cause;
+}
+
 /// The keys of every wall cell orthogonally adjacent to [key] — the cells a
 /// chain explosion at [key] demolishes.
 List<int> adjacentWallKeys(LevelData level, int key) {
@@ -97,7 +123,12 @@ List<MoverState> buildMovers(LevelData level) {
 /// check whether any mover ended on the dot's final cell — if so, the dot dies.
 /// If the dot and a mover merely cross paths (swap cells) the dot escapes. A
 /// shield does NOT save the dot from a mover (pure timing hazards).
-SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
+SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) =>
+    simulateDetailed(level, placed).outcome;
+
+/// Like [simulate], but also reports WHY the dot died (see [SimResult]). The
+/// game screen uses the cause to show a clear fail message.
+SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
 
   // Forced arrows behave like immovable placed arrows.
@@ -137,24 +168,30 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
     if (pause > 0) {
       pause--;
       // The dot held still this tick — a mover that ends on it still catches it.
-      if (moverHit(r, c)) return SimOutcome.lose;
+      if (moverHit(r, c)) return const SimResult(SimOutcome.lose, DeathCause.patrol);
       continue;
     }
 
     final (dr, dc) = dir.delta;
     final nr = r + dr;
     final nc = c + dc;
-    if (nr < 0 || nr >= n || nc < 0 || nc >= n) return SimOutcome.lose;
-    if (effBase(nr, nc) == CellType.wall) return SimOutcome.lose;
+    if (nr < 0 || nr >= n || nc < 0 || nc >= n) {
+      return const SimResult(SimOutcome.lose, DeathCause.edge);
+    }
+    if (effBase(nr, nc) == CellType.wall) {
+      return const SimResult(SimOutcome.lose, DeathCause.wall);
+    }
 
     r = nr;
     c = nc;
     // Both have moved — die only if they share the FINAL cell. If the dot and a
     // mover merely crossed paths (swapped cells) the dot escapes.
-    if (moverHit(r, c)) return SimOutcome.lose;
+    if (moverHit(r, c)) return const SimResult(SimOutcome.lose, DeathCause.patrol);
     final key = r * n + c;
     final base = effBase(r, c);
-    if (base == CellType.gap) return SimOutcome.lose;
+    if (base == CellType.gap) {
+      return const SimResult(SimOutcome.lose, DeathCause.gap);
+    }
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
       if (shielded) {
         // Chain explosion: the shield is spent, the destroyer is cleared, and
@@ -163,7 +200,7 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
         removed.add(key);
         removed.addAll(adjacentWallKeys(level, key));
       } else {
-        return SimOutcome.lose;
+        return const SimResult(SimOutcome.lose, DeathCause.destroyer);
       }
     }
     // The start cell acts as a permanent forced arrow on every visit.
@@ -189,10 +226,13 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
       }
     }
 
-    if (level.baseTypeAt(r, c) == CellType.exit) return SimOutcome.win;
+    if (level.baseTypeAt(r, c) == CellType.exit) {
+      return const SimResult(SimOutcome.win);
+    }
   }
 
-  return SimOutcome.lose; // ran out of ticks (loop) → not a solution
+  // Ran out of ticks (loop) → not a solution; no specific death cause.
+  return const SimResult(SimOutcome.lose);
 }
 
 /// Runs the level and returns the set of cell keys the dot visits if it wins,
