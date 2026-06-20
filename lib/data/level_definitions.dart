@@ -676,18 +676,17 @@ const Map<int, LevelData> levelDefinitions = {
     id: 32,
     size: 5,
     title: 'Sidestep',
-    tip: 'Drop, cross and climb — slip past the patrol.',
-    start: StartSpec(0, 0, Direction.down),
+    tip: 'Cross, climb and turn — slip past the patrol.',
+    start: StartSpec(4, 4, Direction.left),
     exit: Pos(0, 4),
     walls: [
-      Pos(1, 1), Pos(1, 2), Pos(1, 3),
-      Pos(2, 1), Pos(2, 2), Pos(2, 3),
-      Pos(3, 1), Pos(3, 2), Pos(3, 3),
+      Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
     ],
     movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 1),
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 
@@ -946,7 +945,7 @@ const Map<int, LevelData> levelDefinitions = {
       Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
     ],
     destroyers: [Pos(4, 2)],
-    movers: [MovingDestroyer(4, 2, horizontal: true, dir: -1)],
+    movers: [MovingDestroyer(4, 6, horizontal: true, dir: -1, lo: 4, hi: 6)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),

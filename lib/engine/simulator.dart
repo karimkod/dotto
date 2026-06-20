@@ -22,7 +22,8 @@ List<int> adjacentWallKeys(LevelData level, int key) {
 
 /// Mutable runtime state of a patrolling (moving) destroyer.
 class MoverState {
-  MoverState(this.fixed, this.pos, this.dir, this.lo, this.hi, this.horizontal);
+  MoverState(this.fixed, this.pos, this.dir, this.lo, this.hi, this.horizontal,
+      this.blocked);
   final int fixed;
   int pos;
   int dir;
@@ -30,19 +31,38 @@ class MoverState {
   final int hi;
   final bool horizontal;
 
+  /// Positions (along the patrol axis) that are solid — walls, static
+  /// destroyers, the exit — and that the mover bounces off of.
+  final Set<int> blocked;
+
   int get row => horizontal ? fixed : pos;
   int get col => horizontal ? pos : fixed;
 
-  /// Advance one cell, bouncing at the patrol bounds.
+  bool _solid(int p) => p < lo || p > hi || blocked.contains(p);
+
+  /// Advance one cell, bouncing at the patrol bounds and off any solid cell
+  /// (wall, static destroyer, exit). If both neighbors are solid the mover is
+  /// trapped and stays put.
   void step() {
     if (lo >= hi) return; // degenerate (single cell) — stays put
     var next = pos + dir;
-    if (next < lo || next > hi) {
+    if (_solid(next)) {
       dir = -dir;
       next = pos + dir;
+      if (_solid(next)) return; // boxed in on both sides — can't move
     }
     pos = next;
   }
+}
+
+/// Cells a mover treats as solid (bounces off): walls, static destroyers and
+/// the exit.
+bool _isSolidForMover(LevelData level, int r, int c) {
+  final t = level.baseTypeAt(r, c);
+  return t == CellType.wall ||
+      t == CellType.destroyer ||
+      t == CellType.movingDestroyer ||
+      t == CellType.exit;
 }
 
 /// Build the runtime mover list for a level (positions reset to their starts).
@@ -57,6 +77,14 @@ List<MoverState> buildMovers(LevelData level) {
         m.lo ?? 0,
         m.hi ?? (n - 1),
         m.horizontal,
+        {
+          // Solid positions along this mover's fixed row/column.
+          for (var p = 0; p < n; p++)
+            if (m.horizontal
+                ? _isSolidForMover(level, m.r, p)
+                : _isSolidForMover(level, p, m.c))
+              p,
+        },
       ),
   ];
 }

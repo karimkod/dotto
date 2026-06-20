@@ -119,7 +119,7 @@ void main() {
     ],
     // ----- World 4 (31–45): arrows here, pauses/shields below. -----
     31: [(0, 4, Direction.left), (4, 4, Direction.up)],
-    32: [(4, 0, Direction.right), (4, 4, Direction.up)],
+    32: [(4, 0, Direction.up), (0, 0, Direction.right)],
     33: [(0, 5, Direction.left), (5, 5, Direction.up)],
     34: [(0, 5, Direction.left), (5, 5, Direction.up)],
     35: [(0, 5, Direction.left), (5, 5, Direction.up)],
