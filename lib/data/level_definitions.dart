@@ -651,23 +651,18 @@ const Map<int, LevelData> levelDefinitions = {
 
   // ----- Moving destroyers (31–35) -----
 
-  // 31 — First Patrol: a wall corridor right→up→left; a patrol sweeps row 2,
-  // crossing the climb. Time the route around it.
+  // 31 — First Patrol: an open board; a patrol sweeps a row. Turn up at the
+  // right moment to slip past it.
   31: LevelData(
     id: 31,
-    size: 5,
+    size: 4,
     title: 'First Patrol',
     tip: 'The red mine moves! Route around its patrol.',
-    start: StartSpec(4, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3),
-    ],
-    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(0, 3),
+    movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 
