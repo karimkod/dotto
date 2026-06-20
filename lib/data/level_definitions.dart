@@ -546,7 +546,7 @@ const Map<int, LevelData> levelDefinitions = {
       Pos(4, 1),
       Pos(4, 5),
     ],
-    destroyers: [Pos(3, 3), Pos(2, 3)],
+    destroyers: [Pos(3, 3), Pos(2, 3), Pos(5, 5), Pos(0, 4), Pos(0, 0)],
     forcedArrows: [ForcedArrow(5, 3, Direction.up)],
     toolkit: [
       ToolkitEntry(ToolType.arrowDown, 2),
