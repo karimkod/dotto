@@ -485,11 +485,12 @@ const Map<int, LevelData> levelDefinitions = {
     size: 5,
     title: 'Choose Your Bomb',
     tip: 'One destroyer opens the path; the other is just a trap. Pick wisely.',
-    start: StartSpec(0, 2, Direction.down),
-    exit: Pos(4, 2),
-    destroyers: [Pos(2, 2), Pos(1, 4)],
-    walls: [Pos(3, 2), Pos(1, 3)],
-    toolkit: [ToolkitEntry(ToolType.shield, 1)],
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [Pos(4, 3), Pos(1, 4)],
+    destroyers: [Pos(4, 2), Pos(2, 4)],
+    forcedArrows: [ForcedArrow(4, 4, Direction.up)],
+    toolkit: [ToolkitEntry(ToolType.shield, 2)],
   ),
 
   // 26 — Double Breach: two destroyer-doors, two shields and a turn.

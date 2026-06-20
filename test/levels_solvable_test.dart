@@ -81,7 +81,7 @@ void main() {
       (3, 4, Direction.down),
     ],
     24: [(0, 1, Direction.right), (2, 1, Direction.up)],
-    25: [],
+    25: [], // shields only (see below)
     26: [(5, 0, Direction.right)],
     27: [],
     28: [(0, 2, Direction.down), (5, 2, Direction.right)],
@@ -100,7 +100,7 @@ void main() {
     22: [(2, 2)],
     23: [(3, 2)],
     24: [(1, 1)],
-    25: [(1, 2)],
+    25: [(4, 1), (3, 4)],
     26: [(1, 0), (5, 1)],
     27: [(2, 1)],
     28: [(4, 2)],
@@ -153,7 +153,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 29]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 29]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited =
