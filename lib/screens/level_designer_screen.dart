@@ -593,7 +593,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
               ),
               const SizedBox(height: 14),
               _sectionLabel(
-                  'Palette  ·  tap Start/Forced to rotate, Patrol to cycle axis'),
+                  'Palette  ·  tap Start/Forced to rotate, Patrol to cycle '
+                  'axis + direction'),
               const SizedBox(height: 8),
               _palette(),
               const SizedBox(height: 16),

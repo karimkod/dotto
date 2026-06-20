@@ -457,22 +457,25 @@ class GameGridPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
     paintMineIcon(canvas, center, cell, glowTick);
-    // Patrol-axis indicator: a thin double arrow through the cell.
-    final axis = Paint()
+    // Patrol indicator: the axis line, with a single bold arrowhead on the end
+    // the mine STARTS moving toward (dir>0 → right/down, dir<0 → left/up).
+    final stroke = Paint()
       ..color = const Color(0xFFE53935)
       ..strokeWidth = cell * 0.05
-      ..strokeCap = StrokeCap.round;
-    final len = cell * 0.40;
-    final head = cell * 0.08;
-    final dir = m.horizontal ? const Offset(1, 0) : const Offset(0, 1);
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final axisVec = m.horizontal ? const Offset(1, 0) : const Offset(0, 1);
     final perp = m.horizontal ? const Offset(0, 1) : const Offset(1, 0);
-    final a = center - dir * len;
-    final b = center + dir * len;
-    canvas.drawLine(a, b, axis);
-    for (final (tip, back) in [(a, dir), (b, -dir)]) {
-      canvas.drawLine(tip, tip + back * head + perp * head, axis);
-      canvas.drawLine(tip, tip + back * head - perp * head, axis);
-    }
+    final len = cell * 0.40;
+    canvas.drawLine(center - axisVec * len, center + axisVec * len, stroke);
+
+    // Start-direction arrowhead (bigger, so it reads at a glance).
+    final startVec = axisVec * m.dir.toDouble();
+    final tip = center + startVec * len;
+    final head = cell * 0.13;
+    final back = startVec * head;
+    canvas.drawLine(tip, tip - back + perp * head, stroke);
+    canvas.drawLine(tip, tip - back - perp * head, stroke);
   }
 
   /// A destroyer blowing up: a white-hot flash, an expanding shock ring and a
