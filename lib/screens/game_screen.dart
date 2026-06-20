@@ -1234,6 +1234,9 @@ class _GameScreenState extends State<GameScreen>
                             t: Curves.easeInOut.transform(_moverCtrl.value),
                             geo: geo,
                             glowTick: _glowCtrl.value,
+                            // Show the patrol path/axis only while planning —
+                            // during play the motion itself makes it obvious.
+                            planning: _status == GameStatus.planning,
                           ),
                         ),
                       ),
@@ -1903,6 +1906,7 @@ class _MoverPainter extends CustomPainter {
     required this.t,
     required this.geo,
     required this.glowTick,
+    this.planning = false,
   });
 
   final List<MoverState> movers;
@@ -1911,10 +1915,17 @@ class _MoverPainter extends CustomPainter {
   final GridGeometry geo;
   final double glowTick;
 
+  /// While planning, draw each mover's patrol path + axis so the player can read
+  /// "this mine moves left-right / up-down" before pressing Play.
+  final bool planning;
+
+  static const _red = Color(0xFFE53935);
+
   @override
   void paint(Canvas canvas, Size size) {
     for (var i = 0; i < movers.length; i++) {
       final m = movers[i];
+      if (planning) _paintPatrolHint(canvas, m);
       final prev = i < from.length ? from[i] : (m.row, m.col);
       final a = geo.center(prev.$1, prev.$2);
       final b = geo.center(m.row, m.col);
@@ -1925,14 +1936,84 @@ class _MoverPainter extends CustomPainter {
         c,
         geo.cell * (0.34 + 0.05 * pulse),
         Paint()
-          ..color = const Color(0xFFE53935).withValues(alpha: 0.22 + 0.12 * pulse)
+          ..color = _red.withValues(alpha: 0.22 + 0.12 * pulse)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
       );
       paintMineIcon(canvas, c, geo.cell, glowTick);
     }
   }
 
+  /// A faint dashed line spanning the cells the mover can actually reach (its
+  /// bounds, clipped by any solid cells), capped with arrowheads on both ends to
+  /// show the patrol axis. The head on the side the mover starts toward is drawn
+  /// brighter/bigger to hint the initial direction.
+  void _paintPatrolHint(Canvas canvas, MoverState m) {
+    // Reachable extent from the start cell along the patrol axis.
+    var lo = m.pos, hi = m.pos;
+    while (lo - 1 >= m.lo && !m.blocked.contains(lo - 1)) {
+      lo--;
+    }
+    while (hi + 1 <= m.hi && !m.blocked.contains(hi + 1)) {
+      hi++;
+    }
+    if (lo == hi) return; // trapped — nothing to patrol
+
+    Offset at(int p) =>
+        m.horizontal ? geo.center(m.fixed, p) : geo.center(p, m.fixed);
+    final start = at(lo); // low end
+    final end = at(hi); // high end
+    final axis = m.horizontal ? const Offset(1, 0) : const Offset(0, 1);
+    final perp = m.horizontal ? const Offset(0, 1) : const Offset(1, 0);
+
+    final line = Paint()
+      ..color = _red.withValues(alpha: 0.40)
+      ..strokeWidth = geo.cell * 0.045
+      ..strokeCap = StrokeCap.round;
+
+    // Dashed segment between the two ends (inset so it tucks under the heads).
+    final span = (end - start).distance;
+    if (span > 0) {
+      final unit = (end - start) / span;
+      final dash = geo.cell * 0.16;
+      final gap = geo.cell * 0.12;
+      final inset = geo.cell * 0.30;
+      var d = inset;
+      while (d < span - inset) {
+        final s = start + unit * d;
+        final e = start + unit * math.min(d + dash, span - inset);
+        canvas.drawLine(s, e, line);
+        d += dash + gap;
+      }
+    }
+
+    // The mover heads toward +axis when dir > 0, else -axis.
+    final startSide = m.dir > 0 ? end : start; // where it moves to first
+    final farSide = m.dir > 0 ? start : end;
+    _arrowHead(canvas, startSide, m.dir > 0 ? axis : -axis, perp,
+        geo.cell * 0.20, _red.withValues(alpha: 0.85));
+    _arrowHead(canvas, farSide, m.dir > 0 ? -axis : axis, perp,
+        geo.cell * 0.14, _red.withValues(alpha: 0.40));
+  }
+
+  /// A small V-shaped arrowhead at [tip] opening back from [dir] (pointing the
+  /// way [dir] faces), [size] long, drawn in [color].
+  void _arrowHead(
+      Canvas canvas, Offset tip, Offset dir, Offset perp, double size, Color color) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = geo.cell * 0.05
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final back = tip - dir * size;
+    canvas.drawLine(tip, back + perp * size * 0.7, p);
+    canvas.drawLine(tip, back - perp * size * 0.7, p);
+  }
+
   @override
   bool shouldRepaint(covariant _MoverPainter old) =>
-      old.t != t || old.glowTick != glowTick || old.movers != movers;
+      old.t != t ||
+      old.glowTick != glowTick ||
+      old.movers != movers ||
+      old.planning != planning;
 }
