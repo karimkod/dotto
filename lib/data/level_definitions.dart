@@ -493,19 +493,34 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.shield, 2)],
   ),
 
-  // 26 — Double Breach: two destroyer-doors, two shields and a turn.
+  // 26 — Two Doors Down: a wall spans the whole of row 3; the only way past it
+  // is to shield through one of the two destroyer-doors, then again past the
+  // second to reach the corner.
   26: LevelData(
     id: 26,
     size: 6,
-    title: 'Double Breach',
-    tip: 'Two walls, two doors. Shield up for each blast.',
+    title: 'Two Doors Down',
+    tip: 'A wall blocks the way across. Blast through the destroyer-doors.',
     start: StartSpec(0, 0, Direction.down),
     exit: Pos(5, 5),
-    destroyers: [Pos(2, 0), Pos(5, 2)],
-    walls: [Pos(3, 0), Pos(5, 3)],
+    walls: [
+      Pos(3, 0),
+      Pos(3, 1),
+      Pos(3, 2),
+      Pos(3, 3),
+      Pos(3, 4),
+      Pos(3, 5),
+      Pos(5, 4),
+      Pos(1, 2),
+    ],
+    destroyers: [Pos(2, 2), Pos(4, 4)],
+    forcedArrows: [ForcedArrow(0, 2, Direction.down)],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
       ToolkitEntry(ToolType.shield, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 

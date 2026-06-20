@@ -82,7 +82,13 @@ void main() {
     ],
     24: [(0, 1, Direction.right), (2, 1, Direction.up)],
     25: [], // shields only (see below)
-    26: [(5, 0, Direction.right)],
+    26: [
+      (0, 5, Direction.left),
+      (2, 0, Direction.right),
+      (2, 5, Direction.up),
+      (4, 2, Direction.right),
+      (4, 5, Direction.down),
+    ],
     27: [],
     28: [(0, 2, Direction.down), (5, 2, Direction.right)],
     29: [(0, 6, Direction.down)],
@@ -101,7 +107,7 @@ void main() {
     23: [(3, 2)],
     24: [(1, 1)],
     25: [(4, 1), (3, 4)],
-    26: [(1, 0), (5, 1)],
+    26: [(2, 1), (4, 3)],
     27: [(2, 1)],
     28: [(4, 2)],
     29: [(0, 2)],
