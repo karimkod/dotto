@@ -15,7 +15,7 @@ void main(List<String> args) {
         args.firstWhere((a) => int.tryParse(a) != null, orElse: () => ''),
       ) ??
       1;
-  for (var n = from; n <= 35; n++) {
+  for (var n = from; n <= 30; n++) {
     final lvl = levelDataFor(n);
     if (lvl == null) continue;
     final total = toolkitTotal(lvl);

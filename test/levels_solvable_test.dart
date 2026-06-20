@@ -96,13 +96,17 @@ void main() {
       (5, 0, Direction.right),
     ],
     28: [(0, 3, Direction.down), (5, 3, Direction.right)],
-    29: [(0, 6, Direction.down)],
-    30: [(1, 4, Direction.down)],
-    31: [(0, 1, Direction.down), (5, 1, Direction.right)],
-    32: [(6, 6, Direction.up)],
-    33: [(0, 3, Direction.down), (6, 3, Direction.right)],
-    34: [(0, 2, Direction.down), (7, 2, Direction.right)],
-    35: [(0, 4, Direction.down), (7, 4, Direction.right)],
+    29: [
+      (3, 2, Direction.right),
+      (5, 4, Direction.right),
+      (5, 6, Direction.down),
+    ],
+    30: [
+      (3, 3, Direction.right),
+      (3, 5, Direction.down),
+      (5, 2, Direction.down),
+      (5, 5, Direction.left),
+    ],
   };
 
   // Intended shield placements (World 3 only).
@@ -115,18 +119,13 @@ void main() {
     26: [(2, 1), (4, 3)],
     27: [(2, 2), (3, 4)],
     28: [(0, 2)],
-    29: [(0, 2)],
-    30: [(1, 1), (2, 4)],
-    31: [(5, 2)],
-    32: [(6, 1)],
-    33: [(5, 3)],
-    34: [(7, 4)],
-    35: [(6, 4)],
+    29: [(1, 2), (3, 3)],
+    30: [(1, 3), (3, 4), (5, 3)],
   };
 
   int worldOf(int n) => n <= 15 ? 1 : (n <= 20 ? 2 : 3);
 
-  for (var n = 1; n <= 35; n++) {
+  for (var n = 1; n <= 30; n++) {
     test('World ${worldOf(n)} — level $n is solvable', () {
       final level = levelDataFor(n)!;
       final solutions = pathSolve(level);
@@ -146,7 +145,7 @@ void main() {
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 35; n++) {
+  for (var n = 2; n <= 30; n++) {
     test('World ${worldOf(n)} — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(pathMinPieces(level), toolkitTotal(level),
@@ -164,7 +163,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited =

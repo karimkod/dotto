@@ -9,7 +9,7 @@ import '../models/level_data.dart';
 /// World 2 (levels 16–20): Static Destroyers. Red cells kill the dot on contact,
 /// so the toolkit's specific arrows must thread a safe route.
 ///
-/// World 3 (levels 21–35): Shields & Explosions. The Shield aura lets the dot
+/// World 3 (levels 21–30): Shields & Explosions. The Shield aura lets the dot
 /// survive one destroyer; the hit chain-explodes the walls adjacent to it,
 /// turning destroyers-next-to-walls into doors.
 ///
@@ -556,7 +556,7 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Challenge (28–30) -----
+  // ----- Challenge + finale (28–30) -----
 
   // 28 — Detour Blast: the exit is walled off; route to the door and breach it.
   28: LevelData(
@@ -589,124 +589,56 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 29 — Pinned Breach: ride the fixed arrow, breach a wall, drop to the exit.
+  // 29 — Switchback: two full-row barriers, each with a single destroyer-door
+  // offset from the last, so the dot zig-zags down — shielding through each door
+  // — while a fixed arrow drops it onto the second. The exit is tucked behind a
+  // wall so the lower leg is forced. Loose mines at (5,1) and (1,5) punish a
+  // wrong turn.
   29: LevelData(
     id: 29,
     size: 7,
-    title: 'Pinned Breach',
-    tip: 'The fixed arrow turns the corner. Breach the wall, then drop home.',
-    start: StartSpec(6, 0, Direction.up),
+    title: 'Switchback',
+    tip: 'Zig-zag down, blasting a shield through each door.',
+    start: StartSpec(0, 2, Direction.down),
     exit: Pos(6, 6),
-    destroyers: [Pos(0, 3)],
-    walls: [Pos(0, 4)],
-    forcedArrows: [ForcedArrow(0, 0, Direction.right)],
-    toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
+    walls: [
+      Pos(2, 0), Pos(2, 1), Pos(2, 3), Pos(2, 4), Pos(2, 5), Pos(2, 6),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 5), Pos(4, 6),
+      Pos(6, 5),
     ],
-  ),
-
-  // 30 — Twin Doors: two doors in series — breach, turn, breach again.
-  30: LevelData(
-    id: 30,
-    size: 7,
-    title: 'Twin Doors',
-    tip: 'Two doors, one after the other. Carry a shield into each.',
-    start: StartSpec(1, 0, Direction.right),
-    exit: Pos(5, 4),
-    destroyers: [Pos(1, 2), Pos(3, 4)],
-    walls: [Pos(1, 3), Pos(4, 4)],
+    destroyers: [Pos(2, 2), Pos(4, 4), Pos(5, 1), Pos(1, 5)],
+    forcedArrows: [ForcedArrow(3, 4, Direction.down)],
     toolkit: [
       ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.arrowRight, 2),
       ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
-  // ----- Exams (31–35): combine arrows, walls, forced arrows, deadly + door
-  // destroyers and shields. Open layouts, growing to 8x8. -----
-
-  // 31 — Live Wire: a boxed exit door, with a deadly destroyer to steer clear of.
-  31: LevelData(
-    id: 31,
-    size: 6,
-    title: 'Live Wire',
-    tip: 'Breach the door to the exit — and don\'t touch the loose destroyer.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(5, 5),
-    destroyers: [Pos(5, 3), Pos(2, 2)],
-    walls: [Pos(4, 5), Pos(5, 4)],
-    toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 32 — Wall Breaker: punch through the wall on the floor, then climb.
-  32: LevelData(
-    id: 32,
-    size: 7,
-    title: 'Wall Breaker',
-    tip: 'Breach the wall across the floor, then turn up to the exit.',
-    start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 6),
-    destroyers: [Pos(6, 2)],
-    walls: [Pos(6, 3)],
-    toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowUp, 1),
-    ],
-  ),
-
-  // 33 — Boxed In: drop down, run across and breach the door to the corner.
-  33: LevelData(
-    id: 33,
-    size: 7,
-    title: 'Boxed In',
-    tip: 'The exit is sealed. Work down to the door and blast your way in.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(6, 6),
-    destroyers: [Pos(6, 4)],
-    walls: [Pos(5, 6), Pos(6, 5)],
-    toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 34 — The Vault: a big 8x8; reach the sealed corner, dodging a loose mine.
-  34: LevelData(
-    id: 34,
-    size: 8,
-    title: 'The Vault',
-    tip: 'Cross the board to the sealed corner and breach the vault door.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(7, 7),
-    destroyers: [Pos(7, 5), Pos(0, 3)],
-    walls: [Pos(6, 7), Pos(7, 6)],
-    toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 35 — Grand Demolition: the World 3 finale. A wide 8x8 minefield with a
-  // sealed exit; thread past the loose mines and breach the vault.
-  35: LevelData(
-    id: 35,
+  // 30 — Grand Demolition: the World 3 finale. A wide 8x8 with THREE full-row
+  // barriers, each holding one destroyer-door, the doors staggered so the dot
+  // must shield through all three and weave between them, finishing on a fixed
+  // arrow that sweeps it to the corner. Loose mines at (3,1) and (5,6) punish
+  // the tempting wrong turns.
+  30: LevelData(
+    id: 30,
     size: 8,
     title: 'Grand Demolition',
-    tip: 'Mines everywhere. Thread to the sealed corner and blow it open.',
-    start: StartSpec(0, 0, Direction.right),
+    tip: 'Three barriers, three doors. Blast a path all the way down.',
+    start: StartSpec(0, 3, Direction.down),
     exit: Pos(7, 7),
-    destroyers: [Pos(7, 5), Pos(4, 1), Pos(2, 5)],
-    walls: [Pos(6, 7), Pos(7, 6)],
+    walls: [
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 4), Pos(2, 5), Pos(2, 6), Pos(2, 7),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 6), Pos(4, 7),
+      Pos(6, 0), Pos(6, 1), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+    ],
+    destroyers: [Pos(2, 3), Pos(4, 5), Pos(6, 2), Pos(3, 1), Pos(5, 6)],
+    forcedArrows: [ForcedArrow(7, 2, Direction.right)],
     toolkit: [
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.shield, 3),
       ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 };
