@@ -93,9 +93,10 @@ List<MoverState> buildMovers(LevelData level) {
 /// Mirrors the tick rules used by the game screen, so it is the single source
 /// of truth for verifying that a level is solvable.
 ///
-/// Tick order: moving destroyers advance (and may catch the dot), then — unless
-/// paused — the dot steps and its new cell is resolved. Moving destroyers are
-/// pure timing hazards: a shield does NOT save the dot from one.
+/// Tick order: the dot and the moving destroyers move SIMULTANEOUSLY, then we
+/// check whether any mover ended on the dot's final cell — if so, the dot dies.
+/// If the dot and a mover merely cross paths (swap cells) the dot escapes. A
+/// shield does NOT save the dot from a mover (pure timing hazards).
 SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
 
@@ -132,10 +133,11 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
     for (final mv in movers) {
       mv.step();
     }
-    if (moverHit(r, c)) return SimOutcome.lose; // a mover stepped onto the dot
 
     if (pause > 0) {
       pause--;
+      // The dot held still this tick — a mover that ends on it still catches it.
+      if (moverHit(r, c)) return SimOutcome.lose;
       continue;
     }
 
@@ -147,7 +149,9 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) {
 
     r = nr;
     c = nc;
-    if (moverHit(r, c)) return SimOutcome.lose; // the dot stepped onto a mover
+    // Both have moved — die only if they share the FINAL cell. If the dot and a
+    // mover merely crossed paths (swapped cells) the dot escapes.
+    if (moverHit(r, c)) return SimOutcome.lose;
     final key = r * n + c;
     final base = effBase(r, c);
     if (base == CellType.gap) return SimOutcome.lose;
@@ -223,9 +227,9 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     for (final mv in movers) {
       mv.step();
     }
-    if (moverHit(r, c)) return null;
     if (pause > 0) {
       pause--;
+      if (moverHit(r, c)) return null; // mover lands on the held-still dot
       continue;
     }
     final (dr, dc) = dir.delta;
@@ -235,6 +239,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     if (effBase(nr, nc) == CellType.wall) return null;
     r = nr;
     c = nc;
+    // Die only on a shared FINAL cell; crossing (swapping cells) is safe.
     if (moverHit(r, c)) return null;
     final base = effBase(r, c);
     if (base == CellType.gap) return null;

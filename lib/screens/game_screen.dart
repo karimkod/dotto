@@ -668,7 +668,9 @@ class _GameScreenState extends State<GameScreen>
     if (_status != GameStatus.running) return;
     final size = _level!.size;
 
-    // 1. Patrols advance (and may catch the stationary dot).
+    // 1. Patrols advance simultaneously with the dot — collisions are checked
+    // only after BOTH have moved (below), so a patrol the dot is leaving as it
+    // arrives doesn't kill it.
     if (_movers.isNotEmpty) {
       setState(() {
         _moverFrom = [for (final m in _movers) (m.row, m.col)];
@@ -677,15 +679,15 @@ class _GameScreenState extends State<GameScreen>
         }
       });
       _moverCtrl.forward(from: 0);
-      if (_moverOn(_dot.r, _dot.c)) {
-        _explode(_idx(_dot.r, _dot.c), fatal: true);
-        _failExploded('A patrol caught the dot!');
-        return;
-      }
     }
 
     if (_dot.pause > 0) {
       setState(() => _dot.pause--);
+      // The dot held still — a patrol that ends on it still catches it.
+      if (_moverOn(_dot.r, _dot.c)) {
+        _explode(_idx(_dot.r, _dot.c), fatal: true);
+        _failExploded('A patrol caught the dot!');
+      }
       return;
     }
 
@@ -713,7 +715,8 @@ class _GameScreenState extends State<GameScreen>
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
 
-    // The dot stepped onto a patrol.
+    // Both have moved — die only if a patrol shares the dot's FINAL cell.
+    // Crossing paths (swapping cells) is safe.
     if (_moverOn(nr, nc)) {
       _explode(newKey, fatal: true);
       _failExploded('A patrol caught the dot!');
