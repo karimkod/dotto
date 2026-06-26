@@ -101,4 +101,47 @@ void main() {
     );
     expect(simulate(level, {2 * 6 + 1: _shield()}), SimOutcome.lose);
   });
+
+  // A vertical patrol on column 2 ends on (0,2) exactly as the dot arrives there
+  // (mover start (2,2) heading up: row 2→1→0 over ticks 0,1; the dot reaches
+  // (0,2) on tick 1), so without a shield it is a guaranteed patrol kill.
+  LevelData onePatrol() => LevelData(
+        id: 905,
+        size: 4,
+        title: 'patrol-1',
+        tip: '',
+        start: const StartSpec(0, 0, Direction.right),
+        exit: const Pos(0, 3),
+        movers: const [MovingDestroyer(2, 2, horizontal: false, dir: -1)],
+        toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+      );
+
+  test('a shield protects against a moving destroyer (patrol)', () {
+    expect(simulate(onePatrol(), {0 * 4 + 1: _shield()}), SimOutcome.win);
+  });
+
+  test('without a shield a patrol kills the dot', () {
+    final result = simulateDetailed(onePatrol(), {});
+    expect(result.outcome, SimOutcome.lose);
+    expect(result.cause, DeathCause.patrol);
+  });
+
+  test('a shield destroys the patrol AND chain-explodes its adjacent wall', () {
+    // The patrol ends on (0,2); a wall blocking the path sits beside it at
+    // (0,3) — off the mover's column so it doesn't pen the patrol in. Shielding
+    // the hit at (0,2) must demolish (0,3), letting the dot continue to (0,4).
+    final level = LevelData(
+      id: 906,
+      size: 5,
+      title: 'patrol-chain',
+      tip: '',
+      start: const StartSpec(0, 0, Direction.right),
+      exit: const Pos(0, 4),
+      walls: const [Pos(0, 3)],
+      movers: const [MovingDestroyer(2, 2, horizontal: false, dir: -1)],
+      toolkit: const [ToolkitEntry(ToolType.shield, 1)],
+    );
+    // Shield at (0,1): surviving the patrol at (0,2) chain-clears the (0,3) wall.
+    expect(simulate(level, {0 * 5 + 1: _shield()}), SimOutcome.win);
+  });
 }

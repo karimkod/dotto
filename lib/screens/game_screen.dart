@@ -664,8 +664,28 @@ class _GameScreenState extends State<GameScreen>
         Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
-  bool _moverOn(int r, int c) =>
-      _movers.any((m) => m.row == r && m.col == c);
+  List<MoverState> _moversAt(int r, int c) =>
+      _movers.where((m) => m.row == r && m.col == c).toList();
+
+  /// The dot (carrying a shield) destroys the patrol(s) on its cell: spend the
+  /// aura, remove the mover(s), blow each one up and chain-explode its adjacent
+  /// walls. The dot survives.
+  void _shieldDestroyMovers(List<MoverState> hit) {
+    setState(() {
+      _dotShielded = false;
+      for (final m in hit) {
+        _movers.remove(m);
+      }
+    });
+    for (final m in hit) {
+      final key = _idx(m.row, m.col);
+      _explode(key, fatal: false);
+      for (final w in adjacentWallKeys(_level!, key)) {
+        if (_destroyedCells.contains(w)) continue;
+        _explodeWall(w);
+      }
+    }
+  }
 
   void _beat() {
     if (_status != GameStatus.running) return;
@@ -686,10 +706,16 @@ class _GameScreenState extends State<GameScreen>
 
     if (_dot.pause > 0) {
       setState(() => _dot.pause--);
-      // The dot held still — a patrol that ends on it still catches it.
-      if (_moverOn(_dot.r, _dot.c)) {
-        _explode(_idx(_dot.r, _dot.c), fatal: true);
-        _failExploded(DeathCause.patrol);
+      // The dot held still — a patrol that ends on it collides. A shield blows
+      // the patrol away; otherwise the dot is caught.
+      final hit = _moversAt(_dot.r, _dot.c);
+      if (hit.isNotEmpty) {
+        if (_dotShielded) {
+          _shieldDestroyMovers(hit);
+        } else {
+          _explode(_idx(_dot.r, _dot.c), fatal: true);
+          _failExploded(DeathCause.patrol);
+        }
       }
       return;
     }
@@ -718,9 +744,15 @@ class _GameScreenState extends State<GameScreen>
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
 
-    // Both have moved — die only if a patrol shares the dot's FINAL cell.
-    // Crossing paths (swapping cells) is safe.
-    if (_moverOn(nr, nc)) {
+    // Both have moved — collide only if a patrol shares the dot's FINAL cell
+    // (crossing/swapping cells is safe). A shield blows the patrol away and the
+    // dot survives; otherwise it's caught.
+    final hitMovers = _moversAt(nr, nc);
+    if (hitMovers.isNotEmpty) {
+      if (_dotShielded) {
+        _shieldDestroyMovers(hitMovers);
+        return; // survive this tick; the dot moves on next beat
+      }
       _explode(newKey, fatal: true);
       _failExploded(DeathCause.patrol);
       return;

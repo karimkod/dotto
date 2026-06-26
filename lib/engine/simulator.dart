@@ -156,8 +156,23 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
   final movers = buildMovers(level);
-  bool moverHit(int rr, int cc) =>
-      movers.any((mv) => mv.row == rr && mv.col == cc);
+  // Resolve any patrol(s) sharing the dot's cell. A shield is spent to destroy
+  // the mover(s) and chain-explode adjacent walls (the dot survives); without a
+  // shield the dot dies. Returns true when the collision is fatal.
+  bool moverCollision(int rr, int cc) {
+    final hit = movers.where((mv) => mv.row == rr && mv.col == cc).toList();
+    if (hit.isEmpty) return false;
+    if (!shielded) return true;
+    shielded = false;
+    for (final mv in hit) {
+      movers.remove(mv);
+      final mk = mv.row * n + mv.col;
+      removed.add(mk);
+      removed.addAll(adjacentWallKeys(level, mk));
+    }
+    return false;
+  }
+
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
@@ -168,7 +183,9 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
     if (pause > 0) {
       pause--;
       // The dot held still this tick — a mover that ends on it still catches it.
-      if (moverHit(r, c)) return const SimResult(SimOutcome.lose, DeathCause.patrol);
+      if (moverCollision(r, c)) {
+        return const SimResult(SimOutcome.lose, DeathCause.patrol);
+      }
       continue;
     }
 
@@ -184,9 +201,11 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
 
     r = nr;
     c = nc;
-    // Both have moved — die only if they share the FINAL cell. If the dot and a
+    // Both have moved — collide only on a shared FINAL cell. If the dot and a
     // mover merely crossed paths (swapped cells) the dot escapes.
-    if (moverHit(r, c)) return const SimResult(SimOutcome.lose, DeathCause.patrol);
+    if (moverCollision(r, c)) {
+      return const SimResult(SimOutcome.lose, DeathCause.patrol);
+    }
     final key = r * n + c;
     final base = effBase(r, c);
     if (base == CellType.gap) {
@@ -258,8 +277,22 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
   final movers = buildMovers(level);
-  bool moverHit(int rr, int cc) =>
-      movers.any((mv) => mv.row == rr && mv.col == cc);
+  // See simulate(): a shield destroys the patrol(s) on the dot's cell and
+  // chain-explodes adjacent walls; otherwise the dot dies. Returns true if fatal.
+  bool moverCollision(int rr, int cc) {
+    final hit = movers.where((mv) => mv.row == rr && mv.col == cc).toList();
+    if (hit.isEmpty) return false;
+    if (!shielded) return true;
+    shielded = false;
+    for (final mv in hit) {
+      movers.remove(mv);
+      final mk = mv.row * n + mv.col;
+      removed.add(mk);
+      removed.addAll(adjacentWallKeys(level, mk));
+    }
+    return false;
+  }
+
   final visited = <int>{r * n + c};
   final maxTicks = n * n * 4 + 20;
 
@@ -269,7 +302,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     }
     if (pause > 0) {
       pause--;
-      if (moverHit(r, c)) return null; // mover lands on the held-still dot
+      if (moverCollision(r, c)) return null; // mover lands on the held-still dot
       continue;
     }
     final (dr, dc) = dir.delta;
@@ -279,8 +312,8 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     if (effBase(nr, nc) == CellType.wall) return null;
     r = nr;
     c = nc;
-    // Die only on a shared FINAL cell; crossing (swapping cells) is safe.
-    if (moverHit(r, c)) return null;
+    // Collide only on a shared FINAL cell; crossing (swapping cells) is safe.
+    if (moverCollision(r, c)) return null;
     final base = effBase(r, c);
     if (base == CellType.gap) return null;
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
