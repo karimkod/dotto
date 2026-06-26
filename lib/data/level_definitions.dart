@@ -674,13 +674,9 @@ const Map<int, LevelData> levelDefinitions = {
     tip: 'Cross, climb and turn — slip past the patrol.',
     start: StartSpec(4, 4, Direction.left),
     exit: Pos(0, 4),
-    walls: [
-      Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
-    ],
-    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    movers: [MovingDestroyer(2, 2, horizontal: true, dir: 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowUp, 2),
       ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
