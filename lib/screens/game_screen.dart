@@ -84,6 +84,7 @@ class _GameScreenState extends State<GameScreen>
   final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
   final List<Explosion> _explosions = []; // destroyer blasts in progress
   final Set<int> _destroyedCells = {}; // destroyers cleared by a shielded dot
+  final Set<int> _consumedShields = {}; // shield cells picked up this run
 
   /// True once the dot has the protective shield aura (consumed by a destroyer).
   bool _dotShielded = false;
@@ -351,6 +352,7 @@ class _GameScreenState extends State<GameScreen>
     _removing.clear();
     _explosions.clear();
     _destroyedCells.clear();
+    _consumedShields.clear();
     _dotShielded = false;
     _dotGone = false;
     _movers = buildMovers(_level!);
@@ -801,11 +803,19 @@ class _GameScreenState extends State<GameScreen>
           });
           Sfx.pause();
         case PlacedType.shield:
-          setState(() {
-            _dotShielded = true; // gain the protective aura (one at a time)
-            _glow(newKey, kShieldColor, 1.0);
-          });
-          Sfx.shield();
+          // Collected once per run: revisiting the (now-empty) cell grants
+          // nothing. The placement stays in _placed so Retry restores it.
+          if (_consumedShields.add(newKey)) {
+            setState(() {
+              _dotShielded = true; // gain the protective aura (one at a time)
+              _glow(newKey, kShieldColor, 1.0);
+              // The shield leaves the grid with a shrink-out as it's picked up.
+              // (_revision changes each beat as the trail grows, so the grid
+              // repaints without the now-hidden shield.)
+              _removing.add(FadingPiece(newKey, piece.tool, piece.direction));
+            });
+            Sfx.shield();
+          }
         case PlacedType.teleporter:
           _teleport();
       }
@@ -1204,7 +1214,16 @@ class _GameScreenState extends State<GameScreen>
                       size: Size.square(side),
                       painter: GameGridPainter(
                         level: _level!,
-                        placed: _placed,
+                        // Picked-up shields vanish from the grid (the shrink-out
+                        // is drawn via `removing`); the placement itself stays
+                        // in _placed so Retry restores it.
+                        placed: _consumedShields.isEmpty
+                            ? _placed
+                            : {
+                                for (final e in _placed.entries)
+                                  if (!_consumedShields.contains(e.key))
+                                    e.key: e.value,
+                              },
                         trail: _trail,
                         revision: _revision,
                         placeAnim: _placeAnim,

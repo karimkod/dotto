@@ -703,7 +703,7 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 34 — Patrolled Gap: a patrol guards the lone gap the corridor must cross.
+  // 34 — Patrolled Gap: an open board crossed by four patrols; thread the climb.
   34: LevelData(
     id: 34,
     size: 6,
@@ -711,11 +711,12 @@ const Map<int, LevelData> levelDefinitions = {
     tip: 'A patrol guards the only way up. Pick your moment.',
     start: StartSpec(5, 0, Direction.right),
     exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+    movers: [
+      MovingDestroyer(3, 4, horizontal: true, dir: 1),
+      MovingDestroyer(2, 1, horizontal: true, dir: -1),
+      MovingDestroyer(1, 0, horizontal: true, dir: 1),
+      MovingDestroyer(4, 5, horizontal: true, dir: -1),
     ],
-    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),

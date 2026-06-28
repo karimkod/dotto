@@ -150,6 +150,9 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   // The dot carries at most one shield aura at a time. Passing a shield cell
   // grants it; the next destroyer it hits is destroyed and the aura is spent.
   var shielded = false;
+  // Shield cells already collected — picked up once, they leave the grid and
+  // can't be collected again.
+  final takenShields = <int>{};
   // Cells cleared by a chain explosion (the hit destroyer + its adjacent walls).
   // They become passable empty cells for the rest of the run.
   final removed = <int>{};
@@ -233,7 +236,8 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
         case PlacedType.pause:
           pause = 2;
         case PlacedType.shield:
-          shielded = true;
+          // Collected once; revisiting the (now-empty) cell re-grants nothing.
+          if (takenShields.add(key)) shielded = true;
         case PlacedType.teleporter:
           for (final e in placed.entries) {
             if (e.value.type == PlacedType.teleporter && e.key != key) {
@@ -273,6 +277,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   var dir = level.start.dir;
   var pause = 0;
   var shielded = false;
+  final takenShields = <int>{};
   final removed = <int>{};
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
@@ -333,7 +338,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     } else if (piece != null && piece.type == PlacedType.pause) {
       pause = 2;
     } else if (piece != null && piece.type == PlacedType.shield) {
-      shielded = true;
+      if (takenShields.add(r * n + c)) shielded = true; // collected once
     }
     if (level.baseTypeAt(r, c) == CellType.exit) return visited;
   }
