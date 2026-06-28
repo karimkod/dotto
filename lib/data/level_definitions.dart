@@ -711,6 +711,7 @@ const Map<int, LevelData> levelDefinitions = {
     tip: 'A patrol guards the only way up. Pick your moment.',
     start: StartSpec(5, 0, Direction.right),
     exit: Pos(0, 0),
+    walls: [Pos(0, 5)],
     movers: [
       MovingDestroyer(3, 4, horizontal: true, dir: 1),
       MovingDestroyer(2, 1, horizontal: true, dir: -1),

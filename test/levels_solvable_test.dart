@@ -121,7 +121,7 @@ void main() {
     31: [(3, 3, Direction.up)],
     32: [(3, 3, Direction.right), (3, 4, Direction.up), (4, 3, Direction.up)],
     33: [(0, 5, Direction.left), (5, 5, Direction.up)],
-    34: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    34: [(5, 1, Direction.up), (0, 1, Direction.left)],
     35: [(0, 5, Direction.left), (5, 5, Direction.up)],
     36: [],
     37: [],
