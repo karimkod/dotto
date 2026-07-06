@@ -237,7 +237,7 @@ void main() {
     const level45 = Level(
       id: 45,
       number: 45,
-      title: 'Last Patrol',
+      title: 'Grand Finale',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
@@ -247,10 +247,11 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, 7);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: pause to let the patrol pass, climb the last column, turn left
-    // across the top to the corner exit.
-    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(0, 6));
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(6, 5));
+    // Solution: pause early to time the top-run patrol, shield up before the
+    // breach, climb the last column into the wedged patrol (chain-explodes the
+    // wall), then the fixed arrow carries the dot left to the corner exit.
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(6, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(6, 5));
     await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(6, 6));
 
     await runToWin(tester);

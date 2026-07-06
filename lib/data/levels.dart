@@ -38,9 +38,9 @@ List<Level> buildInitialLevels() {
     if (number <= 27) return Difficulty.medium; // path clearing (24–27)
     if (number <= 30) return Difficulty.hard; // challenge + finale (28–30)
     // World 4 (31–45).
-    if (number <= 33) return Difficulty.easy; // moving destroyers intro (31–35)
-    if (number <= 40) return Difficulty.medium; // intro + pause (34–40)
-    return Difficulty.hard; // exams (41–45)
+    if (number <= 34) return Difficulty.easy; // moving destroyers intro (31–34)
+    if (number <= 41) return Difficulty.medium; // shield chains + pause (35–41)
+    return Difficulty.hard; // 42–44 harder pause, 45 finale
   }
 
   LevelStatus statusFor(int number) {

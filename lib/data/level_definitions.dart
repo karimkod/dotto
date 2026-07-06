@@ -724,33 +724,109 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 35 — Pinned Patrol: a fixed arrow on the route plus a patrol to dodge.
+  // ----- Shield + patrol chain explosions (35–39) -----
+  // A wall blocks the exit; a moving mine patrols beside it. Route the SHIELDED
+  // dot into the mine — the shielded hit destroys it and chain-explodes the
+  // adjacent wall, opening the path.
+
+  // 35 — Breach: intro. Shield the dot, climb into the patrol; the blast clears
+  // the wall capping the column so the dot rolls up to the exit.
   35: LevelData(
     id: 35,
-    size: 6,
-    title: 'Pinned Patrol',
-    tip: 'The fixed arrow guides you home — just dodge the patrol.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
-    ],
-    destroyers: [],
-    forcedArrows: [ForcedArrow(0, 3, Direction.left)],
-    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    size: 5,
+    title: 'Breach',
+    tip: 'Shield up and ram the mine — the blast clears the wall.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 2),
+    walls: [Pos(1, 2)],
+    movers: [MovingDestroyer(2, 2, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.shield, 1),
     ],
   ),
 
-  // ----- Pause blocks (36–40) -----
-
-  // 36 — Freeze Frame: a vertical patrol crosses the straight run. Place a
-  // pause so the dot waits for it to pass.
+  // 36 — Pick a Section: a full wall barrier; only breaching under the exit
+  // opens the way. Choose which column to climb.
   36: LevelData(
     id: 36,
+    size: 5,
+    title: 'Pick a Section',
+    tip: 'One breach opens the wall. Aim it under the exit.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 3),
+    walls: [Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4)],
+    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // 37 — Double Breach: two walls, two patrols, two shields. Blast through both
+  // gates to reach the far corner.
+  37: LevelData(
+    id: 37,
+    size: 6,
+    title: 'Double Breach',
+    tip: 'Two gates, two shields. Breach the floor, then the climb.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [Pos(5, 3), Pos(2, 5)],
+    movers: [
+      MovingDestroyer(3, 2, horizontal: false, dir: 1),
+      MovingDestroyer(3, 2, horizontal: true, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 2),
+    ],
+  ),
+
+  // 38 — Decoys: still mines sit around as bait, but the shield must go to the
+  // moving one that guards the wall. Spend it wisely.
+  38: LevelData(
+    id: 38,
+    size: 6,
+    title: 'Decoys',
+    tip: 'Still mines are bait — save the shield for the patrol.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 3),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
+    ],
+    destroyers: [Pos(4, 5), Pos(3, 1)],
+    movers: [MovingDestroyer(2, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // 39 — Cave-In: the exam. A patrol is wedged in a wall cluster; one shielded
+  // hit blows out three walls at once. A fixed arrow guides the run home.
+  39: LevelData(
+    id: 39,
+    size: 7,
+    title: 'Cave-In',
+    tip: 'One breach, three walls. Then ride the arrow home.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [Pos(3, 2), Pos(3, 4), Pos(2, 3)],
+    forcedArrows: [ForcedArrow(0, 3, Direction.left)],
+    movers: [MovingDestroyer(3, 3, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // ----- Pause blocks (40–44) -----
+
+  // 40 — Freeze Frame: a vertical patrol crosses the straight run. Place a
+  // pause so the dot waits for it to pass.
+  40: LevelData(
+    id: 40,
     size: 5,
     title: 'Freeze Frame',
     tip: 'Pause = wait. Let the patrol cross, then go.',
@@ -760,10 +836,10 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.pause, 1)],
   ),
 
-  // 37 — Slip Through: two vertical patrols across the run; pause to slip
+  // 41 — Slip Through: two vertical patrols across the run; pause to slip
   // between them.
-  37: LevelData(
-    id: 37,
+  41: LevelData(
+    id: 41,
     size: 5,
     title: 'Slip Through',
     tip: 'Two patrols. Pause to slip through the gap.',
@@ -776,10 +852,10 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.pause, 1)],
   ),
 
-  // 38 — Wait For It: climb a corridor that a patrol blocks; pause to let it
+  // 42 — Wait For It: climb a corridor that a patrol blocks; pause to let it
   // clear the gap.
-  38: LevelData(
-    id: 38,
+  42: LevelData(
+    id: 42,
     size: 6,
     title: 'Wait For It',
     tip: 'The patrol blocks the climb. Wait for it to swing away.',
@@ -796,9 +872,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 39 — Double Wait: two patrols on the climb; two pauses to thread both.
-  39: LevelData(
-    id: 39,
+  // 43 — Double Wait: two patrols on the climb; two pauses to thread both.
+  43: LevelData(
+    id: 43,
     size: 6,
     title: 'Double Wait',
     tip: 'Two patrols, two waits. Time each one.',
@@ -818,9 +894,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 40 — Pinned Wait: a fixed arrow finishes the route; pause past the patrol.
-  40: LevelData(
-    id: 40,
+  // 44 — Pinned Wait: a fixed arrow finishes the route; pause past the patrol.
+  44: LevelData(
+    id: 44,
     size: 6,
     title: 'Pinned Wait',
     tip: 'Ride the fixed arrow — but pause for the patrol first.',
@@ -838,110 +914,27 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Exams (41–45): combine everything. -----
+  // ----- Final exam (45) -----
 
-  // 41 — a static mine to avoid + a patrol + a pause on the climb.
-  41: LevelData(
-    id: 41,
-    size: 6,
-    title: 'Mind the Mine',
-    tip: 'Dodge the still mine, time the moving one.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
-    ],
-    destroyers: [Pos(2, 2)],
-    movers: [MovingDestroyer(4, 1, horizontal: true, dir: -1)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.pause, 1),
-    ],
-  ),
-
-  // 42 — shield through a static door + dodge a patrol.
-  42: LevelData(
-    id: 42,
-    size: 6,
-    title: 'Shielded Sprint',
-    tip: 'Shield the still mine; the moving one needs timing.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
-    ],
-    destroyers: [Pos(0, 3)],
-    movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.shield, 1),
-    ],
-  ),
-
-  // 43 — Patrol Climb: a full corridor with a patrol and a pause.
-  43: LevelData(
-    id: 43,
-    size: 6,
-    title: 'Patrol Climb',
-    tip: 'Climb and turn home, pausing for the patrol.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
-    ],
-    movers: [MovingDestroyer(2, 3, horizontal: true, dir: -1)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.pause, 1),
-    ],
-  ),
-
-  // 44 — Long Watch: a tall 7x7 corridor with a patrol and a pause.
-  44: LevelData(
-    id: 44,
-    size: 7,
-    title: 'Long Watch',
-    tip: 'A long climb past a patrol. Time it well.',
-    start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
-    ],
-    movers: [MovingDestroyer(2, 4, horizontal: true, dir: -1)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.pause, 1),
-    ],
-  ),
-
-  // 45 — Last Patrol: the World 4 finale — a 7x7 corridor with a static mine
-  // to dodge and a patrol to time.
+  // 45 — Grand Finale: everything at once. Breach the wall on the climb with a
+  // shielded hit (chain explosion), then pause on the top run to dodge a patrol,
+  // and ride the fixed arrow into the corner.
   45: LevelData(
     id: 45,
     size: 7,
-    title: 'Last Patrol',
-    tip: 'Everything at once: a still mine, a patrol and a pause.',
+    title: 'Grand Finale',
+    tip: 'Breach the wall, wait out the patrol, ride the arrow home.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 0),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5),
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
+    walls: [Pos(3, 5), Pos(2, 6)],
+    forcedArrows: [ForcedArrow(0, 6, Direction.left)],
+    movers: [
+      MovingDestroyer(3, 6, horizontal: true, dir: 1),
+      MovingDestroyer(4, 2, horizontal: false, dir: 1),
     ],
-    destroyers: [Pos(4, 2)],
-    movers: [MovingDestroyer(4, 6, horizontal: true, dir: -1, lo: 4, hi: 6)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.pause, 1),
     ],
   ),

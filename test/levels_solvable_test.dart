@@ -122,33 +122,33 @@ void main() {
     32: [(3, 3, Direction.right), (3, 4, Direction.up), (4, 3, Direction.up)],
     33: [(0, 5, Direction.left), (5, 5, Direction.up)],
     34: [(5, 1, Direction.up), (0, 1, Direction.left)],
-    35: [(0, 5, Direction.left), (5, 5, Direction.up)],
-    36: [],
-    37: [],
-    38: [(5, 5, Direction.up)],
-    39: [(5, 5, Direction.up)],
-    40: [(5, 5, Direction.up)],
-    41: [(0, 5, Direction.left), (5, 5, Direction.up)],
-    42: [(0, 5, Direction.left), (5, 5, Direction.up)],
-    43: [(0, 5, Direction.left), (5, 5, Direction.up)],
-    44: [(0, 6, Direction.left), (6, 6, Direction.up)],
-    45: [(0, 6, Direction.left), (6, 6, Direction.up)],
+    // 35–39: shield + patrol chain explosions (shields listed below).
+    35: [(4, 2, Direction.up)],
+    36: [(4, 3, Direction.up)],
+    37: [(5, 5, Direction.up)],
+    38: [(5, 3, Direction.up)],
+    39: [(6, 3, Direction.up)],
+    // 40–44: pause blocks.
+    40: [],
+    41: [],
+    42: [(5, 5, Direction.up)],
+    43: [(5, 5, Direction.up)],
+    44: [(5, 5, Direction.up)],
+    // 45: grand finale (breach + pause + fixed arrow).
+    45: [(6, 6, Direction.up)],
   };
 
   // Intended pause placements (World 4).
   final pauses = <int, List<(int, int)>>{
-    36: [(4, 1)],
-    37: [(2, 1)],
-    38: [(5, 4)],
-    39: [(3, 5), (5, 4)],
-    40: [(5, 4)],
-    41: [(5, 4)],
-    43: [(5, 4)],
-    44: [(6, 5)],
-    45: [(6, 5)],
+    40: [(4, 1)],
+    41: [(2, 1)],
+    42: [(5, 4)],
+    43: [(3, 5), (5, 4)],
+    44: [(5, 4)],
+    45: [(6, 1)],
   };
 
-  // Intended shield placements (World 3, plus World 4's shield exam 42).
+  // Intended shield placements (World 3, plus World 4's chain-explosion levels).
   final shields = <int, List<(int, int)>>{
     21: [(3, 2)],
     22: [(2, 2)],
@@ -160,7 +160,12 @@ void main() {
     28: [(0, 2)],
     29: [(1, 2), (3, 3)],
     30: [(1, 3), (3, 4), (5, 3)],
-    42: [(5, 4)],
+    35: [(4, 1)],
+    36: [(4, 2)],
+    37: [(5, 1), (5, 4)],
+    38: [(5, 2)],
+    39: [(6, 2)],
+    45: [(6, 5)],
   };
 
   int worldOf(int n) =>
@@ -214,7 +219,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 35, 40]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 39, 44, 45]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
