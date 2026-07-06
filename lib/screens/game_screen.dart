@@ -692,7 +692,8 @@ class _GameScreenState extends State<GameScreen>
   /// A fatal patrol collision. The explosion waits for the dot's and the
   /// patrol's glide animations to finish, so the two visually meet in the shared
   /// cell BEFORE the blast — otherwise the dot bursts mid-glide, in "mid-air".
-  Future<void> _moverDeath(int cell, DeathCause cause) async {
+  /// The colliding patrol(s) blow up together with the dot and leave the board.
+  Future<void> _moverDeath(int cell, DeathCause cause, List<MoverState> hit) async {
     _timer?.cancel(); // stop further beats while the glides settle
     _timer = null;
     try {
@@ -704,6 +705,14 @@ class _GameScreenState extends State<GameScreen>
       // A ticker was canceled (widget disposed / run reset) — nothing to do.
     }
     if (!mounted || _status != GameStatus.running) return;
+    // The patrol dies with the dot: drop it from the active movers so it stops
+    // patrolling and disappears from the board (it shares [cell] with the dot,
+    // so the blast below covers its position too).
+    setState(() {
+      for (final m in hit) {
+        _movers.remove(m);
+      }
+    });
     _explode(cell, fatal: true);
     _failExploded(cause);
   }
@@ -735,7 +744,7 @@ class _GameScreenState extends State<GameScreen>
           _shieldDestroyMovers(hit);
         } else {
           // Let the patrol finish gliding onto the dot before the blast.
-          _moverDeath(_idx(_dot.r, _dot.c), DeathCause.patrol);
+          _moverDeath(_idx(_dot.r, _dot.c), DeathCause.patrol, hit);
         }
       }
       return;
@@ -775,7 +784,7 @@ class _GameScreenState extends State<GameScreen>
         return; // survive this tick; the dot moves on next beat
       }
       // Let the dot and the patrol finish gliding into the shared cell first.
-      _moverDeath(newKey, DeathCause.patrol);
+      _moverDeath(newKey, DeathCause.patrol, hitMovers);
       return;
     }
 
