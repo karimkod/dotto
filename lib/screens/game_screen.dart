@@ -699,13 +699,11 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// A fatal patrol collision. The explosion waits for the dot's and the
-  /// patrol's glide animations to finish, so the two visually meet in the shared
-  /// cell BEFORE the blast — otherwise the dot bursts mid-glide, in "mid-air".
-  /// The colliding patrol(s) blow up together with the dot and leave the board.
-  Future<void> _moverDeath(int cell, DeathCause cause, List<MoverState> hit) async {
-    _timer?.cancel(); // stop further beats while the glides settle
-    _timer = null;
+  /// Waits until the dot's and the patrols' one-beat glide animations settle, so
+  /// nothing explodes while the dot (or a patrol) is still mid-glide, "in the
+  /// air." Returns once both controllers have reached the end of the current
+  /// beat's animation.
+  Future<void> _settleGlides() async {
     try {
       await Future.wait([
         if (_dotCtrl.isAnimating) _dotCtrl.forward().orCancel,
@@ -714,17 +712,42 @@ class _GameScreenState extends State<GameScreen>
     } catch (_) {
       // A ticker was canceled (widget disposed / run reset) — nothing to do.
     }
+  }
+
+  /// A FATAL hit — a static mine or a patrol. The blast waits for the glide to
+  /// finish so the dot visually REACHES the cell before it bursts, instead of
+  /// exploding mid-glide. Any colliding patrol(s) blow up with it and leave the
+  /// board (they share [cell] with the dot, so the blast covers them).
+  Future<void> _fatalHit(int cell, DeathCause cause,
+      {List<MoverState> hit = const []}) async {
+    _timer?.cancel(); // stop further beats while the glides settle
+    _timer = null;
+    await _settleGlides();
     if (!mounted || _status != GameStatus.running) return;
-    // The patrol dies with the dot: drop it from the active movers so it stops
-    // patrolling and disappears from the board (it shares [cell] with the dot,
-    // so the blast below covers its position too).
-    setState(() {
-      for (final m in hit) {
-        _removeMover(m);
-      }
-    });
+    if (hit.isNotEmpty) {
+      setState(() {
+        for (final m in hit) {
+          _removeMover(m);
+        }
+      });
+    }
     _explode(cell, fatal: true);
     _failExploded(cause);
+  }
+
+  /// Runs a SURVIVING shielded blow-up (destroyer/patrol chain explosion) only
+  /// after the dot's glide finishes, so the boom lands as the dot reaches the
+  /// cell. The beat timer is HELD during the glide so no later beat runs on the
+  /// pre-blast board (which would move the dot into the still-solid wall); the
+  /// run resumes once the chain — clearing walls, spending the shield — resolves.
+  Future<void> _afterGlide(void Function() blast) async {
+    _timer?.cancel();
+    _timer = null;
+    await _settleGlides();
+    if (!mounted || _status != GameStatus.running) return;
+    blast();
+    _timer =
+        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
   void _beat() {
@@ -751,10 +774,10 @@ class _GameScreenState extends State<GameScreen>
       final hit = _moversAt(_dot.r, _dot.c);
       if (hit.isNotEmpty) {
         if (_dotShielded) {
-          _shieldDestroyMovers(hit);
-        } else {
           // Let the patrol finish gliding onto the dot before the blast.
-          _moverDeath(_idx(_dot.r, _dot.c), DeathCause.patrol, hit);
+          _afterGlide(() => _shieldDestroyMovers(hit));
+        } else {
+          _fatalHit(_idx(_dot.r, _dot.c), DeathCause.patrol, hit: hit);
         }
       }
       return;
@@ -790,11 +813,12 @@ class _GameScreenState extends State<GameScreen>
     final hitMovers = _moversAt(nr, nc);
     if (hitMovers.isNotEmpty) {
       if (_dotShielded) {
-        _shieldDestroyMovers(hitMovers);
-        return; // survive this tick; the dot moves on next beat
+        // Survive: blow the patrol away once the dot has glided into the cell.
+        _afterGlide(() => _shieldDestroyMovers(hitMovers));
+        return; // the dot moves on next beat
       }
       // Let the dot and the patrol finish gliding into the shared cell first.
-      _moverDeath(newKey, DeathCause.patrol, hitMovers);
+      _fatalHit(newKey, DeathCause.patrol, hit: hitMovers);
       return;
     }
 
@@ -806,13 +830,13 @@ class _GameScreenState extends State<GameScreen>
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {
       if (_dotShielded) {
         // The shield absorbs the blow: the destroyer explodes, every adjacent
-        // wall is demolished (chain explosion), and the dot survives and
-        // continues. The aura is spent.
-        _chainExplode(newKey);
+        // wall is demolished (chain explosion), and the dot survives. Wait for
+        // the dot to glide onto the cell so the boom lands on contact.
+        _afterGlide(() => _chainExplode(newKey));
         return; // survive this tick; the dot moves on next beat
       }
-      _explode(newKey, fatal: true);
-      _failExploded(DeathCause.destroyer);
+      // Wait for the dot to reach the mine before it bursts (no mid-air blast).
+      _fatalHit(newKey, DeathCause.destroyer);
       return;
     }
 
