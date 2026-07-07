@@ -669,6 +669,16 @@ class _GameScreenState extends State<GameScreen>
   List<MoverState> _moversAt(int r, int c) =>
       _movers.where((m) => m.row == r && m.col == c).toList();
 
+  /// Remove a patrol from the active list, keeping [_moverFrom] index-aligned
+  /// with [_movers] so the surviving patrols keep gliding from their OWN
+  /// previous cell (not a shifted neighbour's) after one is destroyed.
+  void _removeMover(MoverState m) {
+    final i = _movers.indexOf(m);
+    if (i < 0) return;
+    _movers.removeAt(i);
+    if (i < _moverFrom.length) _moverFrom.removeAt(i);
+  }
+
   /// The dot (carrying a shield) destroys the patrol(s) on its cell: spend the
   /// aura, remove the mover(s), blow each one up and chain-explode its adjacent
   /// walls. The dot survives.
@@ -676,7 +686,7 @@ class _GameScreenState extends State<GameScreen>
     setState(() {
       _dotShielded = false;
       for (final m in hit) {
-        _movers.remove(m);
+        _removeMover(m);
       }
     });
     for (final m in hit) {
@@ -710,7 +720,7 @@ class _GameScreenState extends State<GameScreen>
     // so the blast below covers its position too).
     setState(() {
       for (final m in hit) {
-        _movers.remove(m);
+        _removeMover(m);
       }
     });
     _explode(cell, fatal: true);

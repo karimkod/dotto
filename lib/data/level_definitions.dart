@@ -772,10 +772,10 @@ const Map<int, LevelData> levelDefinitions = {
     tip: 'Two gates, two shields. Breach the floor, then the climb.',
     start: StartSpec(5, 0, Direction.right),
     exit: Pos(0, 5),
-    walls: [Pos(5, 3), Pos(2, 5)],
+    walls: [Pos(5, 4), Pos(2, 5)],
     movers: [
-      MovingDestroyer(3, 2, horizontal: false, dir: 1),
-      MovingDestroyer(3, 2, horizontal: true, dir: -1),
+      MovingDestroyer(2, 3, horizontal: false, dir: 1), // floor-gate patrol (col 3)
+      MovingDestroyer(3, 2, horizontal: true, dir: -1), // climb-gate patrol (row 3)
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
