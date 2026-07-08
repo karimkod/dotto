@@ -869,9 +869,10 @@ const Map<int, LevelData> levelDefinitions = {
     exit: Pos(0, 5),
     walls: [
       Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(2, 2), // the patrol bounces off this wall on its left
       Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
     ],
-    movers: [MovingDestroyer(2, 5, horizontal: true, dir: -1, lo: 3, hi: 5)],
+    movers: [MovingDestroyer(2, 5, horizontal: true, dir: -1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.pause, 1),
