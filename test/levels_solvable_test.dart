@@ -125,8 +125,8 @@ void main() {
     // 35–39: shield + patrol chain explosions (shields listed below).
     35: [(4, 2, Direction.up)],
     36: [(4, 3, Direction.up)],
-    37: [(5, 5, Direction.up)],
-    38: [(5, 3, Direction.up)],
+    37: [(0, 5, Direction.left), (5, 5, Direction.up)],
+    38: [(0, 5, Direction.down), (5, 3, Direction.up)],
     39: [(6, 3, Direction.up)],
     // 40–44: pause blocks.
     40: [],
@@ -219,7 +219,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 39, 44, 45]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 44, 45]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(

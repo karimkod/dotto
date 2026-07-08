@@ -746,7 +746,7 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 36 — Pick a Section: a full wall barrier; only breaching under the exit
+  // 36 — Pick a Section: a stepped wall barrier; only breaching under the exit
   // opens the way. Choose which column to climb.
   36: LevelData(
     id: 36,
@@ -755,7 +755,7 @@ const Map<int, LevelData> levelDefinitions = {
     tip: 'One breach opens the wall. Aim it under the exit.',
     start: StartSpec(4, 0, Direction.right),
     exit: Pos(0, 3),
-    walls: [Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4)],
+    walls: [Pos(1, 2), Pos(1, 3), Pos(0, 2), Pos(1, 4), Pos(0, 4)],
     movers: [MovingDestroyer(2, 0, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
@@ -764,21 +764,22 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // 37 — Double Breach: two walls, two patrols, two shields. Blast through both
-  // gates to reach the far corner.
+  // gates to reach the corner.
   37: LevelData(
     id: 37,
     size: 6,
     title: 'Double Breach',
     tip: 'Two gates, two shields. Breach the floor, then the climb.',
     start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 5),
-    walls: [Pos(5, 4), Pos(2, 5)],
+    exit: Pos(0, 2),
+    walls: [Pos(5, 4), Pos(2, 5), Pos(1, 2)],
     movers: [
-      MovingDestroyer(2, 3, horizontal: false, dir: 1), // floor-gate patrol (col 3)
-      MovingDestroyer(3, 2, horizontal: true, dir: -1), // climb-gate patrol (row 3)
+      MovingDestroyer(2, 3, horizontal: false, dir: 1),
+      MovingDestroyer(3, 2, horizontal: true, dir: -1),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.shield, 2),
     ],
   ),
@@ -791,14 +792,14 @@ const Map<int, LevelData> levelDefinitions = {
     title: 'Decoys',
     tip: 'Still mines are bait — save the shield for the patrol.',
     start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 3),
-    walls: [
-      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
-    ],
-    destroyers: [Pos(4, 5), Pos(3, 1)],
+    exit: Pos(3, 5),
+    walls: [Pos(0, 1), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4)],
+    destroyers: [Pos(3, 1), Pos(4, 5), Pos(5, 5)],
+    forcedArrows: [ForcedArrow(0, 3, Direction.right)],
     movers: [MovingDestroyer(2, 1, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.shield, 1),
     ],
   ),
