@@ -27,6 +27,11 @@ import 'level_designer_screen.dart';
 /// Milliseconds between dot movement ticks.
 const _tickMs = 400;
 
+/// Fixed height reserved for the bottom button area (the hint line + Play, the
+/// win pause, or Continue/Back to Menu). Pinning it keeps the grid above from
+/// shifting as the footer swaps between these states.
+const double _kFooterHeight = 82;
+
 /// The core game screen. For levels with a definition it is fully playable;
 /// otherwise it shows a "coming soon" placeholder.
 ///
@@ -1597,10 +1602,23 @@ class _GameScreenState extends State<GameScreen>
 
   void _goToMenu() => Navigator.of(context).pop(true);
 
+  /// The bottom button area, always occupying [_kFooterHeight] so the grid above
+  /// never jumps when the footer swaps between Play, the win pause, and Continue.
+  /// Content is bottom-aligned so the button keeps the same baseline throughout.
   Widget _buildFooter() {
+    return SizedBox(
+      height: _kFooterHeight,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: _footerContent(),
+      ),
+    );
+  }
+
+  Widget _footerContent() {
     if (_status == GameStatus.won) {
       // During the celebration, keep the spot empty; fade Continue in after.
-      if (!_celebrationDone) return const SizedBox(height: 54);
+      if (!_celebrationDone) return const SizedBox.shrink();
       return TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
         duration: const Duration(milliseconds: 350),
