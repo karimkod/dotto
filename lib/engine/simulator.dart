@@ -48,13 +48,14 @@ List<int> adjacentWallKeys(LevelData level, int key) {
 
 /// Mutable runtime state of a patrolling (moving) destroyer.
 class MoverState {
-  MoverState(this.fixed, this.pos, this.dir, this.lo, this.hi, this.horizontal,
+  MoverState(this.fixed, this.pos, this.dir, this.size, this.horizontal,
       this.blocked);
   final int fixed;
   int pos;
   int dir;
-  final int lo;
-  final int hi;
+
+  /// Grid size along the moving axis; the mover bounces at the edges (0..size-1).
+  final int size;
   final bool horizontal;
 
   /// Positions (along the patrol axis) that are solid — walls, static
@@ -64,13 +65,12 @@ class MoverState {
   int get row => horizontal ? fixed : pos;
   int get col => horizontal ? pos : fixed;
 
-  bool _solid(int p) => p < lo || p > hi || blocked.contains(p);
+  bool _solid(int p) => p < 0 || p >= size || blocked.contains(p);
 
-  /// Advance one cell, bouncing at the patrol bounds and off any solid cell
-  /// (wall, static destroyer, exit). If both neighbors are solid the mover is
-  /// trapped and stays put.
+  /// Advance one cell, bouncing at the grid edge and off any solid cell (wall,
+  /// static destroyer, exit). If both neighbors are solid the mover is trapped
+  /// and stays put.
   void step() {
-    if (lo >= hi) return; // degenerate (single cell) — stays put
     var next = pos + dir;
     if (_solid(next)) {
       dir = -dir;
@@ -100,8 +100,7 @@ List<MoverState> buildMovers(LevelData level) {
         m.horizontal ? m.r : m.c,
         m.horizontal ? m.c : m.r,
         m.dir,
-        m.lo ?? 0,
-        m.hi ?? (n - 1),
+        n,
         m.horizontal,
         {
           // Solid positions along this mover's fixed row/column.

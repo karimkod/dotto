@@ -889,11 +889,13 @@ const Map<int, LevelData> levelDefinitions = {
     exit: Pos(0, 5),
     walls: [
       Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4),
+      Pos(2, 2), // left bounce wall for the row-2 patrol
       Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4),
+      Pos(4, 2), // left bounce wall for the row-4 patrol
     ],
     movers: [
-      MovingDestroyer(2, 3, horizontal: true, dir: 1, lo: 3, hi: 5),
-      MovingDestroyer(4, 3, horizontal: true, dir: 1, lo: 3, hi: 5),
+      MovingDestroyer(2, 3, horizontal: true, dir: 1),
+      MovingDestroyer(4, 3, horizontal: true, dir: 1),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),

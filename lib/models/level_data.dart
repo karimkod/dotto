@@ -32,24 +32,20 @@ class ForcedArrow {
 }
 
 /// A destroyer that patrols a row ([horizontal]) or column, moving one cell per
-/// beat and bouncing at its bounds. [r],[c] is its starting cell; [dir] is the
-/// first step (+1 or -1) along the moving axis; [lo]/[hi] bound the moving
-/// coordinate (default the whole row/column).
+/// beat and bouncing off the grid edges and any solid cell (wall, static
+/// destroyer, exit) in its lane. [r],[c] is its starting cell; [dir] is the
+/// first step (+1 or -1) along the moving axis.
 class MovingDestroyer {
   const MovingDestroyer(
     this.r,
     this.c, {
     required this.horizontal,
     this.dir = 1,
-    this.lo,
-    this.hi,
   });
   final int r;
   final int c;
   final bool horizontal;
   final int dir;
-  final int? lo;
-  final int? hi;
 }
 
 /// Static definition of a single level.

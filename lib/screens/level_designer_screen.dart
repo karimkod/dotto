@@ -289,7 +289,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_movers.isNotEmpty) {
       final md = _movers.values
           .map((m) =>
-              'MovingDestroyer(${m.r}, ${m.c}, horizontal: ${m.horizontal}, dir: ${m.dir}${m.lo != null ? ', lo: ${m.lo}' : ''}${m.hi != null ? ', hi: ${m.hi}' : ''})')
+              'MovingDestroyer(${m.r}, ${m.c}, horizontal: ${m.horizontal}, dir: ${m.dir})')
           .join(', ');
       b.writeln('  movers: [$md],');
     }
@@ -429,7 +429,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       final mm = RegExp(r'movers\s*:\s*\[([^\]]*)\]').firstMatch(text);
       if (mm != null) {
         for (final dm in RegExp(
-                r'MovingDestroyer\(\s*(\d+)\s*,\s*(\d+)\s*,\s*horizontal:\s*(true|false)\s*(?:,\s*dir:\s*(-?\d+))?\s*(?:,\s*lo:\s*(\d+))?\s*(?:,\s*hi:\s*(\d+))?')
+                r'MovingDestroyer\(\s*(\d+)\s*,\s*(\d+)\s*,\s*horizontal:\s*(true|false)\s*(?:,\s*dir:\s*(-?\d+))?')
             .allMatches(mm.group(1)!)) {
           final r = int.parse(dm.group(1)!);
           final c = int.parse(dm.group(2)!);
@@ -438,8 +438,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             c,
             horizontal: dm.group(3) == 'true',
             dir: dm.group(4) != null ? int.parse(dm.group(4)!) : 1,
-            lo: dm.group(5) != null ? int.parse(dm.group(5)!) : null,
-            hi: dm.group(6) != null ? int.parse(dm.group(6)!) : null,
           );
         }
       }
