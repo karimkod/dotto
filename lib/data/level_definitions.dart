@@ -827,12 +827,31 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Pause blocks (40–44) -----
+  // ----- Pure timing (40) -----
 
-  // 40 — Freeze Frame: a vertical patrol crosses the straight run. Place a
-  // pause so the dot waits for it to pass.
+  // 40 — Timing Run: no walls at all. A vertical patrol sweeps column 3; weave
+  // up-and-over (or down-and-under) it to reach the far side.
   40: LevelData(
     id: 40,
+    size: 6,
+    title: 'Timing Run',
+    tip: 'No walls — just weave around the sweeping patrol.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 5),
+    movers: [MovingDestroyer(5, 3, horizontal: false, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // ----- Pause blocks (41–45) -----
+
+  // 41 — Freeze Frame: a vertical patrol crosses the straight run. Place a
+  // pause so the dot waits for it to pass.
+  41: LevelData(
+    id: 41,
     size: 5,
     title: 'Freeze Frame',
     tip: 'Pause = wait. Let the patrol cross, then go.',
@@ -842,10 +861,10 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.pause, 1)],
   ),
 
-  // 41 — Slip Through: two vertical patrols across the run; pause to slip
+  // 42 — Slip Through: two vertical patrols across the run; pause to slip
   // between them.
-  41: LevelData(
-    id: 41,
+  42: LevelData(
+    id: 42,
     size: 5,
     title: 'Slip Through',
     tip: 'Two patrols. Pause to slip through the gap.',
@@ -858,10 +877,10 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [ToolkitEntry(ToolType.pause, 1)],
   ),
 
-  // 42 — Wait For It: climb a corridor that a patrol blocks; pause to let it
+  // 43 — Wait For It: climb a corridor that a patrol blocks; pause to let it
   // clear the gap.
-  42: LevelData(
-    id: 42,
+  43: LevelData(
+    id: 43,
     size: 6,
     title: 'Wait For It',
     tip: 'The patrol blocks the climb. Wait for it to swing away.',
@@ -879,9 +898,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 43 — Double Wait: two patrols on the climb; two pauses to thread both.
-  43: LevelData(
-    id: 43,
+  // 44 — Double Wait: two patrols on the climb; two pauses to thread both.
+  44: LevelData(
+    id: 44,
     size: 6,
     title: 'Double Wait',
     tip: 'Two patrols, two waits. Time each one.',
@@ -903,9 +922,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 44 — Pinned Wait: a fixed arrow finishes the route; pause past the patrol.
-  44: LevelData(
-    id: 44,
+  // 45 — Pinned Wait: a fixed arrow finishes the route; pause past the patrol.
+  45: LevelData(
+    id: 45,
     size: 6,
     title: 'Pinned Wait',
     tip: 'Ride the fixed arrow — but pause for the patrol first.',
@@ -923,13 +942,13 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // ----- Final exam (45) -----
+  // ----- Final exam (46) -----
 
-  // 45 — Grand Finale: everything at once. Breach the wall on the climb with a
+  // 46 — Grand Finale: everything at once. Breach the wall on the climb with a
   // shielded hit (chain explosion), then pause on the top run to dodge a patrol,
   // and ride the fixed arrow into the corner.
-  45: LevelData(
-    id: 45,
+  46: LevelData(
+    id: 46,
     size: 7,
     title: 'Grand Finale',
     tip: 'Breach the wall, wait out the patrol, ride the arrow home.',

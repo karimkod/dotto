@@ -232,16 +232,16 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (45) shows Back to Menu, not Continue',
+  testWidgets('last level (46) shows Back to Menu, not Continue',
       (tester) async {
-    const level45 = Level(
-      id: 45,
-      number: 45,
+    const level46 = Level(
+      id: 46,
+      number: 46,
       title: 'Grand Finale',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level45)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level46)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
