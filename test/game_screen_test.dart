@@ -232,27 +232,27 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (46) shows Back to Menu, not Continue',
+  testWidgets('last level (50) shows Back to Menu, not Continue',
       (tester) async {
-    const level46 = Level(
-      id: 46,
-      number: 46,
-      title: 'Grand Finale',
+    const level50 = Level(
+      id: 50,
+      number: 50,
+      title: 'The Summit',
       difficulty: Difficulty.hard,
       status: LevelStatus.unlocked,
     );
-    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level46)));
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level50)));
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, 7);
+    final geo = GridGeometry(boardRect.width, 8);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: pause early to time the top-run patrol, shield up before the
-    // breach, climb the last column into the wedged patrol (chain-explodes the
-    // wall), then the fixed arrow carries the dot left to the corner exit.
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(6, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(6, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(6, 6));
+    // Solution: pause for the floor patrol, shield up before the breach, climb
+    // the last column into the wedged patrol (chain-explodes the wall), then the
+    // fixed arrow carries the dot left across the top to the corner exit.
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(7, 6));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 7));
 
     await runToWin(tester);
 

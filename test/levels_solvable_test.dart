@@ -1,5 +1,5 @@
 // Verifies every level (World 1: 1–15, World 2: 16–20, World 3: 21–30,
-// World 4: 31–46): that it is solvable, that the intended hand-authored
+// World 4: 31–50): that it is solvable, that the intended hand-authored
 // solution actually wins, and that every level is "tight" (no solution leaves a
 // toolkit piece unused). World 4 has moving destroyers, so it uses the
 // timing-aware brute solver. Doubles as the "level solver" the design called
@@ -130,24 +130,31 @@ void main() {
     39: [(1, 6, Direction.left), (6, 6, Direction.up)],
     // 40: pure timing — weave around the sweeping patrol.
     40: [(2, 2, Direction.down), (5, 2, Direction.right), (5, 5, Direction.up)],
-    // 41–45: pause blocks.
+    // 41–46: timing puzzles (pauses listed below).
     41: [],
-    42: [],
+    42: [(4, 4, Direction.up)],
     43: [(5, 5, Direction.up)],
-    44: [(5, 5, Direction.up)],
+    44: [(0, 3, Direction.left), (5, 3, Direction.up)],
     45: [(5, 5, Direction.up)],
-    // 46: grand finale (breach + pause + fixed arrow).
     46: [(6, 6, Direction.up)],
+    // 47–50: final exams.
+    47: [(5, 5, Direction.up)],
+    48: [(6, 6, Direction.up)],
+    49: [(6, 6, Direction.up)],
+    50: [(7, 7, Direction.up)],
   };
 
   // Intended pause placements (World 4).
   final pauses = <int, List<(int, int)>>{
-    41: [(4, 1)],
-    42: [(2, 1)],
-    43: [(5, 4)],
-    44: [(3, 5), (5, 4)],
-    45: [(5, 4)],
-    46: [(6, 1)],
+    41: [(2, 1)],
+    42: [(4, 3)],
+    43: [(5, 1), (5, 4)],
+    45: [(5, 3), (5, 4)],
+    46: [(6, 4), (6, 5)],
+    47: [(5, 1)],
+    48: [(6, 1)],
+    49: [(6, 1)],
+    50: [(7, 3)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -167,7 +174,11 @@ void main() {
     37: [(5, 2), (5, 3)],
     38: [(5, 2)],
     39: [(3, 6), (6, 5)],
-    46: [(6, 5)],
+    44: [(5, 2)],
+    47: [(5, 4)],
+    48: [(6, 5)],
+    49: [(6, 5), (3, 6)],
+    50: [(7, 6)],
   };
 
   int worldOf(int n) =>
@@ -180,7 +191,7 @@ void main() {
   int minPiecesFor(LevelData lvl) =>
       lvl.movers.isNotEmpty ? minSolutionPieces(lvl) : pathMinPieces(lvl);
 
-  for (var n = 1; n <= 46; n++) {
+  for (var n = 1; n <= 50; n++) {
     test('World ${worldOf(n)} — level $n is solvable', () {
       final level = levelDataFor(n)!;
       final solutions = solveFor(level);
@@ -203,7 +214,7 @@ void main() {
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 46; n++) {
+  for (var n = 2; n <= 50; n++) {
     test('World ${worldOf(n)} — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(minPiecesFor(level), toolkitTotal(level),
@@ -221,7 +232,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 45, 46]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 47, 48, 49, 50]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
