@@ -804,21 +804,26 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 39 — Cave-In: the exam. A patrol is wedged in a wall cluster; one shielded
-  // hit blows out three walls at once. A fixed arrow guides the run home.
+  // 39 — Cave-In: the exam. Two shields breach a wall cluster; a fixed arrow
+  // and a patrol guard the twisting run home.
   39: LevelData(
     id: 39,
     size: 7,
     title: 'Cave-In',
     tip: 'One breach, three walls. Then ride the arrow home.',
     start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [Pos(3, 2), Pos(3, 4), Pos(2, 3)],
-    forcedArrows: [ForcedArrow(0, 3, Direction.left)],
-    movers: [MovingDestroyer(3, 3, horizontal: true, dir: 1)],
+    exit: Pos(4, 0),
+    walls: [
+      Pos(5, 0), Pos(5, 1), Pos(4, 1), Pos(3, 1), Pos(0, 3), Pos(1, 3),
+      Pos(2, 3), Pos(3, 3), Pos(4, 5), Pos(5, 5), Pos(4, 6), Pos(3, 2),
+    ],
+    destroyers: [Pos(5, 6)],
+    forcedArrows: [ForcedArrow(1, 0, Direction.down)],
+    movers: [MovingDestroyer(0, 4, horizontal: false, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.shield, 2),
     ],
   ),
 

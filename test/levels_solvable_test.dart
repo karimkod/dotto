@@ -127,7 +127,7 @@ void main() {
     36: [(4, 3, Direction.up)],
     37: [(0, 5, Direction.left), (5, 5, Direction.up)],
     38: [(0, 5, Direction.down), (5, 3, Direction.up)],
-    39: [(6, 3, Direction.up)],
+    39: [(1, 6, Direction.left), (6, 6, Direction.up)],
     // 40–44: pause blocks.
     40: [],
     41: [],
@@ -164,7 +164,7 @@ void main() {
     36: [(4, 2)],
     37: [(5, 2), (5, 3)],
     38: [(5, 2)],
-    39: [(6, 2)],
+    39: [(3, 6), (6, 5)],
     45: [(6, 5)],
   };
 
