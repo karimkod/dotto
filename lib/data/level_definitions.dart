@@ -868,9 +868,9 @@ const Map<int, LevelData> levelDefinitions = {
     size: 5,
     title: 'Two Lanes',
     tip: 'Turn up — but the climb is patrolled. Pause to time it.',
-    start: StartSpec(4, 0, Direction.right),
-    exit: Pos(0, 4),
-    movers: [MovingDestroyer(1, 3, horizontal: true, dir: -1)],
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(0, 3),
+    movers: [MovingDestroyer(1, 0, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.pause, 1),
@@ -884,14 +884,17 @@ const Map<int, LevelData> levelDefinitions = {
     size: 6,
     title: 'Pause Chain',
     tip: 'Two patrols, two waits — and where you pause decides both.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 5),
+    start: StartSpec(1, 1, Direction.right),
+    exit: Pos(1, 0),
+    walls: [Pos(0, 1), Pos(2, 1), Pos(3, 1), Pos(4, 1)],
+    forcedArrows: [ForcedArrow(1, 5, Direction.down)],
     movers: [
-      MovingDestroyer(3, 2, horizontal: false, dir: 1), // floor crosser
-      MovingDestroyer(2, 5, horizontal: true, dir: 1), // climb crosser
+      MovingDestroyer(2, 4, horizontal: true, dir: -1),
+      MovingDestroyer(2, 2, horizontal: false, dir: 1),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.pause, 2),
     ],
   ),

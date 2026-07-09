@@ -132,8 +132,8 @@ void main() {
     40: [(2, 2, Direction.down), (5, 2, Direction.right), (5, 5, Direction.up)],
     // 41–46: timing puzzles (pauses listed below).
     41: [],
-    42: [(4, 4, Direction.up)],
-    43: [(5, 5, Direction.up)],
+    42: [(3, 3, Direction.up)],
+    43: [(5, 0, Direction.up), (5, 5, Direction.left)],
     44: [(0, 3, Direction.left), (5, 3, Direction.up)],
     45: [(5, 5, Direction.up)],
     46: [(6, 6, Direction.up)],
@@ -147,8 +147,8 @@ void main() {
   // Intended pause placements (World 4).
   final pauses = <int, List<(int, int)>>{
     41: [(2, 1)],
-    42: [(4, 3)],
-    43: [(5, 1), (5, 4)],
+    42: [(3, 2)],
+    43: [(1, 4), (5, 4)],
     45: [(5, 3), (5, 4)],
     46: [(6, 4), (6, 5)],
     47: [(5, 1)],
@@ -232,7 +232,7 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 47, 48, 49, 50]) {
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 47, 48, 49, 50]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
