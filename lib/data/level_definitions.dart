@@ -899,21 +899,25 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 44 — Shield or Wait?: a patrol guards a wall capping the exit. There is no
-  // pause here — shield straight into the patrol to blast the wall, then home.
+  // 44 — Shield or Wait?: two patrols guard a wall capping the exit. Shield
+  // through one to breach the wall, and time the run with pauses.
   44: LevelData(
     id: 44,
     size: 6,
     title: 'Shield or Wait?',
-    tip: 'No pause this time — shield through the patrol to breach the wall.',
+    tip: 'Shield through the patrol to breach the wall — and pause for the rest.',
     start: StartSpec(5, 0, Direction.right),
     exit: Pos(0, 0),
     walls: [Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5)],
-    movers: [MovingDestroyer(2, 1, horizontal: true, dir: 1)],
+    movers: [
+      MovingDestroyer(2, 0, horizontal: true, dir: 1),
+      MovingDestroyer(4, 1, horizontal: true, dir: -1),
+    ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.pause, 2),
     ],
   ),
 
