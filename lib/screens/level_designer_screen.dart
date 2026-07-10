@@ -78,26 +78,15 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   /// Bumped on import so the text fields rebuild with their new initial values.
   int _formRev = 0;
 
-  // ----- generator parameters -----
-  int _gN = 5;
-  Difficulty _gDiff = Difficulty.easy;
-  bool _gWallsOn = true;
-  int _gWalls = 2;
-  bool _gDestOn = false;
-  int _gDest = 0;
-  bool _gMoverOn = true;
-  int _gMovers = 1;
-  bool _gForcedOn = false;
-  int _gForced = 0;
-  bool _gShieldOn = false;
-  int _gShield = 0;
-  bool _gPauseOn = true;
-  int _gPause = 1;
-  int _gArrows = 1; // always included (1-6)
-  bool _generating = false;
-  String? _genResult;
-  bool _genOk = false;
-  LevelData? _generated;
+  // ----- "Find Toolkit" search state -----
+  bool _finding = false;
+  String? _findResult;
+  bool _findOk = false;
+  Map<ToolType, int>? _foundKit;
+  // Ordered candidate toolkits (smallest first) + cursor into them, so
+  // "Try Another" resumes where the last search stopped.
+  List<Map<ToolType, int>> _candidates = const [];
+  int _candCursor = 0;
 
   @override
   void initState() {
@@ -585,202 +574,178 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ----- generator -----
+  // ----- Find Toolkit -----
 
-  /// A difficulty preset seeds the generator sliders; the user can still tweak.
-  void _applyDifficultyPreset(Difficulty d) {
-    setState(() {
-      _gDiff = d;
-      switch (d) {
-        case Difficulty.easy:
-          _gN = 5;
-          _gWallsOn = true;
-          _gWalls = 2;
-          _gDestOn = false;
-          _gDest = 0;
-          _gMoverOn = true;
-          _gMovers = 1;
-          _gForcedOn = false;
-          _gForced = 0;
-          _gShieldOn = false;
-          _gShield = 0;
-          _gPauseOn = true;
-          _gPause = 1;
-          _gArrows = 1;
-        case Difficulty.medium:
-          _gN = 6;
-          _gWallsOn = true;
-          _gWalls = 4;
-          _gDestOn = false;
-          _gDest = 0;
-          _gMoverOn = true;
-          _gMovers = 1;
-          _gForcedOn = true;
-          _gForced = 1;
-          _gShieldOn = false;
-          _gShield = 0;
-          _gPauseOn = true;
-          _gPause = 1;
-          _gArrows = 2;
-        case Difficulty.hard:
-          _gN = 7;
-          _gWallsOn = true;
-          _gWalls = 5;
-          _gDestOn = true;
-          _gDest = 1;
-          _gMoverOn = true;
-          _gMovers = 1;
-          _gForcedOn = true;
-          _gForced = 1;
-          _gShieldOn = false;
-          _gShield = 0;
-          _gPauseOn = true;
-          _gPause = 1;
-          _gArrows = 2;
+  /// Every toolkit worth trying for the current layout, ordered smallest-first
+  /// (fewer pieces = a harder, more elegant puzzle): arrow-only kits before
+  /// those that add a shield/pause. Capped at 5 arrows, 2 shields, 2 pauses.
+  List<Map<ToolType, int>> _candidateToolkits() {
+    const arrows = [
+      ToolType.arrowUp,
+      ToolType.arrowDown,
+      ToolType.arrowLeft,
+      ToolType.arrowRight,
+    ];
+    // Every multiset of 0..5 arrows across the four directions.
+    final arrowSets = <Map<ToolType, int>>[];
+    void build(int startIdx, int remaining, Map<ToolType, int> acc) {
+      arrowSets.add(Map.of(acc));
+      if (remaining == 0) return;
+      for (var i = startIdx; i < arrows.length; i++) {
+        acc[arrows[i]] = (acc[arrows[i]] ?? 0) + 1;
+        build(i, remaining - 1, acc);
+        acc[arrows[i]] = acc[arrows[i]]! - 1;
+        if (acc[arrows[i]] == 0) acc.remove(arrows[i]);
       }
+    }
+
+    build(0, 5, {});
+    final out = <Map<ToolType, int>>[];
+    for (final a in arrowSets) {
+      for (var s = 0; s <= 2; s++) {
+        for (var p = 0; p <= 2; p++) {
+          final total = a.values.fold(0, (x, y) => x + y) + s + p;
+          if (total < 1) continue;
+          final kit = Map<ToolType, int>.of(a);
+          if (s > 0) kit[ToolType.shield] = s;
+          if (p > 0) kit[ToolType.pause] = p;
+          out.add(kit);
+        }
+      }
+    }
+    int total(Map<ToolType, int> k) => k.values.fold(0, (x, y) => x + y);
+    int specials(Map<ToolType, int> k) =>
+        (k[ToolType.shield] ?? 0) + (k[ToolType.pause] ?? 0);
+    out.sort((a, b) {
+      final t = total(a).compareTo(total(b));
+      if (t != 0) return t; // smallest kits first
+      return specials(a).compareTo(specials(b)); // arrows-only before shield/pause
     });
+    return out;
   }
 
-  /// One random candidate matching the current generator parameters, or null if
-  /// the board can't hold all the requested elements.
-  LevelData? _randomLevel(math.Random rng) {
-    final n = _gN;
-    final all = [for (var i = 0; i < n * n; i++) i];
-    int rr(int k) => k ~/ n;
-    int cc(int k) => k % n;
-    int dist(int a, int b) => (rr(a) - rr(b)).abs() + (cc(a) - cc(b)).abs();
+  /// The current layout with a different toolkit swapped in.
+  LevelData _withToolkit(LevelData base, Map<ToolType, int> kit) => LevelData(
+        id: base.id,
+        size: base.size,
+        title: base.title,
+        tip: base.tip,
+        start: base.start,
+        exit: base.exit,
+        walls: base.walls,
+        destroyers: base.destroyers,
+        forcedArrows: base.forcedArrows,
+        movers: base.movers,
+        toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
+      );
 
-    // Start on a random edge cell, random heading.
-    final edges = all
-        .where((k) => rr(k) == 0 || rr(k) == n - 1 || cc(k) == 0 || cc(k) == n - 1)
-        .toList();
-    final startK = edges[rng.nextInt(edges.length)];
-    final startDir = Direction.values[rng.nextInt(Direction.values.length)];
-
-    // Exit: a distant cell (opposite side of the grid).
-    final far = all.where((k) => k != startK && dist(k, startK) >= n).toList();
-    final exitPool = far.isNotEmpty ? far : all.where((k) => k != startK).toList();
-    final exitK = exitPool[rng.nextInt(exitPool.length)];
-
-    final used = <int>{startK, exitK};
-    int? take() {
-      final avail = all.where((k) => !used.contains(k)).toList();
-      if (avail.isEmpty) return null;
-      final k = avail[rng.nextInt(avail.length)];
-      used.add(k);
-      return k;
-    }
-
-    List<int>? takeN(int count) {
-      final out = <int>[];
-      for (var i = 0; i < count; i++) {
-        final k = take();
-        if (k == null) return null;
-        out.add(k);
-      }
-      return out;
-    }
-
-    final wallKs = _gWallsOn ? takeN(_gWalls) : <int>[];
-    if (wallKs == null) return null;
-    final destKs = _gDestOn ? takeN(_gDest) : <int>[];
-    if (destKs == null) return null;
-    final moverKs = _gMoverOn ? takeN(_gMovers) : <int>[];
-    if (moverKs == null) return null;
-    final forcedKs = _gForcedOn ? takeN(_gForced) : <int>[];
-    if (forcedKs == null) return null;
-
-    // Toolkit: a random mix of arrow directions, plus shields/pauses.
-    final kit = <ToolType, int>{};
-    for (var i = 0; i < _gArrows; i++) {
-      final t = const [
-        ToolType.arrowUp,
-        ToolType.arrowDown,
-        ToolType.arrowLeft,
-        ToolType.arrowRight,
-      ][rng.nextInt(4)];
-      kit[t] = (kit[t] ?? 0) + 1;
-    }
-    if (_gShieldOn && _gShield > 0) kit[ToolType.shield] = _gShield;
-    if (_gPauseOn && _gPause > 0) kit[ToolType.pause] = _gPause;
-
-    return LevelData(
-      id: _number,
-      size: n,
-      title: 'Generated',
-      tip: '',
-      start: StartSpec(rr(startK), cc(startK), startDir),
-      exit: Pos(rr(exitK), cc(exitK)),
-      walls: [for (final k in wallKs) Pos(rr(k), cc(k))],
-      destroyers: [for (final k in destKs) Pos(rr(k), cc(k))],
-      forcedArrows: [
-        for (final k in forcedKs)
-          ForcedArrow(rr(k), cc(k),
-              Direction.values[rng.nextInt(Direction.values.length)]),
-      ],
-      movers: [
-        for (final k in moverKs)
-          MovingDestroyer(rr(k), cc(k),
-              horizontal: rng.nextBool(), dir: rng.nextBool() ? 1 : -1),
-      ],
-      toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
-    );
+  String _kitLabel(Map<ToolType, int> kit) {
+    const order = [
+      ToolType.arrowUp,
+      ToolType.arrowDown,
+      ToolType.arrowLeft,
+      ToolType.arrowRight,
+      ToolType.shield,
+      ToolType.pause,
+    ];
+    String name(ToolType t) => switch (t) {
+          ToolType.arrowUp => 'Up',
+          ToolType.arrowDown => 'Down',
+          ToolType.arrowLeft => 'Left',
+          ToolType.arrowRight => 'Right',
+          ToolType.shield => 'Shield',
+          ToolType.pause => 'Pause',
+          _ => t.name,
+        };
+    final parts = [
+      for (final t in order)
+        if ((kit[t] ?? 0) > 0) '${kit[t]}× ${name(t)}',
+    ];
+    return parts.join(' + ');
   }
 
-  /// Randomly build + brute-verify a level (up to 100 attempts). Yields between
-  /// attempts so the spinner animates and the UI stays responsive.
-  Future<void> _generate() async {
-    if (_generating) return;
+  /// Search toolkit combinations (smallest first) for the FIRST that makes the
+  /// current layout solvable AND tight. [again] resumes after the last hit so
+  /// "Try Another" surfaces the next valid toolkit. Runs async with yields so
+  /// the spinner animates; a per-solve cost guard keeps it responsive.
+  Future<void> _findToolkit({bool again = false}) async {
+    if (_finding) return;
+    if (_startKey == null || _exitKey == null) {
+      _snack('Need a Start and an Exit.');
+      return;
+    }
     setState(() {
-      _generating = true;
-      _genResult = null;
-      _genOk = false;
-      _generated = null;
+      _finding = true;
+      _findResult = null;
+      _findOk = false;
+      if (!again) {
+        _foundKit = null;
+        _candidates = _candidateToolkits();
+        _candCursor = 0;
+      }
     });
-    final rng = math.Random(); // fresh seed each run (also powers Regenerate)
-    LevelData? found;
+    final base = _buildLevel(); // layout fixed; toolkit varies
+    final placeable = placeableCells(base).length;
+    Map<ToolType, int>? found;
     var solutions = 0;
-    for (var attempt = 0; attempt < 100 && found == null; attempt++) {
-      // Let the framework paint the spinner between attempts.
-      await Future<void>.delayed(const Duration(milliseconds: 1));
-      if (!mounted) return;
-      final candidate = _randomLevel(rng);
-      if (candidate == null) continue;
-      // Bound the brute solver's cost so one heavy layout can't freeze the app.
-      final p = placeableCells(candidate).length;
-      final t = toolkitTotal(candidate);
-      // Keep each brute solve fast (and the whole run responsive) — skip layouts
-      // whose search space is too large. This favours smaller kits / denser grids.
-      if (p == 0 || math.pow(p, t) > 1.5e6) continue;
-      final sols = solveAll(candidate);
-      if (sols.isEmpty) continue;
-      final minP = sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
-      if (minP == t) {
-        found = candidate;
-        solutions = sols.length;
+    var i = _candCursor;
+    for (; i < _candidates.length; i++) {
+      if (i % 8 == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+        if (!mounted) return;
+      }
+      final kit = _candidates[i];
+      final total = kit.values.fold(0, (a, b) => a + b);
+      final level = _withToolkit(base, kit);
+      // The fast path solver handles static, pause-free layouts; timing hazards
+      // (movers) or pauses need the brute solver, bounded so it stays responsive.
+      final usePath =
+          base.movers.isEmpty && !kit.containsKey(ToolType.pause);
+      final int minP;
+      final int count;
+      if (usePath) {
+        final sols = pathSolve(level);
+        if (sols.isEmpty) continue;
+        count = sols.length;
+        minP = pathMinPieces(level);
+      } else {
+        if (placeable == 0 || math.pow(placeable, total) > 5e5) continue;
+        final sols = solveAll(level);
+        if (sols.isEmpty) continue;
+        count = sols.length;
+        minP = sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
+      }
+      if (minP == total) {
+        found = kit;
+        solutions = count;
+        i++; // resume past this one next time
+        break;
       }
     }
     if (!mounted) return;
     setState(() {
-      _generating = false;
-      _generated = found;
-      _genOk = found != null;
-      _genResult = found != null
-          ? 'Generated! $solutions solution(s) · tight (${toolkitTotal(found)} pieces)'
-          : "Couldn't generate a level with these parameters, try different "
-              'settings';
+      _finding = false;
+      _candCursor = i;
+      _foundKit = found;
+      _findOk = found != null;
+      _findResult = found != null
+          ? 'Found: ${_kitLabel(found)}  →  $solutions solution(s), TIGHT'
+          : (again
+              ? 'No more valid toolkits for this layout.'
+              : 'No valid toolkit found for this layout.');
     });
   }
 
-  /// Load the last generated level into the editor for fine-tuning.
-  void _acceptGenerated() {
-    final lvl = _generated;
-    if (lvl == null) return;
+  /// Apply the found toolkit to the level's toolkit counters.
+  void _acceptToolkit() {
+    final kit = _foundKit;
+    if (kit == null) return;
     setState(() {
-      _loadFromLevel(lvl, _number, _gDiff);
-      _title = 'Generated';
+      for (final k in _kit.keys.toList()) {
+        _kit[k] = kit[k] ?? 0;
+      }
     });
-    _snack('Loaded into the editor — fine-tune and export.');
+    _snack('Toolkit set — tweak with the counters, then Test or Export.');
   }
 
   // ----- UI -----
@@ -801,8 +766,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _generatePanel(),
-              const SizedBox(height: 16),
               _metaRow(),
               const SizedBox(height: 12),
               Center(
@@ -817,6 +780,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                   'axis + direction'),
               const SizedBox(height: 8),
               _palette(),
+              const SizedBox(height: 16),
+              _findToolkitPanel(),
               const SizedBox(height: 16),
               _sectionLabel('Toolkit (given to player)'),
               const SizedBox(height: 8),
@@ -838,8 +803,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           letterSpacing: 0.6,
           color: AppColors.textSoft));
 
-  // ----- generator panel -----
-  Widget _generatePanel() {
+  // ----- Find Toolkit panel -----
+  Widget _findToolkitPanel() {
+    final ready = _startKey != null && _exitKey != null;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -852,150 +818,63 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome_rounded,
-                  color: AppColors.ink, size: 18),
+              const Icon(Icons.key_rounded, color: AppColors.ink, size: 18),
               const SizedBox(width: 6),
-              const Text('Generate',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink)),
-              const Spacer(),
-              _labeled(
-                'Size',
-                DropdownButton<int>(
-                  value: _gN,
-                  isDense: true,
-                  items: [for (var i = 4; i <= 8; i++) i]
-                      .map((i) =>
-                          DropdownMenuItem(value: i, child: Text('$i × $i')))
-                      .toList(),
-                  onChanged: (v) => setState(() => _gN = v!),
-                ),
+              const Expanded(
+                child: Text('Find Toolkit',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink)),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          _sectionLabel('Difficulty preset  ·  seeds the settings below'),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final d in Difficulty.values)
-                ChoiceChip(
-                  label: Text(d.label),
-                  selected: _gDiff == d,
-                  onSelected: (_) => _applyDifficultyPreset(d),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _sectionLabel('Elements'),
-          const SizedBox(height: 4),
-          _genRow('Walls', _gWallsOn, (v) => setState(() => _gWallsOn = v),
-              _gWalls, 0, 10, (v) => setState(() => _gWalls = v)),
-          _genRow('Static mines', _gDestOn, (v) => setState(() => _gDestOn = v),
-              _gDest, 0, 5, (v) => setState(() => _gDest = v)),
-          _genRow('Patrols', _gMoverOn, (v) => setState(() => _gMoverOn = v),
-              _gMovers, 0, 3, (v) => setState(() => _gMovers = v)),
-          _genRow('Forced arrows', _gForcedOn,
-              (v) => setState(() => _gForcedOn = v), _gForced, 0, 3,
-              (v) => setState(() => _gForced = v)),
-          const SizedBox(height: 8),
-          _sectionLabel('Toolkit'),
-          const SizedBox(height: 4),
-          _genRow('Arrows', true, null, _gArrows, 1, 6,
-              (v) => setState(() => _gArrows = v)),
-          _genRow('Shields', _gShieldOn, (v) => setState(() => _gShieldOn = v),
-              _gShield, 0, 3, (v) => setState(() => _gShield = v)),
-          _genRow('Pauses', _gPauseOn, (v) => setState(() => _gPauseOn = v),
-              _gPause, 0, 3, (v) => setState(() => _gPause = v)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
               FilledButton.icon(
-                onPressed: _generating ? null : _generate,
-                icon: _generating
+                onPressed: (ready && !_finding) ? () => _findToolkit() : null,
+                icon: _finding
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.casino_rounded),
-                label: Text(_generating ? 'Generating…' : 'Generate'),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _generating ? null : _generate,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Regenerate'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: (_genOk && !_generating) ? _acceptGenerated : null,
-                icon: const Icon(Icons.check_rounded),
-                label: const Text('Accept'),
+                    : const Icon(Icons.search_rounded),
+                label: Text(_finding ? 'Searching…' : 'Find Toolkit'),
               ),
             ],
           ),
-          if (_genResult != null) ...[
-            const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          Text(
+            'Design the layout above, then let the solver find the smallest '
+            'toolkit that makes it solvable and tight.',
+            style: const TextStyle(fontSize: 11, color: AppColors.textSoft),
+          ),
+          if (_findResult != null) ...[
+            const SizedBox(height: 10),
             Text(
-              _genResult!,
+              _findResult!,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _genOk ? AppColors.completed : AppColors.coral,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: _findOk ? AppColors.completed : AppColors.coral,
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  /// A toggle (or fixed label when [onToggle] is null) plus a +/- count stepper.
-  Widget _genRow(String label, bool on, ValueChanged<bool>? onToggle, int count,
-      int minC, int maxC, ValueChanged<int> onCount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 26,
-            child: onToggle == null
-                ? const SizedBox.shrink()
-                : Checkbox(
-                    value: on,
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) => onToggle(v ?? false),
-                  ),
-          ),
-          Expanded(
-            child: Text(label,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: on ? AppColors.ink : AppColors.textSoft)),
-          ),
-          Opacity(
-            opacity: on ? 1 : 0.35,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          if (_findOk && !_finding) ...[
+            const SizedBox(height: 10),
+            Row(
               children: [
-                _stepBtn('–',
-                    on ? () => onCount((count - 1).clamp(minC, maxC)) : () {}),
-                SizedBox(
-                  width: 24,
-                  child: Text('$count',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800, color: AppColors.ink)),
+                FilledButton.icon(
+                  onPressed: _acceptToolkit,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Accept'),
                 ),
-                _stepBtn('+',
-                    on ? () => onCount((count + 1).clamp(minC, maxC)) : () {}),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _findToolkit(again: true),
+                  icon: const Icon(Icons.skip_next_rounded),
+                  label: const Text('Try Another'),
+                ),
               ],
             ),
-          ),
+          ],
         ],
       ),
     );
