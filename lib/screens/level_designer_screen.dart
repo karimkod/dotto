@@ -87,6 +87,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // "Try Another" resumes where the last search stopped.
   List<Map<ToolType, int>> _candidates = const [];
   int _candCursor = 0;
+  // Search constraints — skip any toolkit that doesn't match.
+  bool _cMustShield = false;
+  bool _cMustPause = false;
+  int _cMinArrows = 0;
+  int _cMaxArrows = 6;
 
   @override
   void initState() {
@@ -695,6 +700,14 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         if (!mounted) return;
       }
       final kit = _candidates[i];
+      // Constraint filter: skip toolkits that don't match the user's requirements.
+      final arrows = (kit[ToolType.arrowUp] ?? 0) +
+          (kit[ToolType.arrowDown] ?? 0) +
+          (kit[ToolType.arrowLeft] ?? 0) +
+          (kit[ToolType.arrowRight] ?? 0);
+      if (_cMustShield && (kit[ToolType.shield] ?? 0) == 0) continue;
+      if (_cMustPause && (kit[ToolType.pause] ?? 0) == 0) continue;
+      if (arrows < _cMinArrows || arrows > _cMaxArrows) continue;
       final total = kit.values.fold(0, (a, b) => a + b);
       final level = _withToolkit(base, kit);
       // The fast path solver handles static, pause-free layouts; timing hazards
@@ -846,6 +859,41 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             'toolkit that makes it solvable and tight.',
             style: const TextStyle(fontSize: 11, color: AppColors.textSoft),
           ),
+          const SizedBox(height: 8),
+          _sectionLabel('Constraints'),
+          const SizedBox(height: 4),
+          // Changing any constraint restarts the search from the top.
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _constraintCheck('Must include Shield', _cMustShield,
+                  (v) => setState(() {
+                        _cMustShield = v;
+                        _resetFindCursor();
+                      })),
+              _constraintCheck('Must include Pause', _cMustPause,
+                  (v) => setState(() {
+                        _cMustPause = v;
+                        _resetFindCursor();
+                      })),
+              _constraintStepper('Min arrows', _cMinArrows, 0, 6, (v) {
+                setState(() {
+                  _cMinArrows = v;
+                  if (_cMaxArrows < v) _cMaxArrows = v;
+                  _resetFindCursor();
+                });
+              }),
+              _constraintStepper('Max arrows', _cMaxArrows, 1, 6, (v) {
+                setState(() {
+                  _cMaxArrows = v;
+                  if (_cMinArrows > v) _cMinArrows = v;
+                  _resetFindCursor();
+                });
+              }),
+            ],
+          ),
           if (_findResult != null) ...[
             const SizedBox(height: 10),
             Text(
@@ -877,6 +925,58 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// Restart the "Try Another" search and clear the last result — used whenever
+  /// a constraint changes so the next Find respects the new filter from the top.
+  void _resetFindCursor() {
+    _candCursor = 0;
+    _foundKit = null;
+    _findOk = false;
+    _findResult = null;
+  }
+
+  Widget _constraintCheck(
+      String label, bool value, ValueChanged<bool> onChanged) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: value,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: (v) => onChanged(v ?? false),
+          ),
+          Text(label,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, color: AppColors.ink)),
+        ],
+      ),
+    );
+  }
+
+  Widget _constraintStepper(String label, int value, int minV, int maxV,
+      ValueChanged<int> onChanged) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('$label ',
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, color: AppColors.ink)),
+        _stepBtn('–', () => onChanged((value - 1).clamp(minV, maxV))),
+        SizedBox(
+          width: 22,
+          child: Text('$value',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800, color: AppColors.ink)),
+        ),
+        _stepBtn('+', () => onChanged((value + 1).clamp(minV, maxV))),
+      ],
     );
   }
 
