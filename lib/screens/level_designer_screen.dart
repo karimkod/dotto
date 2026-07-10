@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -76,6 +77,27 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
 
   /// Bumped on import so the text fields rebuild with their new initial values.
   int _formRev = 0;
+
+  // ----- generator parameters -----
+  int _gN = 5;
+  Difficulty _gDiff = Difficulty.easy;
+  bool _gWallsOn = true;
+  int _gWalls = 2;
+  bool _gDestOn = false;
+  int _gDest = 0;
+  bool _gMoverOn = true;
+  int _gMovers = 1;
+  bool _gForcedOn = false;
+  int _gForced = 0;
+  bool _gShieldOn = false;
+  int _gShield = 0;
+  bool _gPauseOn = true;
+  int _gPause = 1;
+  int _gArrows = 1; // always included (1-6)
+  bool _generating = false;
+  String? _genResult;
+  bool _genOk = false;
+  LevelData? _generated;
 
   @override
   void initState() {
@@ -563,6 +585,204 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ----- generator -----
+
+  /// A difficulty preset seeds the generator sliders; the user can still tweak.
+  void _applyDifficultyPreset(Difficulty d) {
+    setState(() {
+      _gDiff = d;
+      switch (d) {
+        case Difficulty.easy:
+          _gN = 5;
+          _gWallsOn = true;
+          _gWalls = 2;
+          _gDestOn = false;
+          _gDest = 0;
+          _gMoverOn = true;
+          _gMovers = 1;
+          _gForcedOn = false;
+          _gForced = 0;
+          _gShieldOn = false;
+          _gShield = 0;
+          _gPauseOn = true;
+          _gPause = 1;
+          _gArrows = 1;
+        case Difficulty.medium:
+          _gN = 6;
+          _gWallsOn = true;
+          _gWalls = 4;
+          _gDestOn = false;
+          _gDest = 0;
+          _gMoverOn = true;
+          _gMovers = 1;
+          _gForcedOn = true;
+          _gForced = 1;
+          _gShieldOn = false;
+          _gShield = 0;
+          _gPauseOn = true;
+          _gPause = 1;
+          _gArrows = 2;
+        case Difficulty.hard:
+          _gN = 7;
+          _gWallsOn = true;
+          _gWalls = 5;
+          _gDestOn = true;
+          _gDest = 1;
+          _gMoverOn = true;
+          _gMovers = 1;
+          _gForcedOn = true;
+          _gForced = 1;
+          _gShieldOn = false;
+          _gShield = 0;
+          _gPauseOn = true;
+          _gPause = 1;
+          _gArrows = 2;
+      }
+    });
+  }
+
+  /// One random candidate matching the current generator parameters, or null if
+  /// the board can't hold all the requested elements.
+  LevelData? _randomLevel(math.Random rng) {
+    final n = _gN;
+    final all = [for (var i = 0; i < n * n; i++) i];
+    int rr(int k) => k ~/ n;
+    int cc(int k) => k % n;
+    int dist(int a, int b) => (rr(a) - rr(b)).abs() + (cc(a) - cc(b)).abs();
+
+    // Start on a random edge cell, random heading.
+    final edges = all
+        .where((k) => rr(k) == 0 || rr(k) == n - 1 || cc(k) == 0 || cc(k) == n - 1)
+        .toList();
+    final startK = edges[rng.nextInt(edges.length)];
+    final startDir = Direction.values[rng.nextInt(Direction.values.length)];
+
+    // Exit: a distant cell (opposite side of the grid).
+    final far = all.where((k) => k != startK && dist(k, startK) >= n).toList();
+    final exitPool = far.isNotEmpty ? far : all.where((k) => k != startK).toList();
+    final exitK = exitPool[rng.nextInt(exitPool.length)];
+
+    final used = <int>{startK, exitK};
+    int? take() {
+      final avail = all.where((k) => !used.contains(k)).toList();
+      if (avail.isEmpty) return null;
+      final k = avail[rng.nextInt(avail.length)];
+      used.add(k);
+      return k;
+    }
+
+    List<int>? takeN(int count) {
+      final out = <int>[];
+      for (var i = 0; i < count; i++) {
+        final k = take();
+        if (k == null) return null;
+        out.add(k);
+      }
+      return out;
+    }
+
+    final wallKs = _gWallsOn ? takeN(_gWalls) : <int>[];
+    if (wallKs == null) return null;
+    final destKs = _gDestOn ? takeN(_gDest) : <int>[];
+    if (destKs == null) return null;
+    final moverKs = _gMoverOn ? takeN(_gMovers) : <int>[];
+    if (moverKs == null) return null;
+    final forcedKs = _gForcedOn ? takeN(_gForced) : <int>[];
+    if (forcedKs == null) return null;
+
+    // Toolkit: a random mix of arrow directions, plus shields/pauses.
+    final kit = <ToolType, int>{};
+    for (var i = 0; i < _gArrows; i++) {
+      final t = const [
+        ToolType.arrowUp,
+        ToolType.arrowDown,
+        ToolType.arrowLeft,
+        ToolType.arrowRight,
+      ][rng.nextInt(4)];
+      kit[t] = (kit[t] ?? 0) + 1;
+    }
+    if (_gShieldOn && _gShield > 0) kit[ToolType.shield] = _gShield;
+    if (_gPauseOn && _gPause > 0) kit[ToolType.pause] = _gPause;
+
+    return LevelData(
+      id: _number,
+      size: n,
+      title: 'Generated',
+      tip: '',
+      start: StartSpec(rr(startK), cc(startK), startDir),
+      exit: Pos(rr(exitK), cc(exitK)),
+      walls: [for (final k in wallKs) Pos(rr(k), cc(k))],
+      destroyers: [for (final k in destKs) Pos(rr(k), cc(k))],
+      forcedArrows: [
+        for (final k in forcedKs)
+          ForcedArrow(rr(k), cc(k),
+              Direction.values[rng.nextInt(Direction.values.length)]),
+      ],
+      movers: [
+        for (final k in moverKs)
+          MovingDestroyer(rr(k), cc(k),
+              horizontal: rng.nextBool(), dir: rng.nextBool() ? 1 : -1),
+      ],
+      toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
+    );
+  }
+
+  /// Randomly build + brute-verify a level (up to 100 attempts). Yields between
+  /// attempts so the spinner animates and the UI stays responsive.
+  Future<void> _generate() async {
+    if (_generating) return;
+    setState(() {
+      _generating = true;
+      _genResult = null;
+      _genOk = false;
+      _generated = null;
+    });
+    final rng = math.Random(); // fresh seed each run (also powers Regenerate)
+    LevelData? found;
+    var solutions = 0;
+    for (var attempt = 0; attempt < 100 && found == null; attempt++) {
+      // Let the framework paint the spinner between attempts.
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+      if (!mounted) return;
+      final candidate = _randomLevel(rng);
+      if (candidate == null) continue;
+      // Bound the brute solver's cost so one heavy layout can't freeze the app.
+      final p = placeableCells(candidate).length;
+      final t = toolkitTotal(candidate);
+      // Keep each brute solve fast (and the whole run responsive) — skip layouts
+      // whose search space is too large. This favours smaller kits / denser grids.
+      if (p == 0 || math.pow(p, t) > 1.5e6) continue;
+      final sols = solveAll(candidate);
+      if (sols.isEmpty) continue;
+      final minP = sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
+      if (minP == t) {
+        found = candidate;
+        solutions = sols.length;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _generating = false;
+      _generated = found;
+      _genOk = found != null;
+      _genResult = found != null
+          ? 'Generated! $solutions solution(s) · tight (${toolkitTotal(found)} pieces)'
+          : "Couldn't generate a level with these parameters, try different "
+              'settings';
+    });
+  }
+
+  /// Load the last generated level into the editor for fine-tuning.
+  void _acceptGenerated() {
+    final lvl = _generated;
+    if (lvl == null) return;
+    setState(() {
+      _loadFromLevel(lvl, _number, _gDiff);
+      _title = 'Generated';
+    });
+    _snack('Loaded into the editor — fine-tune and export.');
+  }
+
   // ----- UI -----
   @override
   Widget build(BuildContext context) {
@@ -581,6 +801,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _generatePanel(),
+              const SizedBox(height: 16),
               _metaRow(),
               const SizedBox(height: 12),
               Center(
@@ -615,6 +837,169 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           fontWeight: FontWeight.w800,
           letterSpacing: 0.6,
           color: AppColors.textSoft));
+
+  // ----- generator panel -----
+  Widget _generatePanel() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.ink, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_rounded,
+                  color: AppColors.ink, size: 18),
+              const SizedBox(width: 6),
+              const Text('Generate',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink)),
+              const Spacer(),
+              _labeled(
+                'Size',
+                DropdownButton<int>(
+                  value: _gN,
+                  isDense: true,
+                  items: [for (var i = 4; i <= 8; i++) i]
+                      .map((i) =>
+                          DropdownMenuItem(value: i, child: Text('$i × $i')))
+                      .toList(),
+                  onChanged: (v) => setState(() => _gN = v!),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _sectionLabel('Difficulty preset  ·  seeds the settings below'),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final d in Difficulty.values)
+                ChoiceChip(
+                  label: Text(d.label),
+                  selected: _gDiff == d,
+                  onSelected: (_) => _applyDifficultyPreset(d),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _sectionLabel('Elements'),
+          const SizedBox(height: 4),
+          _genRow('Walls', _gWallsOn, (v) => setState(() => _gWallsOn = v),
+              _gWalls, 0, 10, (v) => setState(() => _gWalls = v)),
+          _genRow('Static mines', _gDestOn, (v) => setState(() => _gDestOn = v),
+              _gDest, 0, 5, (v) => setState(() => _gDest = v)),
+          _genRow('Patrols', _gMoverOn, (v) => setState(() => _gMoverOn = v),
+              _gMovers, 0, 3, (v) => setState(() => _gMovers = v)),
+          _genRow('Forced arrows', _gForcedOn,
+              (v) => setState(() => _gForcedOn = v), _gForced, 0, 3,
+              (v) => setState(() => _gForced = v)),
+          const SizedBox(height: 8),
+          _sectionLabel('Toolkit'),
+          const SizedBox(height: 4),
+          _genRow('Arrows', true, null, _gArrows, 1, 6,
+              (v) => setState(() => _gArrows = v)),
+          _genRow('Shields', _gShieldOn, (v) => setState(() => _gShieldOn = v),
+              _gShield, 0, 3, (v) => setState(() => _gShield = v)),
+          _genRow('Pauses', _gPauseOn, (v) => setState(() => _gPauseOn = v),
+              _gPause, 0, 3, (v) => setState(() => _gPause = v)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _generating ? null : _generate,
+                icon: _generating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.casino_rounded),
+                label: Text(_generating ? 'Generating…' : 'Generate'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _generating ? null : _generate,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Regenerate'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: (_genOk && !_generating) ? _acceptGenerated : null,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Accept'),
+              ),
+            ],
+          ),
+          if (_genResult != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _genResult!,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _genOk ? AppColors.completed : AppColors.coral,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// A toggle (or fixed label when [onToggle] is null) plus a +/- count stepper.
+  Widget _genRow(String label, bool on, ValueChanged<bool>? onToggle, int count,
+      int minC, int maxC, ValueChanged<int> onCount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 26,
+            child: onToggle == null
+                ? const SizedBox.shrink()
+                : Checkbox(
+                    value: on,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (v) => onToggle(v ?? false),
+                  ),
+          ),
+          Expanded(
+            child: Text(label,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: on ? AppColors.ink : AppColors.textSoft)),
+          ),
+          Opacity(
+            opacity: on ? 1 : 0.35,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _stepBtn('–',
+                    on ? () => onCount((count - 1).clamp(minC, maxC)) : () {}),
+                SizedBox(
+                  width: 24,
+                  child: Text('$count',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, color: AppColors.ink)),
+                ),
+                _stepBtn('+',
+                    on ? () => onCount((count + 1).clamp(minC, maxC)) : () {}),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _metaRow() {
     return Wrap(
