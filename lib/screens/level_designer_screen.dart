@@ -90,8 +90,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // Search constraints — skip any toolkit that doesn't match.
   bool _cMustShield = false;
   bool _cMustPause = false;
-  int _cMinArrows = 0;
-  int _cMaxArrows = 6;
 
   @override
   void initState() {
@@ -701,13 +699,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       }
       final kit = _candidates[i];
       // Constraint filter: skip toolkits that don't match the user's requirements.
-      final arrows = (kit[ToolType.arrowUp] ?? 0) +
-          (kit[ToolType.arrowDown] ?? 0) +
-          (kit[ToolType.arrowLeft] ?? 0) +
-          (kit[ToolType.arrowRight] ?? 0);
       if (_cMustShield && (kit[ToolType.shield] ?? 0) == 0) continue;
       if (_cMustPause && (kit[ToolType.pause] ?? 0) == 0) continue;
-      if (arrows < _cMinArrows || arrows > _cMaxArrows) continue;
       final total = kit.values.fold(0, (a, b) => a + b);
       final level = _withToolkit(base, kit);
       // The fast path solver handles static, pause-free layouts; timing hazards
@@ -878,20 +871,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                         _cMustPause = v;
                         _resetFindCursor();
                       })),
-              _constraintStepper('Min arrows', _cMinArrows, 0, 6, (v) {
-                setState(() {
-                  _cMinArrows = v;
-                  if (_cMaxArrows < v) _cMaxArrows = v;
-                  _resetFindCursor();
-                });
-              }),
-              _constraintStepper('Max arrows', _cMaxArrows, 1, 6, (v) {
-                setState(() {
-                  _cMaxArrows = v;
-                  if (_cMinArrows > v) _cMinArrows = v;
-                  _resetFindCursor();
-                });
-              }),
             ],
           ),
           if (_findResult != null) ...[
@@ -956,27 +935,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                   fontWeight: FontWeight.w600, color: AppColors.ink)),
         ],
       ),
-    );
-  }
-
-  Widget _constraintStepper(String label, int value, int minV, int maxV,
-      ValueChanged<int> onChanged) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('$label ',
-            style: const TextStyle(
-                fontWeight: FontWeight.w600, color: AppColors.ink)),
-        _stepBtn('–', () => onChanged((value - 1).clamp(minV, maxV))),
-        SizedBox(
-          width: 22,
-          child: Text('$value',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w800, color: AppColors.ink)),
-        ),
-        _stepBtn('+', () => onChanged((value + 1).clamp(minV, maxV))),
-      ],
     );
   }
 
