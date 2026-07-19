@@ -921,21 +921,33 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 45 — Tick Counter: two patrols sweep adjacent rows at the same speed. Count
-  // the ticks and thread the moving gap between them with your pauses.
+  // 45 — Tick Counter: the exit at (1,5) is walled in on all four sides. The
+  // only door is the wall at (1,4), which a shielded hit on the destroyer at
+  // (1,3) chain-explodes open. The second shield carries the dot through the
+  // destroyer at (1,1) so the forced arrow at (1,0) can run it along row 1 and
+  // out. NOTE: 9 toolkit pieces over 34 cells is ~2.4e12 placements, far past
+  // the brute-force budget, so this level is not solver-verified (see the
+  // unverifiable list in levels_solvable_test.dart).
   45: LevelData(
     id: 45,
-    size: 6,
+    size: 7,
     title: 'Tick Counter',
-    tip: 'Two patrols, one gap. Count the ticks and pause into it.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 5),
-    movers: [
-      MovingDestroyer(2, 5, horizontal: true, dir: 1),
-      MovingDestroyer(3, 2, horizontal: true, dir: -1),
+    tip: '',
+    start: StartSpec(6, 6, Direction.left),
+    exit: Pos(1, 5),
+    walls: [
+      Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(1, 6), Pos(2, 6),
+      Pos(2, 5), Pos(2, 4), Pos(1, 4), Pos(1, 2), Pos(2, 3),
     ],
+    destroyers: [Pos(1, 1), Pos(1, 3)],
+    forcedArrows: [ForcedArrow(1, 0, Direction.right)],
+    movers: [MovingDestroyer(5, 5, horizontal: true, dir: 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
       ToolkitEntry(ToolType.pause, 2),
     ],
   ),

@@ -517,6 +517,16 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (report.overBudget) ...[
+              const Text(
+                'Too large to verify — this toolkit on this board is past the '
+                'search budget, so the solver did not run. Shrink the toolkit '
+                'to get a verdict.',
+                style: TextStyle(fontSize: 12, color: AppColors.coral),
+              ),
+              const SizedBox(height: 8),
+              _stat('Pieces', '${report.total} (toolkit)', AppColors.ink),
+            ] else ...[
             _stat('Solvable', solvable ? 'YES' : 'NO',
                 solvable ? AppColors.completed : AppColors.coral),
             _stat('Solutions', '${report.solutions}${report.capped ? "+" : ""}',
@@ -527,6 +537,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                 tight ? AppColors.completed : AppColors.coral),
             _stat('Solver', report.usedBrute ? 'brute (timing)' : 'path',
                 AppColors.textSoft),
+            ],
             if (_shields.isNotEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 8),

@@ -19,6 +19,19 @@ void main(List<String> args) {
     // Moving destroyers or pause/teleporter pieces => timing matters => the
     // brute solver is the source of truth.
     final usesBrute = needsBruteSolver(lvl);
+    // A big toolkit on an open board explodes combinatorially (level 45 is
+    // ~2.4e12 placements). Say so and move on rather than appearing to hang.
+    if (usesBrute) {
+      final cost = bruteForcePlacements(
+          placeableCells(lvl).length, lvl.toolkit.map((e) => e.count));
+      if (cost > kMaxBrutePlacements) {
+        print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
+            '*** SKIPPED — ${cost.toStringAsExponential(2)} placements, '
+            '${(cost / kMaxBrutePlacements).toStringAsExponential(1)}x over '
+            'budget (total=$total) ***');
+        continue;
+      }
+    }
     final sols = usesBrute ? solveAll(lvl) : pathSolve(lvl);
     final minP = sols.isEmpty
         ? -1

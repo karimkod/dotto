@@ -30,6 +30,7 @@ class SolveReport {
     required this.total,
     required this.usedBrute,
     required this.capped,
+    this.overBudget = false,
   });
 
   /// Number of distinct solutions found ([capped] when the search hit its cap).
@@ -46,6 +47,11 @@ class SolveReport {
 
   /// True when [solutions] is a floor, not an exact count.
   final bool capped;
+
+  /// True when the level was never searched because an exhaustive sweep would
+  /// cost more than [kMaxBrutePlacements]. Everything else in the report is
+  /// meaningless in that case — the answer is "don't know", not "no".
+  final bool overBudget;
 
   bool get solvable => solutions > 0;
 
@@ -73,15 +79,35 @@ SolveReport _bruteReport(LevelData level, BruteStats stats) => SolveReport(
       capped: false,
     );
 
+/// True when an exhaustive sweep of [level] would blow the placement budget.
+/// Checked before starting one, so an over-large level reports "too large"
+/// instead of spinning until the designer gives up.
+bool _overBudget(LevelData level) =>
+    bruteForcePlacements(
+        placeableCells(level).length, level.toolkit.map((e) => e.count)) >
+    kMaxBrutePlacements;
+
+SolveReport _overBudgetReport(LevelData level) => SolveReport(
+      solutions: 0,
+      minPieces: -1,
+      total: toolkitTotal(level),
+      usedBrute: true,
+      capped: false,
+      overBudget: true,
+    );
+
 /// Solve [level] with whichever solver is correct for it. Pure and sendable;
 /// call [solveLevelAsync] from the UI.
-SolveReport solveLevel(LevelData level) => needsBruteSolver(level)
-    ? _bruteReport(level, bruteStats(level))
-    : _pathReport(level);
+SolveReport solveLevel(LevelData level) {
+  if (!needsBruteSolver(level)) return _pathReport(level);
+  if (_overBudget(level)) return _overBudgetReport(level);
+  return _bruteReport(level, bruteStats(level));
+}
 
 /// [solveLevel] in event-loop-friendly slices, for web.
 Future<SolveReport> solveLevelPaced(LevelData level) async {
   if (needsBruteSolver(level)) {
+    if (_overBudget(level)) return _overBudgetReport(level);
     return _bruteReport(level, await bruteStatsPaced(level));
   }
   await Future<void>.delayed(Duration.zero); // let the spinner paint first
