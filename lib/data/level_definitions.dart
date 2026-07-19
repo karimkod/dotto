@@ -530,7 +530,7 @@ const Map<int, LevelData> levelDefinitions = {
     id: 27,
     size: 6,
     title: 'Demolition',
-    tip: '',
+    tip: 'Two barriers, two doors. Open both, then climb straight out.',
     start: StartSpec(2, 0, Direction.right),
     exit: Pos(0, 3),
     walls: [
@@ -932,7 +932,8 @@ const Map<int, LevelData> levelDefinitions = {
     id: 45,
     size: 7,
     title: 'Tick Counter',
-    tip: '',
+    tip: 'The exit is sealed. Two shields open the way in — and pause for the '
+        'patrol.',
     start: StartSpec(6, 6, Direction.left),
     exit: Pos(1, 5),
     walls: [
