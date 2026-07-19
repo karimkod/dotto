@@ -4,14 +4,22 @@ import '../models/grid_cell.dart';
 import '../models/level_data.dart';
 import 'level_solver.dart';
 
-/// Off-thread wrappers around [level_solver]. A brute-force solve can run for
-/// seconds, which freezes the designer if it happens on the UI thread, so every
-/// entry point here hands the work to [compute].
+/// Keeping the designer responsive while the solver runs. A brute-force sweep
+/// can take seconds, so it must never occupy the UI thread uninterrupted.
 ///
-/// All request/result types are plain Dart objects (ints, enums, and const-able
-/// models), so they can be copied across the isolate boundary. Note that on
-/// Flutter web there are no isolates and [compute] runs the callback inline —
-/// correct, just not concurrent.
+/// Two strategies, because the platforms differ:
+///
+///  * **Native** — hand the whole job to a real isolate via [compute]. True
+///    parallelism; the UI thread never touches the search. All request/result
+///    types here are plain Dart objects (ints, enums, const-able models), so
+///    they copy across the isolate boundary.
+///  * **Web** — there are no isolates, and [compute] runs the callback inline,
+///    which is what froze Find Toolkit. Instead the search runs on the main
+///    thread in short slices, yielding to the event loop between them so the
+///    browser can paint. Slower in total, but the UI stays alive.
+///
+/// [kIsWeb] picks between them at the two public entry points; everything below
+/// that is shared, so the two paths can't drift apart in behaviour.
 
 /// The designer's "Solver report": can the level be solved, in how many ways,
 /// and does it use the whole toolkit.
@@ -45,28 +53,45 @@ class SolveReport {
   bool get tight => minPieces == total;
 }
 
-/// Solve [level] with whichever solver is correct for it. Pure and sendable;
-/// call [solveLevelAsync] from the UI.
-SolveReport solveLevel(LevelData level) {
-  final brute = needsBruteSolver(level);
-  final sols = brute ? solveAll(level) : pathSolve(level);
-  final minPieces = sols.isEmpty
-      ? -1
-      : brute
-          ? sols.map((m) => m.length).reduce((a, b) => a < b ? a : b)
-          : pathMinPieces(level);
+/// The path-solver half of a report — shared by the sync and paced paths.
+SolveReport _pathReport(LevelData level) {
+  final sols = pathSolve(level);
   return SolveReport(
     solutions: sols.length,
-    minPieces: minPieces,
+    minPieces: sols.isEmpty ? -1 : pathMinPieces(level),
     total: toolkitTotal(level),
-    usedBrute: brute,
-    capped: !brute && sols.length >= 256,
+    usedBrute: false,
+    capped: sols.length >= 256,
   );
 }
 
-/// [solveLevel] on a background isolate.
+SolveReport _bruteReport(LevelData level, BruteStats stats) => SolveReport(
+      solutions: stats.count,
+      minPieces: stats.minPieces,
+      total: toolkitTotal(level),
+      usedBrute: true,
+      capped: false,
+    );
+
+/// Solve [level] with whichever solver is correct for it. Pure and sendable;
+/// call [solveLevelAsync] from the UI.
+SolveReport solveLevel(LevelData level) => needsBruteSolver(level)
+    ? _bruteReport(level, bruteStats(level))
+    : _pathReport(level);
+
+/// [solveLevel] in event-loop-friendly slices, for web.
+Future<SolveReport> solveLevelPaced(LevelData level) async {
+  if (needsBruteSolver(level)) {
+    return _bruteReport(level, await bruteStatsPaced(level));
+  }
+  await Future<void>.delayed(Duration.zero); // let the spinner paint first
+  return _pathReport(level);
+}
+
+/// Solve [level] without blocking the UI: a real isolate on native, sliced
+/// cooperative work on web.
 Future<SolveReport> solveLevelAsync(LevelData level) =>
-    compute(solveLevel, level);
+    kIsWeb ? solveLevelPaced(level) : compute(solveLevel, level);
 
 /// [base] with a different toolkit swapped in — the layout is fixed while the
 /// toolkit search varies the pieces.
@@ -126,6 +151,49 @@ class FindToolkitResult {
   final int skipped;
 }
 
+/// What to do with one candidate toolkit. Deciding this in one place keeps the
+/// sync and paced searches honest about each other.
+enum _Route {
+  /// Doesn't meet the user's constraints.
+  filtered,
+
+  /// Static layout, no blind pieces — the fast path solver answers it.
+  path,
+
+  /// Timing hazards or pause/teleporter pieces: only the brute force is correct.
+  brute,
+
+  /// Brute force would cost more than [kMaxBrutePlacements].
+  tooCostly,
+}
+
+_Route _routeFor(
+  FindToolkitRequest req,
+  Map<ToolType, int> kit,
+  LevelData level,
+  int placeable,
+) {
+  if (req.mustShield && (kit[ToolType.shield] ?? 0) == 0) return _Route.filtered;
+  if (req.mustPause && (kit[ToolType.pause] ?? 0) == 0) return _Route.filtered;
+  if (!needsBruteSolver(level)) return _Route.path;
+  return bruteForcePlacements(placeable, kit.values) > kMaxBrutePlacements
+      ? _Route.tooCostly
+      : _Route.brute;
+}
+
+/// A candidate that solves the layout using its whole toolkit, or null.
+FindToolkitResult? _accept(
+    Map<ToolType, int> kit, int index, int count, int minPieces, int skipped) {
+  final total = kit.values.fold(0, (a, b) => a + b);
+  if (count == 0 || minPieces != total) return null;
+  return FindToolkitResult(
+    kit: kit,
+    solutions: count,
+    cursor: index + 1, // resume past this one next time
+    skipped: skipped,
+  );
+}
+
 /// Search [FindToolkitRequest.candidates] for the first solvable, tight toolkit.
 /// Pure and sendable; call [findToolkitAsync] from the UI.
 FindToolkitResult findToolkit(FindToolkitRequest req) {
@@ -134,43 +202,85 @@ FindToolkitResult findToolkit(FindToolkitRequest req) {
   var i = req.cursor;
   for (; i < req.candidates.length; i++) {
     final kit = req.candidates[i];
-    // Constraint filter: skip toolkits that don't match the user's requirements.
-    if (req.mustShield && (kit[ToolType.shield] ?? 0) == 0) continue;
-    if (req.mustPause && (kit[ToolType.pause] ?? 0) == 0) continue;
-    final total = kit.values.fold(0, (a, b) => a + b);
     final level = levelWithToolkit(req.base, kit);
-    final int minPieces;
     final int count;
-    if (needsBruteSolver(level)) {
-      // Timing hazards or pause/teleporter pieces — only the brute force is
-      // correct here, so bound it rather than let one candidate run away.
-      if (bruteForcePlacements(placeable, kit.values) > kMaxBrutePlacements) {
+    final int minPieces;
+    switch (_routeFor(req, kit, level, placeable)) {
+      case _Route.filtered:
+        continue;
+      case _Route.tooCostly:
         skipped++;
         continue;
-      }
-      final sols = solveAll(level);
-      if (sols.isEmpty) continue;
-      count = sols.length;
-      minPieces = sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
-    } else {
-      final sols = pathSolve(level);
-      if (sols.isEmpty) continue;
-      count = sols.length;
-      minPieces = pathMinPieces(level);
+      case _Route.brute:
+        final stats = bruteStats(level);
+        count = stats.count;
+        minPieces = stats.minPieces;
+      case _Route.path:
+        final sols = pathSolve(level);
+        count = sols.length;
+        minPieces = sols.isEmpty ? -1 : pathMinPieces(level);
     }
-    if (minPieces == total) {
-      return FindToolkitResult(
-        kit: kit,
-        solutions: count,
-        cursor: i + 1, // resume past this one next time
-        skipped: skipped,
-      );
-    }
+    final hit = _accept(kit, i, count, minPieces, skipped);
+    if (hit != null) return hit;
   }
   return FindToolkitResult(
       kit: null, solutions: 0, cursor: i, skipped: skipped);
 }
 
-/// [findToolkit] on a background isolate.
-Future<FindToolkitResult> findToolkitAsync(FindToolkitRequest req) =>
-    compute(findToolkit, req);
+/// Reports how far the paced search has got, so the UI can show progress.
+typedef SearchProgress = void Function(int checked, int total);
+
+/// [findToolkit] run cooperatively: the brute-force sweeps are sliced and the
+/// loop yields between candidates, so the event loop keeps turning and the
+/// spinner keeps animating. Used on web, where [compute] runs inline.
+Future<FindToolkitResult> findToolkitPaced(
+  FindToolkitRequest req, {
+  SearchProgress? onProgress,
+}) async {
+  final placeable = placeableCells(req.base).length;
+  var skipped = 0;
+  var i = req.cursor;
+  for (; i < req.candidates.length; i++) {
+    final kit = req.candidates[i];
+    final level = levelWithToolkit(req.base, kit);
+    final route = _routeFor(req, kit, level, placeable);
+    // Report every candidate, including the ones we pass over — with a
+    // constraint like "must include Pause" most kits are filtered, and a
+    // counter that only moved on evaluated ones would look frozen.
+    onProgress?.call(i + 1, req.candidates.length);
+    final int count;
+    final int minPieces;
+    switch (route) {
+      case _Route.filtered:
+        continue;
+      case _Route.tooCostly:
+        skipped++;
+        continue;
+      case _Route.brute:
+        // Sliced internally — a single big candidate can't hog the thread.
+        final stats = await bruteStatsPaced(level);
+        count = stats.count;
+        minPieces = stats.minPieces;
+      case _Route.path:
+        final sols = pathSolve(level);
+        count = sols.length;
+        minPieces = sols.isEmpty ? -1 : pathMinPieces(level);
+        // The path solver isn't sliced (it's quick), so breathe between kits.
+        await Future<void>.delayed(Duration.zero);
+    }
+    final hit = _accept(kit, i, count, minPieces, skipped);
+    if (hit != null) return hit;
+  }
+  return FindToolkitResult(
+      kit: null, solutions: 0, cursor: i, skipped: skipped);
+}
+
+/// Search for a toolkit without blocking the UI: a real isolate on native,
+/// sliced cooperative work on web.
+Future<FindToolkitResult> findToolkitAsync(
+  FindToolkitRequest req, {
+  SearchProgress? onProgress,
+}) =>
+    kIsWeb
+        ? findToolkitPaced(req, onProgress: onProgress)
+        : compute(findToolkit, req);

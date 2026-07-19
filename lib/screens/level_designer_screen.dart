@@ -93,6 +93,10 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // Search constraints — skip any toolkit that doesn't match.
   bool _cMustShield = false;
   bool _cMustPause = false;
+  // Live progress through the candidate list (web only, where the search runs
+  // in slices on this thread and can report as it goes).
+  int _findChecked = 0;
+  int _findTotal = 0;
 
   @override
   void initState() {
@@ -690,18 +694,29 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       _findOk = false;
       _candidates = candidates;
       _candCursor = cursor;
+      _findChecked = cursor;
+      _findTotal = candidates.length;
       if (!again) _foundKit = null;
     });
 
     final FindToolkitResult res;
     try {
-      res = await findToolkitAsync(FindToolkitRequest(
-        base: _buildLevel(), // layout fixed; toolkit varies
-        candidates: candidates,
-        cursor: cursor,
-        mustShield: _cMustShield,
-        mustPause: _cMustPause,
-      ));
+      res = await findToolkitAsync(
+        FindToolkitRequest(
+          base: _buildLevel(), // layout fixed; toolkit varies
+          candidates: candidates,
+          cursor: cursor,
+          mustShield: _cMustShield,
+          mustPause: _cMustPause,
+        ),
+        onProgress: (checked, total) {
+          if (!mounted) return;
+          setState(() {
+            _findChecked = checked;
+            _findTotal = total;
+          });
+        },
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -832,7 +847,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.search_rounded),
-                label: Text(_finding ? 'Searching…' : 'Find Toolkit'),
+                label: Text(_finding
+                    ? (_findTotal > 0
+                        ? 'Searching $_findChecked/$_findTotal'
+                        : 'Searching…')
+                    : 'Find Toolkit'),
               ),
             ],
           ),

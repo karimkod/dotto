@@ -20,38 +20,165 @@ List<int> placeableCells(LevelData level) {
 PlacedElement _element(ToolType t) =>
     PlacedElement(type: t.placedType, tool: t, direction: t.direction);
 
-/// Brute-force every distinct way to place a subset of the toolkit on the
-/// board and return all configurations that solve the level. Visiting cells in
-/// index order yields each configuration exactly once.
-List<Map<int, PlacedElement>> solveAll(LevelData level) {
-  final cells = placeableCells(level);
-  final remaining = {for (final e in level.toolkit) e.type: e.count};
-  final solutions = <Map<int, PlacedElement>>[];
-  final current = <int, PlacedElement>{};
+/// Called for each winning placement. The map is the searcher's live board —
+/// copy it if you need to keep it.
+typedef WinSink = void Function(Map<int, PlacedElement> placement);
 
-  void recurse(int i) {
-    if (i == cells.length) {
-      if (simulate(level, current) == SimOutcome.win) {
-        solutions.add(Map.of(current));
-      }
-      return;
-    }
-    // Leave this cell empty.
-    recurse(i + 1);
-    // Or place any still-available tool here.
-    final cell = cells[i];
-    for (final type in remaining.keys) {
-      if (remaining[type]! <= 0) continue;
-      remaining[type] = remaining[type]! - 1;
-      current[cell] = _element(type);
-      recurse(i + 1);
-      current.remove(cell);
-      remaining[type] = remaining[type]! + 1;
+/// One cell's position in the depth-first walk.
+class _Frame {
+  _Frame(this.i);
+
+  /// Index into the searcher's cell list.
+  final int i;
+
+  /// 0 = "leave empty" not yet taken; 1..n = place types[choice-1].
+  int choice = 0;
+
+  /// What this frame currently has on the board, so it can be undone.
+  ToolType? placed;
+}
+
+/// Brute-force every distinct way to place a subset of the toolkit on the
+/// board, reporting each configuration that solves the level. Visiting cells in
+/// index order yields each configuration exactly once.
+///
+/// This is an explicit-stack DFS rather than plain recursion so the sweep can be
+/// PAUSED mid-search: Flutter web has no isolates, so the only way to keep the
+/// UI painting during a long solve is to run it in slices and hand the event
+/// loop a turn in between. [runSlice] does exactly that. Native code paths run
+/// it to completion in one call inside a real isolate.
+class BruteSearch {
+  BruteSearch(this.level, this._onWin)
+      : cells = placeableCells(level),
+        remaining = {for (final e in level.toolkit) e.type: e.count} {
+    types = remaining.keys.toList();
+    if (cells.isEmpty) {
+      _leaf(); // nowhere to place anything — the bare board is the only config
+      done = true;
+    } else {
+      _stack.add(_Frame(0));
     }
   }
 
-  recurse(0);
+  final LevelData level;
+  final WinSink _onWin;
+  final List<int> cells;
+  final Map<ToolType, int> remaining;
+  late final List<ToolType> types;
+  final List<_Frame> _stack = [];
+
+  /// The placement currently on the board.
+  final Map<int, PlacedElement> current = {};
+
+  /// True once the whole space has been explored.
+  bool done = false;
+
+  void _leaf() {
+    if (simulate(level, current) == SimOutcome.win) _onWin(current);
+  }
+
+  /// Explore for up to [budget], then return. True means the search is finished;
+  /// false means call again to resume exactly where it left off.
+  bool runSlice(Duration budget) {
+    if (done) return true;
+    final sw = Stopwatch()..start();
+    var leaves = 0;
+    while (_stack.isNotEmpty) {
+      final f = _stack.last;
+      // Undo whatever the previous choice left on the board.
+      final prev = f.placed;
+      if (prev != null) {
+        current.remove(cells[f.i]);
+        remaining[prev] = remaining[prev]! + 1;
+        f.placed = null;
+      }
+      if (f.choice > types.length) {
+        _stack.removeLast(); // choices exhausted — back up
+        continue;
+      }
+      final choice = f.choice++;
+      if (choice > 0) {
+        final t = types[choice - 1];
+        if (remaining[t]! <= 0) continue; // none of this tool left
+        remaining[t] = remaining[t]! - 1;
+        current[cells[f.i]] = _element(t);
+        f.placed = t;
+      }
+      final next = f.i + 1;
+      if (next == cells.length) {
+        _leaf();
+        // Check the clock rarely — the mask keeps the hot path branch-cheap.
+        // Pausing here is safe: `current` and `remaining` stay consistent
+        // because the frame's placement is undone on re-entry.
+        if ((++leaves & 255) == 0 && sw.elapsed >= budget) return false;
+      } else {
+        _stack.add(_Frame(next));
+      }
+    }
+    done = true;
+    return true;
+  }
+}
+
+/// A budget long enough that [BruteSearch.runSlice] runs to completion.
+const Duration _uninterrupted = Duration(days: 1);
+
+/// Brute-force every distinct way to place a subset of the toolkit on the board
+/// and return all configurations that solve the level.
+List<Map<int, PlacedElement>> solveAll(LevelData level) {
+  final solutions = <Map<int, PlacedElement>>[];
+  BruteSearch(level, (p) => solutions.add(Map.of(p))).runSlice(_uninterrupted);
   return solutions;
+}
+
+/// How many placements win, and the fewest pieces any of them uses (-1 when
+/// there are none). Tallying instead of materialising every solution keeps a
+/// wide-open candidate from building a huge list just to count it.
+class BruteStats {
+  const BruteStats(this.count, this.minPieces);
+  final int count;
+  final int minPieces;
+}
+
+WinSink _tally(void Function(int count, int minPieces) set) {
+  var count = 0;
+  var minPieces = -1;
+  return (p) {
+    count++;
+    if (minPieces < 0 || p.length < minPieces) minPieces = p.length;
+    set(count, minPieces);
+  };
+}
+
+/// [solveAll] reduced to a count and a minimum, without keeping the solutions.
+BruteStats bruteStats(LevelData level) {
+  var count = 0;
+  var minPieces = -1;
+  BruteSearch(level, _tally((c, m) {
+    count = c;
+    minPieces = m;
+  })).runSlice(_uninterrupted);
+  return BruteStats(count, minPieces);
+}
+
+/// [bruteStats] run in [slice]-sized pieces, yielding to the event loop between
+/// them so the UI keeps painting. Use on web, where there are no isolates.
+Future<BruteStats> bruteStatsPaced(
+  LevelData level, {
+  Duration slice = const Duration(milliseconds: 12),
+}) async {
+  var count = 0;
+  var minPieces = -1;
+  final search = BruteSearch(level, _tally((c, m) {
+    count = c;
+    minPieces = m;
+  }));
+  while (!search.runSlice(slice)) {
+    // A macrotask, not a microtask — microtasks drain before the browser gets
+    // to paint, so `Duration.zero` here is what actually frees the frame.
+    await Future<void>.delayed(Duration.zero);
+  }
+  return BruteStats(count, minPieces);
 }
 
 /// True if at least one placement of the toolkit solves the level.

@@ -297,6 +297,88 @@ void main() {
     }
   });
 
+  // ── Brute force: iterative DFS vs. the original recursion ────────────────
+  // solveAll was rewritten as an explicit-stack search so it can be paused
+  // mid-sweep (web has no isolates, so it runs in slices). The rewrite must
+  // enumerate exactly the same space, so check it against a straight
+  // transcription of the recursion it replaced.
+  List<Map<int, PlacedElement>> referenceSolveAll(LevelData level) {
+    final cells = placeableCells(level);
+    final remaining = {for (final e in level.toolkit) e.type: e.count};
+    final solutions = <Map<int, PlacedElement>>[];
+    final current = <int, PlacedElement>{};
+    void recurse(int i) {
+      if (i == cells.length) {
+        if (simulate(level, current) == SimOutcome.win) {
+          solutions.add(Map.of(current));
+        }
+        return;
+      }
+      recurse(i + 1); // leave this cell empty
+      final cell = cells[i];
+      for (final type in remaining.keys) {
+        if (remaining[type]! <= 0) continue;
+        remaining[type] = remaining[type]! - 1;
+        current[cell] = PlacedElement(
+            type: type.placedType, tool: type, direction: type.direction);
+        recurse(i + 1);
+        current.remove(cell);
+        remaining[type] = remaining[type]! + 1;
+      }
+    }
+
+    recurse(0);
+    return solutions;
+  }
+
+  String canon(Map<int, PlacedElement> m) {
+    final keys = m.keys.toList()..sort();
+    return keys.map((k) => '$k:${m[k]!.tool.name}').join(',');
+  }
+
+  for (final n in [2, 5, 12, 21, 24, 41, 42]) {
+    test('level $n — iterative solveAll matches the reference recursion', () {
+      final level = levelDataFor(n)!;
+      final got = solveAll(level).map(canon).toList();
+      final want = referenceSolveAll(level).map(canon).toList();
+      expect(got, want,
+          reason: 'the pausable search must explore the same space, in order');
+    });
+  }
+
+  test('bruteStats agrees with solveAll', () {
+    for (final n in [2, 5, 24, 41, 42, 44]) {
+      final level = levelDataFor(n)!;
+      final sols = solveAll(level);
+      final stats = bruteStats(level);
+      expect(stats.count, sols.length, reason: 'level $n solution count');
+      expect(
+          stats.minPieces,
+          sols.isEmpty
+              ? -1
+              : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b),
+          reason: 'level $n min pieces');
+    }
+  });
+
+  // Pausing must not corrupt the search: a sliced sweep sees the same wins as
+  // an uninterrupted one. A 1-microsecond budget forces a pause at almost every
+  // checkpoint, which is the worst case for resume bookkeeping.
+  test('a sliced BruteSearch finds the same solutions as an unsliced one', () {
+    for (final n in [5, 24, 41, 42]) {
+      final level = levelDataFor(n)!;
+      final sliced = <String>[];
+      final search = BruteSearch(level, (p) => sliced.add(canon(p)));
+      var slices = 0;
+      while (!search.runSlice(const Duration(microseconds: 1))) {
+        slices++;
+        expect(slices, lessThan(1000000), reason: 'slicing must terminate');
+      }
+      expect(sliced, solveAll(level).map(canon).toList(),
+          reason: 'level $n sliced sweep');
+    }
+  });
+
   // World 3 spot-check: the chain explosion is genuinely required.
   test('World 3 — Break Through (24) needs the shield to clear the wall', () {
     final level = levelDataFor(24)!;
