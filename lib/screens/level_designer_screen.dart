@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../engine/level_solver.dart';
+import '../engine/solver_isolate.dart';
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -77,6 +77,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
 
   /// Bumped on import so the text fields rebuild with their new initial values.
   int _formRev = 0;
+
+  /// True while the solver runs on its isolate — drives the Test spinner.
+  bool _testing = false;
 
   // ----- "Find Toolkit" search state -----
   bool _finding = false;
@@ -479,25 +482,29 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   }
 
   // ----- test / solve -----
-  void _test() {
+  /// Run the solver off the UI thread and show its verdict. Which solver runs is
+  /// decided by [needsBruteSolver], so pause/teleporter levels get the
+  /// timing-aware brute force instead of the path solver that can't see them.
+  Future<void> _test() async {
+    if (_testing) return;
     if (_startKey == null || _exitKey == null) {
       _snack('Need a Start and an Exit.');
       return;
     }
     final level = _buildLevel();
-    // Moving destroyers make timing matter — only the brute solver is reliable.
-    final usesBrute = level.movers.isNotEmpty;
-    final sols = usesBrute ? solveAll(level) : pathSolve(level);
-    final minP = usesBrute
-        ? (sols.isEmpty
-            ? -1
-            : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b))
-        : pathMinPieces(level);
-    final total = toolkitTotal(level);
-    final solvable = sols.isNotEmpty;
-    final tight = minP == total;
+    setState(() => _testing = true);
+    final SolveReport report;
+    try {
+      report = await solveLevelAsync(level);
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+    if (!mounted) return;
 
-    showDialog<void>(
+    final solvable = report.solvable;
+    final tight = report.tight;
+
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.card,
@@ -508,11 +515,14 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           children: [
             _stat('Solvable', solvable ? 'YES' : 'NO',
                 solvable ? AppColors.completed : AppColors.coral),
-            _stat('Solutions', '${sols.length}${sols.length >= 256 ? "+" : ""}',
+            _stat('Solutions', '${report.solutions}${report.capped ? "+" : ""}',
                 AppColors.ink),
-            _stat('Pieces used', '$minP / $total (toolkit)', AppColors.ink),
+            _stat('Pieces used', '${report.minPieces} / ${report.total} (toolkit)',
+                AppColors.ink),
             _stat('Tight', tight ? 'YES (no waste)' : 'NO (a piece is unused)',
                 tight ? AppColors.completed : AppColors.coral),
+            _stat('Solver', report.usedBrute ? 'brute (timing)' : 'path',
+                AppColors.textSoft),
             if (_shields.isNotEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
@@ -555,6 +565,16 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ],
         ),
       );
+
+  /// Play the level as designed, skipping the solver entirely — the fast loop
+  /// for trying an idea out by hand before asking whether it's solvable.
+  void _playNow() {
+    if (_startKey == null || _exitKey == null) {
+      _snack('Need a Start and an Exit.');
+      return;
+    }
+    _playTest(_buildLevel());
+  }
 
   void _playTest(LevelData level) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -627,21 +647,6 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     return out;
   }
 
-  /// The current layout with a different toolkit swapped in.
-  LevelData _withToolkit(LevelData base, Map<ToolType, int> kit) => LevelData(
-        id: base.id,
-        size: base.size,
-        title: base.title,
-        tip: base.tip,
-        start: base.start,
-        exit: base.exit,
-        walls: base.walls,
-        destroyers: base.destroyers,
-        forcedArrows: base.forcedArrows,
-        movers: base.movers,
-        toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
-      );
-
   String _kitLabel(Map<ToolType, int> kit) {
     const order = [
       ToolType.arrowUp,
@@ -669,76 +674,61 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
 
   /// Search toolkit combinations (smallest first) for the FIRST that makes the
   /// current layout solvable AND tight. [again] resumes after the last hit so
-  /// "Try Another" surfaces the next valid toolkit. Runs async with yields so
-  /// the spinner animates; a per-solve cost guard keeps it responsive.
+  /// "Try Another" surfaces the next valid toolkit. The whole sweep runs on one
+  /// background isolate, so the UI keeps animating however long it takes.
   Future<void> _findToolkit({bool again = false}) async {
     if (_finding) return;
     if (_startKey == null || _exitKey == null) {
       _snack('Need a Start and an Exit.');
       return;
     }
+    final candidates = again ? _candidates : _candidateToolkits();
+    final cursor = again ? _candCursor : 0;
     setState(() {
       _finding = true;
       _findResult = null;
       _findOk = false;
-      if (!again) {
-        _foundKit = null;
-        _candidates = _candidateToolkits();
-        _candCursor = 0;
-      }
+      _candidates = candidates;
+      _candCursor = cursor;
+      if (!again) _foundKit = null;
     });
-    final base = _buildLevel(); // layout fixed; toolkit varies
-    final placeable = placeableCells(base).length;
-    Map<ToolType, int>? found;
-    var solutions = 0;
-    var i = _candCursor;
-    for (; i < _candidates.length; i++) {
-      if (i % 8 == 0) {
-        await Future<void>.delayed(const Duration(milliseconds: 1));
-        if (!mounted) return;
-      }
-      final kit = _candidates[i];
-      // Constraint filter: skip toolkits that don't match the user's requirements.
-      if (_cMustShield && (kit[ToolType.shield] ?? 0) == 0) continue;
-      if (_cMustPause && (kit[ToolType.pause] ?? 0) == 0) continue;
-      final total = kit.values.fold(0, (a, b) => a + b);
-      final level = _withToolkit(base, kit);
-      // The fast path solver handles static, pause-free layouts; timing hazards
-      // (movers) or pauses need the brute solver, bounded so it stays responsive.
-      final usePath =
-          base.movers.isEmpty && !kit.containsKey(ToolType.pause);
-      final int minP;
-      final int count;
-      if (usePath) {
-        final sols = pathSolve(level);
-        if (sols.isEmpty) continue;
-        count = sols.length;
-        minP = pathMinPieces(level);
-      } else {
-        if (placeable == 0 || math.pow(placeable, total) > 5e5) continue;
-        final sols = solveAll(level);
-        if (sols.isEmpty) continue;
-        count = sols.length;
-        minP = sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
-      }
-      if (minP == total) {
-        found = kit;
-        solutions = count;
-        i++; // resume past this one next time
-        break;
-      }
+
+    final FindToolkitResult res;
+    try {
+      res = await findToolkitAsync(FindToolkitRequest(
+        base: _buildLevel(), // layout fixed; toolkit varies
+        candidates: candidates,
+        cursor: cursor,
+        mustShield: _cMustShield,
+        mustPause: _cMustPause,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _finding = false;
+        _findOk = false;
+        _findResult = 'Search failed: $e';
+      });
+      return;
     }
     if (!mounted) return;
+
+    final found = res.kit;
+    // A bounded search must say so — otherwise "none found" reads as proof that
+    // no toolkit exists when some were simply too expensive to try.
+    final note = res.skipped > 0
+        ? '  (${res.skipped} toolkit(s) skipped — too costly to solve)'
+        : '';
     setState(() {
       _finding = false;
-      _candCursor = i;
+      _candCursor = res.cursor;
       _foundKit = found;
       _findOk = found != null;
       _findResult = found != null
-          ? 'Found: ${_kitLabel(found)}  →  $solutions solution(s), TIGHT'
+          ? 'Found: ${_kitLabel(found)}  →  ${res.solutions} solution(s), TIGHT'
           : (again
-              ? 'No more valid toolkits for this layout.'
-              : 'No valid toolkit found for this layout.');
+              ? 'No more valid toolkits for this layout.$note'
+              : 'No valid toolkit found for this layout.$note');
     });
   }
 
@@ -1184,10 +1174,27 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       spacing: 10,
       runSpacing: 10,
       children: [
+        // Straight to the board — no solver, so a half-built level can still be
+        // played by hand. Listed first because it's the quickest loop.
         FilledButton.icon(
-          onPressed: _test,
-          icon: const Icon(Icons.science_rounded),
-          label: const Text('Test'),
+          onPressed: _playNow,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.completed,
+            foregroundColor: Colors.white,
+          ),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Play'),
+        ),
+        FilledButton.icon(
+          onPressed: _testing ? null : _test,
+          icon: _testing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.science_rounded),
+          label: Text(_testing ? 'Solving…' : 'Test'),
         ),
         OutlinedButton.icon(
           onPressed: _export,

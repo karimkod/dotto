@@ -185,12 +185,13 @@ void main() {
   int worldOf(int n) =>
       n <= 15 ? 1 : (n <= 20 ? 2 : (n <= 30 ? 3 : 4));
 
-  // World 4 (31+) has moving destroyers, so timing matters — only the
-  // brute-force, simulate-based solver is reliable there.
+  // Moving destroyers (World 4) make timing matter, and pause/teleporter pieces
+  // are invisible to the path solver — for either, only the brute-force,
+  // simulate-based solver is reliable.
   List<Map<int, PlacedElement>> solveFor(LevelData lvl) =>
-      lvl.movers.isNotEmpty ? solveAll(lvl) : pathSolve(lvl);
+      needsBruteSolver(lvl) ? solveAll(lvl) : pathSolve(lvl);
   int minPiecesFor(LevelData lvl) =>
-      lvl.movers.isNotEmpty ? minSolutionPieces(lvl) : pathMinPieces(lvl);
+      needsBruteSolver(lvl) ? minSolutionPieces(lvl) : pathMinPieces(lvl);
 
   for (var n = 1; n <= 50; n++) {
     test('World ${worldOf(n)} — level $n is solvable', () {
@@ -248,6 +249,53 @@ void main() {
       }
     });
   }
+
+  // ── Solver routing ───────────────────────────────────────────────────────
+  // The path solver has no clock and never sees movers, so it cannot reason
+  // about pause/teleporter. It used to drop those pieces from the toolkit
+  // silently, which made pause levels look unsolvable (or "solvable" without
+  // ever placing the pause). It must now refuse them, and routing must send
+  // them to the brute force.
+  for (final n in [41, 42, 43, 44]) {
+    test('level $n (pause) routes to the brute solver and uses every pause', () {
+      final level = levelDataFor(n)!;
+      expect(needsBruteSolver(level), isTrue,
+          reason: 'a pause in the toolkit means timing matters');
+      expect(() => pathSolve(level), throwsA(isA<PathSolverUnsupported>()));
+      expect(() => pathMinPieces(level), throwsA(isA<PathSolverUnsupported>()));
+
+      final sols = solveAll(level);
+      expect(sols, isNotEmpty, reason: 'level $n must be solvable');
+      final pauses = level.toolkit
+          .where((e) => e.type == ToolType.pause)
+          .fold(0, (a, e) => a + e.count);
+      for (final s in sols.where((s) => s.length == toolkitTotal(level))) {
+        expect(s.values.where((e) => e.type == PlacedType.pause).length, pauses,
+            reason: 'a full-toolkit solution must place every pause piece');
+      }
+    });
+  }
+
+  test('pause-free static levels still use the fast path solver', () {
+    for (final n in [11, 12, 13, 14, 15]) {
+      expect(needsBruteSolver(levelDataFor(n)!), isFalse);
+    }
+  });
+
+  // The Find Toolkit cost guard must admit the real pause levels; the old
+  // pow(placeable, total) estimate overstated them by orders of magnitude and
+  // skipped 43 and 44 outright.
+  test('brute-force cost estimate admits the authored pause levels', () {
+    for (final n in [41, 42, 43, 44]) {
+      final level = levelDataFor(n)!;
+      final cost = bruteForcePlacements(
+        placeableCells(level).length,
+        level.toolkit.map((e) => e.count),
+      );
+      expect(cost, lessThanOrEqualTo(kMaxBrutePlacements),
+          reason: 'level $n toolkit should be within the search budget');
+    }
+  });
 
   // World 3 spot-check: the chain explosion is genuinely required.
   test('World 3 — Break Through (24) needs the shield to clear the wall', () {

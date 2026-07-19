@@ -16,8 +16,9 @@ void main(List<String> args) {
     final lvl = levelDataFor(n);
     if (lvl == null) continue;
     final total = toolkitTotal(lvl);
-    // Moving destroyers => timing matters => brute solver is the source of truth.
-    final usesBrute = lvl.movers.isNotEmpty;
+    // Moving destroyers or pause/teleporter pieces => timing matters => the
+    // brute solver is the source of truth.
+    final usesBrute = needsBruteSolver(lvl);
     final sols = usesBrute ? solveAll(lvl) : pathSolve(lvl);
     final minP = sols.isEmpty
         ? -1

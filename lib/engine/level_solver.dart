@@ -61,6 +61,89 @@ bool isSolvable(LevelData level) => solveAll(level).isNotEmpty;
 int toolkitTotal(LevelData level) =>
     level.toolkit.fold(0, (sum, e) => sum + e.count);
 
+/// Tools the fast path solver cannot reason about. Pause changes only the dot's
+/// TIMING and the teleporter moves it off its path — neither is expressible in a
+/// solver whose state is (cell, heading, shield, cleared-walls) with no clock.
+const Set<ToolType> pathSolverBlindTools = {
+  ToolType.pause,
+  ToolType.teleporter,
+};
+
+/// True when [level] needs the timing-aware brute-force solver ([solveAll]).
+/// Moving destroyers make arrival time matter, and pause/teleporter pieces are
+/// invisible to the path solver — in either case only the simulate-based brute
+/// force gives a correct answer. This is the single routing predicate: every
+/// caller picks its solver with it, and [pathSolve]/[pathMinPieces] refuse any
+/// level it flags, so the two can never drift apart.
+bool needsBruteSolver(LevelData level) =>
+    level.movers.isNotEmpty ||
+    level.toolkit.any((e) => pathSolverBlindTools.contains(e.type));
+
+/// Thrown when the path solver is handed a level only [solveAll] can answer.
+/// Route with [needsBruteSolver] instead of catching this.
+class PathSolverUnsupported implements Exception {
+  const PathSolverUnsupported(this.reason);
+  final String reason;
+  @override
+  String toString() => 'PathSolverUnsupported: $reason — use solveAll().';
+}
+
+void _requirePathSolvable(LevelData level) {
+  if (!needsBruteSolver(level)) return;
+  final blind = level.toolkit
+      .map((e) => e.type)
+      .where(pathSolverBlindTools.contains)
+      .map((t) => t.name)
+      .toSet();
+  throw PathSolverUnsupported(
+    level.movers.isNotEmpty && blind.isNotEmpty
+        ? 'level ${level.id} has moving destroyers and ${blind.join("/")} '
+            'in its toolkit'
+        : level.movers.isNotEmpty
+            ? 'level ${level.id} has moving destroyers (timing matters)'
+            : 'level ${level.id} has ${blind.join("/")} in its toolkit',
+  );
+}
+
+/// C(n, k) as a double, saturating rather than overflowing.
+double _choose(int n, int k) {
+  if (k < 0 || k > n) return 0;
+  var r = 1.0;
+  for (var i = 1; i <= k; i++) {
+    r = r * (n - k + i) / i;
+    if (r.isInfinite) return double.infinity;
+  }
+  return r;
+}
+
+/// How many distinct full-toolkit placements [solveAll] enumerates: choose which
+/// [placeable] cells hold a piece, then which piece lands on each (identical
+/// pieces don't double-count). This dominates the smaller-subset leaves, so it
+/// is the right scale for a cost guard — and it is far tighter than
+/// `pow(placeable, total)`, which counts ordered placements and overstates the
+/// real work by orders of magnitude.
+double bruteForcePlacements(int placeable, Iterable<int> pieceCounts) {
+  final counts = pieceCounts.where((c) => c > 0).toList();
+  final total = counts.fold(0, (a, b) => a + b);
+  if (total == 0 || placeable <= 0) return 0;
+  if (total > placeable) return double.infinity;
+  // multinomial(total; counts) built up as a product of binomials.
+  var arrangements = 1.0;
+  var used = 0;
+  for (final c in counts) {
+    used += c;
+    arrangements *= _choose(used, c);
+  }
+  return _choose(placeable, total) * arrangements;
+}
+
+/// Placement budget for one brute-force solve. Measured cost is ~1.5µs per
+/// placement (level 43: 285k placements in ~420ms), so this is a few seconds at
+/// the very top end — fine off the UI thread, and generous enough to admit the
+/// real pause levels (level 44 is ~5.9M) that the old `pow(...) > 5e5` guard
+/// silently skipped.
+const double kMaxBrutePlacements = 8e6;
+
 /// Fewest pieces used by any solution (-1 if unsolvable). When this equals
 /// [toolkitTotal], every solution uses all pieces.
 int minSolutionPieces(LevelData level) {
@@ -86,19 +169,22 @@ int _adjacentWallMask(LevelData level, int key) {
   return m;
 }
 
-/// Toolkit pieces the path solver can place: arrows (which turn the dot) and
-/// shields (which grant the protective aura). Pause/teleporter are not used by
-/// the authored worlds and are left to the brute-force [solveAll].
+/// Toolkit pieces the path solver places. Callers reach here only after
+/// [_requirePathSolvable], so every entry is an arrow or a shield — the whole
+/// toolkit is used. It must never quietly drop a piece: doing so made the solver
+/// answer a different question than it was asked (a level needing a pause looked
+/// unsolvable, or "solvable" without ever placing it).
 Map<ToolType, int> _placeableKit(LevelData level) => {
-      for (final e in level.toolkit)
-        if (e.type.direction != null || e.type == ToolType.shield)
-          e.type: e.count,
+      for (final e in level.toolkit) e.type: e.count,
     };
 
 /// Smallest number of pieces (arrows + shields) any solution needs (-1 if
 /// unsolvable). Branch-and-bound on the fewest-piece win found. When this equals
 /// [toolkitTotal] the level is "tight" — no piece can be left unused.
+///
+/// Throws [PathSolverUnsupported] when [needsBruteSolver] flags the level.
 int pathMinPieces(LevelData level) {
+  _requirePathSolvable(level);
   final n = level.size;
   final forced = <int, Direction>{
     for (final a in level.forcedArrows) a.r * n + a.c: a.dir,
@@ -179,8 +265,11 @@ int pathMinPieces(LevelData level) {
 /// All distinct on-path placements that win, capped at [maxResults]. For a tight
 /// level every entry uses the whole toolkit, so the count is the number of
 /// genuinely different solutions — the design goal is one (or very few).
+///
+/// Throws [PathSolverUnsupported] when [needsBruteSolver] flags the level.
 List<Map<int, PlacedElement>> pathSolve(LevelData level,
     {int maxResults = 256}) {
+  _requirePathSolvable(level);
   final n = level.size;
   final forced = <int, Direction>{
     for (final a in level.forcedArrows) a.r * n + a.c: a.dir,
