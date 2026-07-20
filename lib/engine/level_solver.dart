@@ -344,11 +344,18 @@ class PathSearch {
 
   bool done = false;
 
-  /// Step one mover, mirroring [MoverState.step].
+  /// Step one mover, mirroring [MoverState.step] — including the fact that a
+  /// wall a chain explosion has opened stops being solid. The templates in
+  /// [_movers] are shared across every branch of the search, so the cleared
+  /// cells have to come from the branch's own state, never from mutating them.
   void _stepMover(int i) {
     final m = _movers[i];
     var pos = _cur.moverPos[i], d = _cur.moverDir[i];
-    bool solid(int p) => p < 0 || p >= m.size || m.blocked.contains(p);
+    bool solid(int p) {
+      if (p < 0 || p >= m.size) return true;
+      if (!m.blocked.contains(p)) return false;
+      return !_cur.removed.contains(m.keyAt(p));
+    }
     var next = pos + d;
     if (solid(next)) {
       d = -d;

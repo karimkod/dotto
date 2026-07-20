@@ -534,6 +534,80 @@ void main() {
     }, timeout: heavy);
   });
 
+  // ── Patrols and demolished walls ─────────────────────────────────────────
+  // A patrol's bounce set is a snapshot of the walls at level start. Once a
+  // chain explosion opens a wall in its lane, the patrol must sweep through the
+  // gap instead of bouncing off a wall that is no longer there.
+  group('patrols and demolished walls', () {
+    // Row 3 lane: wall at (3,3), patrol at (3,5) heading left. The wall is
+    // beside the mine at (2,3), so shielding into that mine blows (3,3) open.
+    const lane = LevelData(
+      id: 902,
+      size: 6,
+      title: 'patrol lane wall',
+      tip: '',
+      start: StartSpec(5, 0, Direction.right),
+      exit: Pos(0, 0),
+      walls: [Pos(3, 3)],
+      destroyers: [Pos(2, 3)],
+      movers: [MovingDestroyer(3, 5, horizontal: true, dir: -1)],
+      toolkit: [],
+    );
+
+    test('the bounce set starts out treating the wall as solid', () {
+      final movers = buildMovers(lane);
+      expect(movers.single.blocked.contains(3), isTrue,
+          reason: 'the wall at (3,3) sits in the patrol lane');
+    });
+
+    test('an untouched wall still stops the patrol', () {
+      final m = buildMovers(lane).single;
+      // Walking left from column 5 it should stall against the wall at column 3.
+      for (var i = 0; i < 10; i++) {
+        m.step(const <int>{});
+      }
+      expect(m.col, greaterThan(3),
+          reason: 'with the wall intact the patrol must stay east of it');
+    });
+
+    test('once blown open, the patrol sweeps straight through', () {
+      final m = buildMovers(lane).single;
+      final removed = {3 * lane.size + 3}; // (3,3) demolished
+      var reachedWest = false;
+      for (var i = 0; i < 10; i++) {
+        m.step(removed);
+        if (m.col < 3) reachedWest = true;
+      }
+      expect(reachedWest, isTrue,
+          reason: 'a demolished wall must not keep bouncing the patrol');
+    });
+
+    test('a demolished static mine also stops blocking', () {
+      // Column 3 lane, with the mine at (2,3) inside it.
+      const col = LevelData(
+        id: 903,
+        size: 6,
+        title: 'patrol column mine',
+        tip: '',
+        start: StartSpec(5, 0, Direction.right),
+        exit: Pos(0, 0),
+        destroyers: [Pos(2, 3)],
+        movers: [MovingDestroyer(4, 3, horizontal: false, dir: -1)],
+        toolkit: [],
+      );
+      final m = buildMovers(col).single;
+      expect(m.blocked.contains(2), isTrue);
+      final removed = {2 * col.size + 3}; // the mine is gone
+      var passed = false;
+      for (var i = 0; i < 10; i++) {
+        m.step(removed);
+        if (m.row < 2) passed = true;
+      }
+      expect(passed, isTrue,
+          reason: 'a destroyed mine leaves floor the patrol can cross');
+    });
+  });
+
   // World 3 spot-check: the chain explosion is genuinely required.
   test('World 3 — Break Through (24) needs the shield to clear the wall', () {
     final level = levelDataFor(24)!;

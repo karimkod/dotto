@@ -796,7 +796,7 @@ class _GameScreenState extends State<GameScreen>
       setState(() {
         _moverFrom = [for (final m in _movers) (m.row, m.col)];
         for (final m in _movers) {
-          m.step();
+          m.step(_destroyedCells);
         }
       });
       _moverCtrl.forward(from: 0);

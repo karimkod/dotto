@@ -58,24 +58,38 @@ class MoverState {
   final int size;
   final bool horizontal;
 
-  /// Positions (along the patrol axis) that are solid — walls, static
-  /// destroyers, the exit — and that the mover bounces off of.
+  /// Positions (along the patrol axis) that were solid AT LEVEL START — walls,
+  /// static destroyers, the exit. This is a snapshot and never changes, so it
+  /// must always be read together with the run's live removed-cell set: a chain
+  /// explosion turns a wall into floor, and the patrol has to sweep through the
+  /// new opening rather than bounce off a wall that is no longer there.
   final Set<int> blocked;
 
   int get row => horizontal ? fixed : pos;
   int get col => horizontal ? pos : fixed;
 
-  bool _solid(int p) => p < 0 || p >= size || blocked.contains(p);
+  /// Cell key of position [p] along this patrol's lane.
+  int keyAt(int p) => horizontal ? fixed * size + p : p * size + fixed;
 
-  /// Advance one cell, bouncing at the grid edge and off any solid cell (wall,
-  /// static destroyer, exit). If both neighbors are solid the mover is trapped
-  /// and stays put.
-  void step() {
+  bool _solid(int p, Set<int> removed) {
+    if (p < 0 || p >= size) return true; // grid edge
+    if (!blocked.contains(p)) return false;
+    return !removed.contains(keyAt(p)); // blown open? then it's floor now
+  }
+
+  /// Advance one cell, bouncing at the grid edge and off any cell still solid
+  /// (wall, static destroyer, exit). If both neighbours are solid the mover is
+  /// trapped and stays put.
+  ///
+  /// [removed] is the run's live set of cell keys cleared by chain explosions.
+  /// It is a required argument on purpose: passing a stale or empty set silently
+  /// makes patrols bounce off demolished walls, which is hard to spot in play.
+  void step(Set<int> removed) {
     var next = pos + dir;
-    if (_solid(next)) {
+    if (_solid(next, removed)) {
       dir = -dir;
       next = pos + dir;
-      if (_solid(next)) return; // boxed in on both sides — can't move
+      if (_solid(next, removed)) return; // boxed in on both sides — can't move
     }
     pos = next;
   }
@@ -222,7 +236,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   for (var t = 0; t < maxTicks; t++) {
     was = {for (final mv in movers) mv: (mv.row, mv.col)};
     for (final mv in movers) {
-      mv.step();
+      mv.step(removed);
     }
 
     if (pause > 0) {
@@ -363,7 +377,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   for (var t = 0; t < maxTicks; t++) {
     was = {for (final mv in movers) mv: (mv.row, mv.col)};
     for (final mv in movers) {
-      mv.step();
+      mv.step(removed);
     }
     if (pause > 0) {
       pause--;
