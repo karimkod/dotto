@@ -68,6 +68,50 @@ void main() {
     expect(simulate(level, {0 * 4 + 1: _shield()}), SimOutcome.lose);
   });
 
+  // A patrol's cell is plain empty floor (patrols are runtime state, not a base
+  // cell type), so unlike a static mine the player CAN place a piece there.
+  // Surviving the patrol must not swallow whatever is underneath it.
+  group('a piece under a patrol', () {
+    // Row 2: dot runs right from (2,0), shield at (2,1). The patrol starts at
+    // (2,4) heading left and lands on (2,2) on the same beat as the dot. The
+    // exit is UP at (0,2), so only the arrow at (2,2) can win it.
+    LevelData underPatrol() => LevelData(
+          id: 905,
+          size: 5,
+          title: 'arrow under a patrol',
+          tip: '',
+          start: const StartSpec(2, 0, Direction.right),
+          exit: const Pos(0, 2),
+          movers: const [MovingDestroyer(2, 4, horizontal: true, dir: -1)],
+          toolkit: const [
+            ToolkitEntry(ToolType.arrowUp, 1),
+            ToolkitEntry(ToolType.shield, 1),
+          ],
+        );
+
+    PlacedElement up() => const PlacedElement(
+        type: PlacedType.arrow, tool: ToolType.arrowUp, direction: Direction.up);
+
+    test('the arrow still turns the dot after the shield kills the patrol', () {
+      final level = underPatrol();
+      expect(simulate(level, {2 * 5 + 1: _shield(), 2 * 5 + 2: up()}),
+          SimOutcome.win);
+    });
+
+    test('without the shield the patrol still kills the dot', () {
+      final level = underPatrol();
+      expect(simulateDetailed(level, {2 * 5 + 2: up()}).cause,
+          DeathCause.patrol);
+    });
+
+    test('without the arrow the dot runs off the board', () {
+      // Confirms the win above comes from the arrow, not from anything else.
+      final level = underPatrol();
+      expect(simulateDetailed(level, {2 * 5 + 1: _shield()}).cause,
+          DeathCause.edge);
+    });
+  });
+
   test('chain explosion clears the wall adjacent to the destroyer', () {
     // start (2,0)→right, exit (2,5), destroyer (2,2) with a wall at (2,3).
     final level = LevelData(

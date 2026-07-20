@@ -5,7 +5,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level.dart';
+import 'package:dotto/models/level_data.dart';
 import 'package:dotto/widgets/game_grid.dart';
 import 'package:dotto/screens/game_screen.dart';
 
@@ -364,5 +366,66 @@ void main() {
 
     // Win → Continue appears.
     expect(find.text('Continue'), findsOneWidget);
+  });
+
+  // Surviving a patrol with a shield must NOT skip what is on the floor of that
+  // cell. Row 2: the dot runs right from (2,0) collecting a shield at (2,1);
+  // the patrol starting at (2,4) heading left lands on (2,2) on the same beat
+  // the dot does. The exit is UP at (0,2), so the ONLY way to win is for the
+  // arrow at (2,2) to still turn the dot after the shield blows the patrol away.
+  //
+  // The game used to return early from the beat after a shielded patrol kill,
+  // skipping the placed piece entirely — the dot ploughed on east and off the
+  // board. The simulator always applied the arrow, so the solver was verifying
+  // solutions the player could not actually execute.
+  testWidgets('an arrow under a patrol still turns the dot after a shield kill',
+      (tester) async {
+    const level = LevelData(
+      id: 905,
+      size: 5,
+      title: 'arrow under a patrol',
+      tip: '',
+      start: StartSpec(2, 0, Direction.right),
+      exit: Pos(0, 2),
+      movers: [MovingDestroyer(2, 4, horizontal: true, dir: -1)],
+      toolkit: [
+        ToolkitEntry(ToolType.shield, 1),
+        ToolkitEntry(ToolType.arrowUp, 1),
+      ],
+    );
+    const meta = Level(
+      id: 905,
+      number: 905,
+      title: 'arrow under a patrol',
+      difficulty: Difficulty.hard,
+      status: LevelStatus.unlocked,
+    );
+
+    await tester.pumpWidget(const MaterialApp(
+        home: GameScreen(level: meta, levelOverride: level)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+
+    // Shield at (2,1), then the Up arrow at (2,2) — under the patrol's path.
+    await tester.tap(find.text('SHIELD'));
+    await tester.pump();
+    await tester.tapAt(boardRect.topLeft + geo.center(2, 1));
+    await tester.pump();
+    await tester.tap(find.text('UP'));
+    await tester.pump();
+    await tester.tapAt(boardRect.topLeft + geo.center(2, 2));
+    await tester.pump();
+
+    await runToWin(tester);
+
+    // Assert on the footer, not the celebration text: the win message is picked
+    // at random from six, so matching it would make this test flaky. An override
+    // level has no next level, so a win ends on "Back to Menu" and a loss would
+    // offer "Retry".
+    expect(find.text('Back to Menu'), findsOneWidget,
+        reason: 'the arrow under the patrol must still redirect the dot');
+    expect(find.text('Retry'), findsNothing, reason: 'the dot should not die');
   });
 }

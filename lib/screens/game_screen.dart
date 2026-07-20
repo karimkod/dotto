@@ -848,8 +848,15 @@ class _GameScreenState extends State<GameScreen>
     final hitMovers = _moversHitting(nr, nc, fromR, fromC);
     if (hitMovers.isNotEmpty) {
       if (_dotShielded) {
-        // Survive: blow the patrol away once the dot has glided into the cell.
-        _afterGlide(() => _shieldDestroyMovers(hitMovers));
+        // Survive: blow the patrol away once the dot has glided into the cell,
+        // then resolve that cell as normal. Surviving a patrol does NOT skip
+        // what is on the floor underneath it — an arrow there still turns the
+        // dot, a pause still holds it. (The patrol's cell is plain empty floor,
+        // so unlike a static mine the player can place a piece on it.)
+        _afterGlide(() {
+          _shieldDestroyMovers(hitMovers);
+          _resolveCell(newKey, nr, nc);
+        });
         return; // the dot moves on next beat
       }
       // Let the dot and the patrol finish gliding into the shared cell first.
@@ -857,6 +864,17 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
+    _resolveCell(newKey, nr, nc);
+  }
+
+  /// Resolve whatever the dot has landed on: hazards underfoot, the start-cell
+  /// redirect, any placed piece, and the exit. Mirrors the tail of
+  /// [simulateDetailed] in the same order, and is reached both by a clean
+  /// arrival and by surviving a patrol on this cell with a shield.
+  ///
+  /// A patrol never stands on a static mine (mines are solid to patrols), so the
+  /// mine branch below cannot re-enter [_afterGlide] when called from a blast.
+  void _resolveCell(int newKey, int nr, int nc) {
     final base = _effBase(nr, nc);
     if (base == CellType.gap) {
       _die(DeathCause.gap);
