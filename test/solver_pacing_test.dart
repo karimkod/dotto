@@ -29,14 +29,20 @@ Future<int> ticksDuring(Future<void> Function() action) async {
 }
 
 void main() {
-  // Level 43 is a real brute-force level (~285k placements) — big enough that
-  // an unsliced sweep is plainly visible as a freeze.
-  final level = levelDataFor(43)!;
+  // Level 45 is the heaviest authored level — a full sweep runs ~18s, so it is
+  // the only one still long enough to expose a freeze now that the path search
+  // finishes the rest in milliseconds. Both runs are capped so the test stays
+  // quick; an incomplete result is fine here, since what is under test is the
+  // event loop's behaviour, not the answer.
+  final heavy = levelDataFor(45)!;
+  const cap = Duration(milliseconds: 1200);
 
   test('the paced sweep lets the event loop run; the sync one does not',
       () async {
-    final pacedTicks = await ticksDuring(() => bruteStatsPaced(level));
-    final syncTicks = await ticksDuring(() async => bruteStats(level));
+    final pacedTicks =
+        await ticksDuring(() => bruteStatsPaced(heavy, cap: cap));
+    final syncTicks =
+        await ticksDuring(() async => bruteStats(heavy, cap: cap));
 
     // The synchronous sweep occupies the thread start to finish, so the timer
     // is starved (browsers coalesce the missed firings into one).
@@ -49,15 +55,19 @@ void main() {
   });
 
   test('pacing does not change the answer', () async {
+    // A level that completes well inside the cap, so both runs are exhaustive
+    // and their answers must match exactly.
+    final level = levelDataFor(43)!;
     final paced = await bruteStatsPaced(level);
     final sync = bruteStats(level);
+    expect(paced.complete && sync.complete, isTrue);
     expect(paced.count, sync.count);
     expect(paced.minPieces, sync.minPieces);
   });
 
   test('no single slice overruns its budget by much', () async {
     const slice = Duration(milliseconds: 12);
-    final search = BruteSearch(levelDataFor(44)!, (_) {});
+    final search = PathSearch(heavy, (_) {});
     var worst = Duration.zero;
     var slices = 0;
     while (slices < 40) {

@@ -1,8 +1,8 @@
 // Verifies every level (World 1: 1–15, World 2: 16–20, World 3: 21–30,
 // World 4: 31–50): that it is solvable, that the intended hand-authored
 // solution actually wins, and that every level is "tight" (no solution leaves a
-// toolkit piece unused). World 4 has moving destroyers, so it uses the
-// timing-aware brute solver. Doubles as the "level solver" the design called
+// toolkit piece unused). World 4 has moving destroyers and pauses, so it uses
+// the timing-aware path search. Doubles as the "level solver" the design called
 // for.
 
 import 'package:flutter/foundation.dart';
@@ -136,7 +136,7 @@ void main() {
     43: [(5, 0, Direction.up), (5, 5, Direction.left)],
     44: [(0, 2, Direction.left), (5, 2, Direction.up)],
     // 45: shield through (1,3) to blow the wall at (1,4) open, then ride the
-    // forced arrow at (1,0) along row 1 and out. See the unverifiable note.
+    // forced arrow at (1,0) along row 1 and out.
     45: [
       (0, 1, Direction.right),
       (0, 2, Direction.down),
@@ -194,24 +194,21 @@ void main() {
   int worldOf(int n) =>
       n <= 15 ? 1 : (n <= 20 ? 2 : (n <= 30 ? 3 : 4));
 
-  // Levels whose search space is too large to enumerate. Level 45 puts 9
-  // toolkit pieces on 34 placeable cells — ~2.4e12 placements, roughly 300000x
-  // the brute-force budget — so the exhaustive "is it solvable" and "is it
-  // tight" tests cannot run on it.
-  //
-  // It is NOT unverified: its recorded solution below is checked by the
-  // "intended solution wins" test through simulate(), which is exact and cheap.
-  // What is unproven is TIGHTNESS — whether some solution wins with fewer than
-  // all 9 pieces. Shrinking the toolkit to <=5 would bring it back in budget.
-  const unbounded = {45};
+  // Enumerating a level twice (once for solvability, once for tightness) is
+  // wasted work — level 45 alone takes ~18s a pass. Cache per level.
+  final solved = <int, List<Map<int, PlacedElement>>>{};
 
   // Moving destroyers (World 4) make timing matter, and pause/teleporter pieces
-  // are invisible to the path solver — for either, only the brute-force,
-  // simulate-based solver is reliable.
-  List<Map<int, PlacedElement>> solveFor(LevelData lvl) =>
-      needsBruteSolver(lvl) ? solveAll(lvl) : pathSolve(lvl);
-  int minPiecesFor(LevelData lvl) =>
-      needsBruteSolver(lvl) ? minSolutionPieces(lvl) : pathMinPieces(lvl);
+  // are invisible to the static path solver — for either, the timing-aware
+  // path search ([pathSolveAll]) is the reliable one.
+  List<Map<int, PlacedElement>> solveFor(LevelData lvl) => solved.putIfAbsent(
+      lvl.id, () => needsBruteSolver(lvl) ? pathSolveAll(lvl) : pathSolve(lvl));
+  int minPiecesFor(LevelData lvl) {
+    final sols = solveFor(lvl);
+    return sols.isEmpty
+        ? -1
+        : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
+  }
 
   for (var n = 1; n <= 50; n++) {
     test('World ${worldOf(n)} — level $n is solvable', () {
@@ -220,7 +217,7 @@ void main() {
       debugPrint('Level $n "${level.title}": ${solutions.length} solution(s)');
       expect(solutions, isNotEmpty,
           reason: 'level $n should have at least one solution');
-    }, skip: unbounded.contains(n) ? 'search space too large — see `unbounded`' : null);
+    });
 
     test('World ${worldOf(n)} — level $n intended solution wins', () {
       final level = levelDataFor(n)!;
@@ -241,7 +238,7 @@ void main() {
       final level = levelDataFor(n)!;
       expect(minPiecesFor(level), toolkitTotal(level),
           reason: 'level $n should have no solution that leaves a piece unused');
-    }, skip: unbounded.contains(n) ? 'search space too large — see `unbounded`' : null);
+    });
   }
 
   // The World 1 exam levels (11–15) are designed to have a single solution.
@@ -396,6 +393,64 @@ void main() {
       }
       expect(sliced, solveAll(level).map(canon).toList(),
           reason: 'level $n sliced sweep');
+    }
+  });
+
+  // ── Path search vs. exhaustive brute force ───────────────────────────────
+  // PathSearch only places pieces on cells the dot actually lands on during
+  // that run. That is sound because a piece elsewhere cannot influence the run
+  // — so it must agree with the exhaustive search on SOLVABILITY and on the
+  // MINIMUM piece count. (A minimal solution never contains an inert piece, or
+  // it would not be minimal.) The solution COUNT may legitimately be smaller,
+  // since the exhaustive search also counts placements that dump spare pieces
+  // on cells the dot never visits.
+  for (final n in [2, 5, 12, 21, 24, 27, 41, 42, 43, 46, 47]) {
+    test('level $n — path search agrees with exhaustive brute force', () {
+      final level = levelDataFor(n)!;
+      final exhaustive = solveAll(level);
+      final path = pathSolveAll(level);
+      int min(List<Map<int, PlacedElement>> s) => s.isEmpty
+          ? -1
+          : s.map((m) => m.length).reduce((a, b) => a < b ? a : b);
+      expect(path.isNotEmpty, exhaustive.isNotEmpty,
+          reason: 'the two searches must agree on whether level $n is solvable');
+      expect(min(path), min(exhaustive),
+          reason: 'minimum piece count must survive the pruning');
+      expect(path.length, lessThanOrEqualTo(exhaustive.length),
+          reason: 'pruning can only ever remove inert placements');
+    });
+  }
+
+  // Whatever the path search reports must genuinely win under the simulator,
+  // which is the actual source of truth for the game.
+  for (final n in [24, 41, 42, 43, 44, 45, 46, 47]) {
+    test('level $n — every path-search solution really wins', () {
+      final level = levelDataFor(n)!;
+      final sols = pathSolveAll(level);
+      expect(sols, isNotEmpty);
+      for (final s in sols) {
+        expect(simulate(level, s), SimOutcome.win,
+            reason: 'a reported solution for level $n does not actually win');
+      }
+    });
+  }
+
+  // Reachability pruning must never discard a cell a real run can touch.
+  test('reachable cells cover every cell the intended solutions visit', () {
+    for (var n = 1; n <= 50; n++) {
+      final level = levelDataFor(n)!;
+      final reach = reachableCells(level);
+      final visited = tracePath(
+          level,
+          place(level, intended[n]!, shields[n] ?? const [],
+              pauses[n] ?? const []));
+      expect(visited, isNotNull, reason: 'level $n intended solution must win');
+      for (final cell in visited!) {
+        if (cell == level.start.r * level.size + level.start.c) continue;
+        expect(reach.contains(cell), isTrue,
+            reason: 'level $n: reachability missed visited cell '
+                '(${cell ~/ level.size},${cell % level.size})');
+      }
     }
   });
 

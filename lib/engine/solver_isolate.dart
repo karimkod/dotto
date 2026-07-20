@@ -77,37 +77,21 @@ SolveReport _bruteReport(LevelData level, BruteStats stats) => SolveReport(
       total: toolkitTotal(level),
       usedBrute: true,
       capped: false,
-    );
-
-/// True when an exhaustive sweep of [level] would blow the placement budget.
-/// Checked before starting one, so an over-large level reports "too large"
-/// instead of spinning until the designer gives up.
-bool _overBudget(LevelData level) =>
-    bruteForcePlacements(
-        placeableCells(level).length, level.toolkit.map((e) => e.count)) >
-    kMaxBrutePlacements;
-
-SolveReport _overBudgetReport(LevelData level) => SolveReport(
-      solutions: 0,
-      minPieces: -1,
-      total: toolkitTotal(level),
-      usedBrute: true,
-      capped: false,
-      overBudget: true,
+      // The search ran; it just may not have finished. Predicting cost up front
+      // is not possible for a path search, so we measure instead of guessing.
+      overBudget: !stats.complete,
     );
 
 /// Solve [level] with whichever solver is correct for it. Pure and sendable;
 /// call [solveLevelAsync] from the UI.
 SolveReport solveLevel(LevelData level) {
   if (!needsBruteSolver(level)) return _pathReport(level);
-  if (_overBudget(level)) return _overBudgetReport(level);
   return _bruteReport(level, bruteStats(level));
 }
 
 /// [solveLevel] in event-loop-friendly slices, for web.
 Future<SolveReport> solveLevelPaced(LevelData level) async {
   if (needsBruteSolver(level)) {
-    if (_overBudget(level)) return _overBudgetReport(level);
     return _bruteReport(level, await bruteStatsPaced(level));
   }
   await Future<void>.delayed(Duration.zero); // let the spinner paint first
@@ -188,23 +172,21 @@ enum _Route {
 
   /// Timing hazards or pause/teleporter pieces: only the brute force is correct.
   brute,
-
-  /// Brute force would cost more than [kMaxBrutePlacements].
-  tooCostly,
 }
+
+/// Per-candidate ceiling. The sweep tries hundreds of toolkits, so no single one
+/// may run as long as [kSolveCap] — a candidate that overruns is reported as
+/// skipped rather than silently treated as unsolvable.
+const Duration _kCandidateCap = Duration(seconds: 3);
 
 _Route _routeFor(
   FindToolkitRequest req,
   Map<ToolType, int> kit,
   LevelData level,
-  int placeable,
 ) {
   if (req.mustShield && (kit[ToolType.shield] ?? 0) == 0) return _Route.filtered;
   if (req.mustPause && (kit[ToolType.pause] ?? 0) == 0) return _Route.filtered;
-  if (!needsBruteSolver(level)) return _Route.path;
-  return bruteForcePlacements(placeable, kit.values) > kMaxBrutePlacements
-      ? _Route.tooCostly
-      : _Route.brute;
+  return needsBruteSolver(level) ? _Route.brute : _Route.path;
 }
 
 /// A candidate that solves the layout using its whole toolkit, or null.
@@ -223,7 +205,6 @@ FindToolkitResult? _accept(
 /// Search [FindToolkitRequest.candidates] for the first solvable, tight toolkit.
 /// Pure and sendable; call [findToolkitAsync] from the UI.
 FindToolkitResult findToolkit(FindToolkitRequest req) {
-  final placeable = placeableCells(req.base).length;
   var skipped = 0;
   var i = req.cursor;
   for (; i < req.candidates.length; i++) {
@@ -231,14 +212,15 @@ FindToolkitResult findToolkit(FindToolkitRequest req) {
     final level = levelWithToolkit(req.base, kit);
     final int count;
     final int minPieces;
-    switch (_routeFor(req, kit, level, placeable)) {
+    switch (_routeFor(req, kit, level)) {
       case _Route.filtered:
         continue;
-      case _Route.tooCostly:
-        skipped++;
-        continue;
       case _Route.brute:
-        final stats = bruteStats(level);
+        final stats = bruteStats(level, cap: _kCandidateCap);
+        if (!stats.complete) {
+          skipped++; // inconclusive — never report it as unsolvable
+          continue;
+        }
         count = stats.count;
         minPieces = stats.minPieces;
       case _Route.path:
@@ -263,13 +245,12 @@ Future<FindToolkitResult> findToolkitPaced(
   FindToolkitRequest req, {
   SearchProgress? onProgress,
 }) async {
-  final placeable = placeableCells(req.base).length;
   var skipped = 0;
   var i = req.cursor;
   for (; i < req.candidates.length; i++) {
     final kit = req.candidates[i];
     final level = levelWithToolkit(req.base, kit);
-    final route = _routeFor(req, kit, level, placeable);
+    final route = _routeFor(req, kit, level);
     // Report every candidate, including the ones we pass over — with a
     // constraint like "must include Pause" most kits are filtered, and a
     // counter that only moved on evaluated ones would look frozen.
@@ -279,12 +260,13 @@ Future<FindToolkitResult> findToolkitPaced(
     switch (route) {
       case _Route.filtered:
         continue;
-      case _Route.tooCostly:
-        skipped++;
-        continue;
       case _Route.brute:
         // Sliced internally — a single big candidate can't hog the thread.
-        final stats = await bruteStatsPaced(level);
+        final stats = await bruteStatsPaced(level, cap: _kCandidateCap);
+        if (!stats.complete) {
+          skipped++; // inconclusive — never report it as unsolvable
+          continue;
+        }
         count = stats.count;
         minPieces = stats.minPieces;
       case _Route.path:

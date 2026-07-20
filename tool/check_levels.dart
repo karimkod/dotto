@@ -19,20 +19,11 @@ void main(List<String> args) {
     // Moving destroyers or pause/teleporter pieces => timing matters => the
     // brute solver is the source of truth.
     final usesBrute = needsBruteSolver(lvl);
-    // A big toolkit on an open board explodes combinatorially (level 45 is
-    // ~2.4e12 placements). Say so and move on rather than appearing to hang.
-    if (usesBrute) {
-      final cost = bruteForcePlacements(
-          placeableCells(lvl).length, lvl.toolkit.map((e) => e.count));
-      if (cost > kMaxBrutePlacements) {
-        print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
-            '*** SKIPPED — ${cost.toStringAsExponential(2)} placements, '
-            '${(cost / kMaxBrutePlacements).toStringAsExponential(1)}x over '
-            'budget (total=$total) ***');
-        continue;
-      }
-    }
-    final sols = usesBrute ? solveAll(lvl) : pathSolve(lvl);
+    // Both solvers follow the dot's path, so even level 45's 9-piece toolkit is
+    // tractable — no level needs skipping any more.
+    final sols = usesBrute ? pathSolveAll(lvl) : pathSolve(lvl);
+    // Only pathSolve caps its results; pathSolveAll counts are exact.
+    final capped = !usesBrute && sols.length >= 256;
     final minP = sols.isEmpty
         ? -1
         : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
@@ -40,7 +31,7 @@ void main(List<String> args) {
     final unique = sols.length == 1;
     print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
         '${usesBrute ? "[brute] " : ""}'
-        'sols=${sols.length}${sols.length >= 256 ? "+" : ""} '
+        'sols=${sols.length}${capped ? "+" : ""} '
         'min=$minP total=$total '
         '${sols.isEmpty ? "*** UNSOLVABLE ***" : (tight ? "TIGHT" : "*** LOOSE ***")} '
         '${unique ? "UNIQUE" : "(${sols.length} solutions)"}');

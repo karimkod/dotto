@@ -20,6 +20,107 @@ List<int> placeableCells(LevelData level) {
 PlacedElement _element(ToolType t) =>
     PlacedElement(type: t.placedType, tool: t, direction: t.direction);
 
+/// Every cell the dot could land on under ANY placement of the toolkit.
+///
+/// A placed piece only ever changes the run when the dot lands on its cell, so
+/// a piece anywhere outside this set is provably inert — the brute force can
+/// skip those cells without losing a single solution.
+///
+/// The walk is deliberately generous, because it must be a SUPERSET of what any
+/// real run can touch:
+///   * at every empty cell the player could have placed any arrow, so all four
+///     headings are explored from it;
+///   * destroyers are treated as survivable (a shield may clear them);
+///   * walls beside a destroyer — or beside any cell in a patrol's lane — are
+///     treated as demolishable, since a shielded hit chain-explodes them;
+///   * gaps, and walls no explosion can reach, block. Nothing ever clears a gap.
+/// Mover collisions and shield supply are ignored; both only ever kill the dot,
+/// so ignoring them can add cells but never lose one.
+Set<int> reachableCells(LevelData level) {
+  final n = level.size;
+
+  // Walls some chain explosion could open.
+  final clearable = <int>{};
+  void markWallsAround(int r, int c) {
+    for (final (dr, dc) in const [(-1, 0), (1, 0), (0, -1), (0, 1)]) {
+      final ar = r + dr, ac = c + dc;
+      if (ar < 0 || ar >= n || ac < 0 || ac >= n) continue;
+      if (level.baseTypeAt(ar, ac) == CellType.wall) clearable.add(ar * n + ac);
+    }
+  }
+
+  for (final d in level.destroyers) {
+    markWallsAround(d.r, d.c);
+  }
+  for (final m in level.movers) {
+    // A patrol sweeps its whole lane, and can be shielded anywhere along it.
+    for (var p = 0; p < n; p++) {
+      markWallsAround(m.horizontal ? m.r : p, m.horizontal ? p : m.c);
+    }
+  }
+
+  bool blocks(int r, int c) {
+    final t = level.baseTypeAt(r, c);
+    if (t == CellType.gap) return true;
+    if (t == CellType.wall) return !clearable.contains(r * n + c);
+    return false;
+  }
+
+  final cells = <int>{};
+  // State is (cell, heading) packed as key * 4 + direction index.
+  final seen = <int>{};
+  final stack = <int>[];
+  void push(int r, int c, Direction d) {
+    final s = (r * n + c) * 4 + d.index;
+    if (seen.add(s)) stack.add(s);
+  }
+
+  push(level.start.r, level.start.c, level.start.dir);
+  while (stack.isNotEmpty) {
+    final s = stack.removeLast();
+    final dir = Direction.values[s % 4];
+    final from = s ~/ 4;
+    final (dr, dc) = dir.delta;
+    final nr = from ~/ n + dr, nc = from % n + dc;
+    if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+    if (blocks(nr, nc)) continue;
+    cells.add(nr * n + nc);
+    final t = level.baseTypeAt(nr, nc);
+    if (t == CellType.exit) continue; // the run ends here
+    final forced = level.forcedArrowAt(nr, nc);
+    if (forced != null) {
+      push(nr, nc, forced);
+    } else if (t == CellType.start) {
+      push(nr, nc, level.start.dir); // start permanently redirects
+    } else if (t == CellType.empty) {
+      // Any arrow could sit here — or none, which keeps the incoming heading.
+      for (final d in Direction.values) {
+        push(nr, nc, d);
+      }
+    } else {
+      push(nr, nc, dir); // destroyer or blown-open wall: straight through
+    }
+  }
+  return cells;
+}
+
+/// The cells the brute force actually has to try: [placeableCells] narrowed to
+/// those the dot can reach.
+///
+/// Falls back to the full set when the toolkit holds a teleporter. That is the
+/// one piece whose effect is NOT local — the simulator reads the *other*
+/// teleporter's cell to find the destination, so a teleporter on a cell the dot
+/// never lands on still changes the run, and pruning it away would be wrong.
+List<int> candidateCells(LevelData level) {
+  final all = placeableCells(level);
+  if (level.toolkit.any((e) => e.type == ToolType.teleporter)) return all;
+  final reach = reachableCells(level);
+  return [
+    for (final c in all)
+      if (reach.contains(c)) c,
+  ];
+}
+
 /// Called for each winning placement. The map is the searcher's live board —
 /// copy it if you need to keep it.
 typedef WinSink = void Function(Map<int, PlacedElement> placement);
@@ -49,7 +150,7 @@ class _Frame {
 /// it to completion in one call inside a real isolate.
 class BruteSearch {
   BruteSearch(this.level, this._onWin)
-      : cells = placeableCells(level),
+      : cells = candidateCells(level),
         remaining = {for (final e in level.toolkit) e.type: e.count} {
     types = remaining.keys.toList();
     if (cells.isEmpty) {
@@ -120,8 +221,322 @@ class BruteSearch {
   }
 }
 
-/// A budget long enough that [BruteSearch.runSlice] runs to completion.
+/// A budget long enough that a `runSlice` call runs to completion.
 const Duration _uninterrupted = Duration(days: 1);
+
+// ── Path-following search ──────────────────────────────────────────────────
+// [BruteSearch] tries every piece on every candidate cell, which explodes: on
+// level 45 that is ~2.4e12 placements. Reachability pruning barely dents it,
+// because once any arrow may sit on any empty cell the dot can steer almost
+// anywhere.
+//
+// The real saving is per-RUN, not per-board: on any single run the dot lands on
+// a dozen-odd cells, and a piece anywhere else cannot have influenced it. So
+// this search simulates the dot tick-accurately — movers, pauses, shields,
+// chain explosions and all — and branches ONLY when it lands on a cell whose
+// contents are still undecided. Every distinct decision sequence yields a
+// distinct placement, so solutions are enumerated exactly once.
+//
+// Versus [BruteSearch] this reports the same SOLVABILITY and the same MINIMUM
+// piece count (a minimal solution never contains an inert piece, or it would
+// not be minimal). It reports a smaller solution COUNT, because it omits
+// placements that merely dump spare pieces on cells the dot never visits —
+// which is the same convention [pathSolve] already uses.
+
+/// One branch point: the state to restore, and which choices remain.
+class _Choice {
+  _Choice(this.saved, this.key, this.options);
+  final _RunState saved;
+  final int key;
+
+  /// null = leave the cell empty; otherwise the tool to place.
+  final List<ToolType?> options;
+  int next = 0;
+}
+
+/// A full simulation state, cheap enough to snapshot at each branch point.
+class _RunState {
+  _RunState({
+    required this.r,
+    required this.c,
+    required this.dir,
+    required this.pause,
+    required this.shielded,
+    required this.tick,
+    required this.taken,
+    required this.removed,
+    required this.decided,
+    required this.moverPos,
+    required this.moverDir,
+    required this.placed,
+    required this.remaining,
+  });
+
+  int r, c, pause, tick;
+  Direction dir;
+  bool shielded;
+  Set<int> taken, removed, decided;
+  List<int> moverPos, moverDir;
+  Map<int, PlacedElement> placed;
+  Map<ToolType, int> remaining;
+
+  _RunState clone() => _RunState(
+        r: r,
+        c: c,
+        dir: dir,
+        pause: pause,
+        shielded: shielded,
+        tick: tick,
+        taken: {...taken},
+        removed: {...removed},
+        decided: {...decided},
+        moverPos: [...moverPos],
+        moverDir: [...moverDir],
+        placed: {...placed},
+        remaining: {...remaining},
+      );
+}
+
+/// Enumerates every winning placement by following the dot's actual path.
+/// Mirrors [simulateDetailed]'s tick order exactly — that is what makes its
+/// answers trustworthy. Pausable via [runSlice], like [BruteSearch].
+class PathSearch {
+  PathSearch(this.level, this._onWin)
+      : n = level.size,
+        maxTicks = level.size * level.size * 4 + 20,
+        _movers = buildMovers(level) {
+    for (final a in level.forcedArrows) {
+      _forced[a.r * n + a.c] = a.dir;
+    }
+    for (final k in placeableCells(level)) {
+      _placeable.add(k);
+    }
+    _cur = _RunState(
+      r: level.start.r,
+      c: level.start.c,
+      dir: level.start.dir,
+      pause: 0,
+      shielded: false,
+      tick: 0,
+      taken: {},
+      removed: {},
+      decided: {},
+      moverPos: [for (final m in _movers) m.pos],
+      moverDir: [for (final m in _movers) m.dir],
+      placed: {},
+      remaining: {for (final e in level.toolkit) e.type: e.count},
+    );
+  }
+
+  final LevelData level;
+  final int n;
+  final int maxTicks;
+  final WinSink _onWin;
+  final List<MoverState> _movers; // templates: lane, size, blocked set
+  final Map<int, Direction> _forced = {};
+  final Set<int> _placeable = {};
+  final List<_Choice> _stack = [];
+  late _RunState _cur;
+
+  bool done = false;
+
+  /// Step one mover, mirroring [MoverState.step].
+  void _stepMover(int i) {
+    final m = _movers[i];
+    var pos = _cur.moverPos[i], d = _cur.moverDir[i];
+    bool solid(int p) => p < 0 || p >= m.size || m.blocked.contains(p);
+    var next = pos + d;
+    if (solid(next)) {
+      d = -d;
+      next = pos + d;
+      if (solid(next)) {
+        _cur.moverDir[i] = d;
+        return; // boxed in
+      }
+    }
+    _cur.moverPos[i] = next;
+    _cur.moverDir[i] = d;
+  }
+
+  int _moverRow(int i) => _movers[i].horizontal ? _movers[i].fixed : _cur.moverPos[i];
+  int _moverCol(int i) => _movers[i].horizontal ? _cur.moverPos[i] : _movers[i].fixed;
+
+  /// Resolve patrols sharing the dot's cell. Returns true when fatal.
+  bool _moverCollision() {
+    final hit = <int>[];
+    for (var i = 0; i < _movers.length; i++) {
+      if (_cur.moverPos[i] >= 0 &&
+          _moverRow(i) == _cur.r &&
+          _moverCol(i) == _cur.c) {
+        hit.add(i);
+      }
+    }
+    if (hit.isEmpty) return false;
+    if (!_cur.shielded) return true;
+    _cur.shielded = false;
+    for (final i in hit) {
+      final mk = _moverRow(i) * n + _moverCol(i);
+      _cur.moverPos[i] = -1000; // destroyed, parked off-lane
+      _cur.removed.add(mk);
+      _cur.removed.addAll(adjacentWallKeys(level, mk));
+    }
+    return false;
+  }
+
+  CellType _eff(int r, int c) => _cur.removed.contains(r * n + c)
+      ? CellType.empty
+      : level.baseTypeAt(r, c);
+
+  /// Apply a piece's effect to the live state.
+  void _apply(PlacedElement piece, int key) {
+    switch (piece.type) {
+      case PlacedType.arrow:
+        _cur.dir = piece.direction!;
+      case PlacedType.pause:
+        _cur.pause = 2;
+      case PlacedType.shield:
+        if (_cur.taken.add(key)) _cur.shielded = true;
+      case PlacedType.teleporter:
+        for (final e in _cur.placed.entries) {
+          if (e.value.type == PlacedType.teleporter && e.key != key) {
+            _cur.r = e.key ~/ n;
+            _cur.c = e.key % n;
+            break;
+          }
+        }
+    }
+  }
+
+  /// Take the next untried choice, restoring state. False when exhausted.
+  bool _backtrack() {
+    while (_stack.isNotEmpty) {
+      final f = _stack.last;
+      if (f.next >= f.options.length) {
+        _stack.removeLast();
+        continue;
+      }
+      final opt = f.options[f.next++];
+      _cur = f.saved.clone();
+      _cur.decided.add(f.key);
+      if (opt != null) {
+        _cur.remaining[opt] = _cur.remaining[opt]! - 1;
+        final piece = _element(opt);
+        _cur.placed[f.key] = piece;
+        _apply(piece, f.key);
+      }
+      // The exit check happens after the piece resolves, as in the simulator.
+      if (level.baseTypeAt(_cur.r, _cur.c) == CellType.exit) {
+        _onWin(_cur.placed);
+        continue; // a win is a leaf — keep looking for others
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Explore for up to [budget]. True when the search is finished.
+  bool runSlice(Duration budget) {
+    if (done) return true;
+    final sw = Stopwatch()..start();
+    var leaves = 0;
+
+    while (true) {
+      var dead = false;
+      // Advance until this run ends or reaches an undecided cell.
+      while (_cur.tick < maxTicks) {
+        _cur.tick++;
+        for (var i = 0; i < _movers.length; i++) {
+          if (_cur.moverPos[i] > -1000) _stepMover(i);
+        }
+        if (_cur.pause > 0) {
+          _cur.pause--;
+          if (_moverCollision()) {
+            dead = true;
+            break;
+          }
+          continue;
+        }
+        final (dr, dc) = _cur.dir.delta;
+        final nr = _cur.r + dr, nc = _cur.c + dc;
+        if (nr < 0 || nr >= n || nc < 0 || nc >= n) {
+          dead = true;
+          break;
+        }
+        if (_eff(nr, nc) == CellType.wall) {
+          dead = true;
+          break;
+        }
+        _cur.r = nr;
+        _cur.c = nc;
+        if (_moverCollision()) {
+          dead = true;
+          break;
+        }
+        final key = nr * n + nc;
+        final base = _eff(nr, nc);
+        if (base == CellType.gap) {
+          dead = true;
+          break;
+        }
+        if (base == CellType.destroyer || base == CellType.movingDestroyer) {
+          if (!_cur.shielded) {
+            dead = true;
+            break;
+          }
+          _cur.shielded = false;
+          _cur.removed.add(key);
+          _cur.removed.addAll(adjacentWallKeys(level, key));
+        }
+        if (base == CellType.start) _cur.dir = level.start.dir;
+
+        // Branch point: an undecided cell we could still put a piece on.
+        if (_placeable.contains(key) &&
+            !_cur.decided.contains(key) &&
+            !_cur.placed.containsKey(key)) {
+          final opts = <ToolType?>[
+            null, // leave it empty
+            for (final t in _cur.remaining.keys)
+              if (_cur.remaining[t]! > 0) t,
+          ];
+          _stack.add(_Choice(_cur.clone(), key, opts));
+          if (!_backtrack()) {
+            done = true;
+            return true;
+          }
+          continue; // resume simulating with the chosen option applied
+        }
+
+        final placedHere = _cur.placed[key];
+        final forcedDir = _forced[key];
+        if (placedHere != null) {
+          _apply(placedHere, key);
+        } else if (forcedDir != null) {
+          _cur.dir = forcedDir;
+        }
+        if (level.baseTypeAt(_cur.r, _cur.c) == CellType.exit) {
+          _onWin(_cur.placed);
+          dead = true; // a win ends this run
+          break;
+        }
+      }
+      // This run is over (won, died, or looped) — take the next branch.
+      if (dead || _cur.tick >= maxTicks) {
+        if (!_backtrack()) {
+          done = true;
+          return true;
+        }
+      }
+      if ((++leaves & 63) == 0 && sw.elapsed >= budget) return false;
+    }
+  }
+}
+
+/// Every winning placement, found by following the dot's path.
+List<Map<int, PlacedElement>> pathSolveAll(LevelData level) {
+  final out = <Map<int, PlacedElement>>[];
+  PathSearch(level, (p) => out.add(Map.of(p))).runSlice(_uninterrupted);
+  return out;
+}
 
 /// Brute-force every distinct way to place a subset of the toolkit on the board
 /// and return all configurations that solve the level.
@@ -135,10 +550,20 @@ List<Map<int, PlacedElement>> solveAll(LevelData level) {
 /// there are none). Tallying instead of materialising every solution keeps a
 /// wide-open candidate from building a huge list just to count it.
 class BruteStats {
-  const BruteStats(this.count, this.minPieces);
+  const BruteStats(this.count, this.minPieces, {this.complete = true});
   final int count;
   final int minPieces;
+
+  /// False when the search hit its time cap before exhausting the space. The
+  /// numbers are then a floor, not an answer — treat the result as "don't
+  /// know", never as "unsolvable".
+  final bool complete;
 }
+
+/// Default ceiling on a single solve. Level 45 — the heaviest authored level —
+/// enumerates fully in ~18s, so this leaves headroom without letting a
+/// pathological board hang forever.
+const Duration kSolveCap = Duration(seconds: 40);
 
 WinSink _tally(void Function(int count, int minPieces) set) {
   var count = 0;
@@ -150,15 +575,24 @@ WinSink _tally(void Function(int count, int minPieces) set) {
   };
 }
 
-/// [solveAll] reduced to a count and a minimum, without keeping the solutions.
-BruteStats bruteStats(LevelData level) {
+/// Solution count and minimum piece count, via the path-following search.
+///
+/// Uses [PathSearch], not [BruteSearch]: it gives the same solvability and the
+/// same minimum while skipping placements the dot could never have touched,
+/// which is the difference between 18 seconds and 2.4e12 placements on level 45.
+BruteStats bruteStats(LevelData level, {Duration cap = kSolveCap}) {
   var count = 0;
   var minPieces = -1;
-  BruteSearch(level, _tally((c, m) {
+  final search = PathSearch(level, _tally((c, m) {
     count = c;
     minPieces = m;
-  })).runSlice(_uninterrupted);
-  return BruteStats(count, minPieces);
+  }));
+  final sw = Stopwatch()..start();
+  var finished = false;
+  while (!(finished = search.runSlice(const Duration(milliseconds: 50)))) {
+    if (sw.elapsed >= cap) break;
+  }
+  return BruteStats(count, minPieces, complete: finished);
 }
 
 /// [bruteStats] run in [slice]-sized pieces, yielding to the event loop between
@@ -166,19 +600,23 @@ BruteStats bruteStats(LevelData level) {
 Future<BruteStats> bruteStatsPaced(
   LevelData level, {
   Duration slice = const Duration(milliseconds: 12),
+  Duration cap = kSolveCap,
 }) async {
   var count = 0;
   var minPieces = -1;
-  final search = BruteSearch(level, _tally((c, m) {
+  final search = PathSearch(level, _tally((c, m) {
     count = c;
     minPieces = m;
   }));
-  while (!search.runSlice(slice)) {
+  final sw = Stopwatch()..start();
+  var finished = false;
+  while (!(finished = search.runSlice(slice))) {
+    if (sw.elapsed >= cap) break;
     // A macrotask, not a microtask — microtasks drain before the browser gets
     // to paint, so `Duration.zero` here is what actually frees the frame.
     await Future<void>.delayed(Duration.zero);
   }
-  return BruteStats(count, minPieces);
+  return BruteStats(count, minPieces, complete: finished);
 }
 
 /// True if at least one placement of the toolkit solves the level.
