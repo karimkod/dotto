@@ -361,13 +361,31 @@ class PathSearch {
   int _moverRow(int i) => _movers[i].horizontal ? _movers[i].fixed : _cur.moverPos[i];
   int _moverCol(int i) => _movers[i].horizontal ? _cur.moverPos[i] : _movers[i].fixed;
 
-  /// Resolve patrols sharing the dot's cell. Returns true when fatal.
-  bool _moverCollision() {
+  /// Resolve patrols that hit the dot — sharing its cell, or trading places
+  /// with it when it moved from ([fromR],[fromC]). Returns true when fatal.
+  /// Mirrors [moversCrossed] in the simulator; the two must never diverge.
+  bool _moverCollision({int? fromR, int? fromC, List<int>? before}) {
     final hit = <int>[];
     for (var i = 0; i < _movers.length; i++) {
-      if (_cur.moverPos[i] >= 0 &&
-          _moverRow(i) == _cur.r &&
-          _moverCol(i) == _cur.c) {
+      if (_cur.moverPos[i] < 0) continue; // destroyed
+      if (_moverRow(i) == _cur.r && _moverCol(i) == _cur.c) {
+        hit.add(i);
+        continue;
+      }
+      if (fromR == null || fromC == null || before == null) continue;
+      final m = _movers[i];
+      final wasRow = m.horizontal ? m.fixed : before[i];
+      final wasCol = m.horizontal ? before[i] : m.fixed;
+      if (moversCrossed(
+        dotFromR: fromR,
+        dotFromC: fromC,
+        dotToR: _cur.r,
+        dotToC: _cur.c,
+        moverFromR: wasRow,
+        moverFromC: wasCol,
+        moverToR: _moverRow(i),
+        moverToC: _moverCol(i),
+      )) {
         hit.add(i);
       }
     }
@@ -445,6 +463,8 @@ class PathSearch {
       // Advance until this run ends or reaches an undecided cell.
       while (_cur.tick < maxTicks) {
         _cur.tick++;
+        // Positions before the step, so a crossing can be spotted below.
+        final beforeStep = [..._cur.moverPos];
         for (var i = 0; i < _movers.length; i++) {
           if (_cur.moverPos[i] > -1000) _stepMover(i);
         }
@@ -466,9 +486,11 @@ class PathSearch {
           dead = true;
           break;
         }
+        final fromR = _cur.r, fromC = _cur.c;
         _cur.r = nr;
         _cur.c = nc;
-        if (_moverCollision()) {
+        if (_moverCollision(
+            fromR: fromR, fromC: fromC, before: beforeStep)) {
           dead = true;
           break;
         }

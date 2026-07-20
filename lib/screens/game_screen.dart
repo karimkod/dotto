@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
 import '../engine/simulator.dart'
-    show adjacentWallKeys, buildMovers, DeathCause, MoverState;
+    show adjacentWallKeys, buildMovers, DeathCause, MoverState, moversCrossed;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -674,6 +674,36 @@ class _GameScreenState extends State<GameScreen>
   List<MoverState> _moversAt(int r, int c) =>
       _movers.where((m) => m.row == r && m.col == c).toList();
 
+  /// Patrols that hit the dot as it moved from (fromR,fromC) to (toR,toC):
+  /// those ending on its cell, plus those that traded places with it. Crossing
+  /// counts as a hit — otherwise the two slide through each other, which looks
+  /// on screen like the dot surviving a direct strike. [_moverFrom] is captured
+  /// before the step and kept index-aligned by [_removeMover].
+  List<MoverState> _moversHitting(int toR, int toC, int fromR, int fromC) {
+    final out = <MoverState>[];
+    for (var i = 0; i < _movers.length; i++) {
+      final m = _movers[i];
+      if (m.row == toR && m.col == toC) {
+        out.add(m);
+        continue;
+      }
+      if (i < _moverFrom.length &&
+          moversCrossed(
+            dotFromR: fromR,
+            dotFromC: fromC,
+            dotToR: toR,
+            dotToC: toC,
+            moverFromR: _moverFrom[i].$1,
+            moverFromC: _moverFrom[i].$2,
+            moverToR: m.row,
+            moverToC: m.col,
+          )) {
+        out.add(m);
+      }
+    }
+    return out;
+  }
+
   /// Remove a patrol from the active list, keeping [_moverFrom] index-aligned
   /// with [_movers] so the surviving patrols keep gliding from their OWN
   /// previous cell (not a shifted neighbour's) after one is destroyed.
@@ -812,10 +842,10 @@ class _GameScreenState extends State<GameScreen>
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
 
-    // Both have moved — collide only if a patrol shares the dot's FINAL cell
-    // (crossing/swapping cells is safe). A shield blows the patrol away and the
-    // dot survives; otherwise it's caught.
-    final hitMovers = _moversAt(nr, nc);
+    // Both have moved — a patrol catches the dot by sharing its FINAL cell or by
+    // trading places with it. A shield blows the patrol away and the dot
+    // survives; otherwise it's caught.
+    final hitMovers = _moversHitting(nr, nc, fromR, fromC);
     if (hitMovers.isNotEmpty) {
       if (_dotShielded) {
         // Survive: blow the patrol away once the dot has glided into the cell.

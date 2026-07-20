@@ -81,6 +81,29 @@ class MoverState {
   }
 }
 
+/// True when the dot and a patrol swapped cells this tick: the dot stepped into
+/// the cell the patrol just left, and the patrol stepped into the cell the dot
+/// just left. They never share a cell, so a final-cell-only check misses it and
+/// the two slide through one another.
+///
+/// Every code path that moves the dot past a patrol must apply this — the live
+/// game tick, [simulateDetailed], [tracePath] and the solver's own path search —
+/// or the game and the solver disagree about what kills you.
+bool moversCrossed({
+  required int dotFromR,
+  required int dotFromC,
+  required int dotToR,
+  required int dotToC,
+  required int moverFromR,
+  required int moverFromC,
+  required int moverToR,
+  required int moverToC,
+}) =>
+    moverFromR == dotToR &&
+    moverFromC == dotToC &&
+    moverToR == dotFromR &&
+    moverToC == dotFromC;
+
 /// Cells a mover treats as solid (bounces off): walls, static destroyers and
 /// the exit.
 bool _isSolidForMover(LevelData level, int r, int c) {
@@ -120,8 +143,10 @@ List<MoverState> buildMovers(LevelData level) {
 ///
 /// Tick order: the dot and the moving destroyers move SIMULTANEOUSLY, then we
 /// check whether any mover ended on the dot's final cell — if so, the dot dies.
-/// If the dot and a mover merely cross paths (swap cells) the dot escapes. A
-/// shield does NOT save the dot from a mover (pure timing hazards).
+/// The dot ALSO dies when it and a patrol trade places (see [moversCrossed]):
+/// they never share a cell, but they pass straight through each other, which
+/// reads on screen as the dot surviving a direct hit. A shield saves the dot in
+/// either case, destroying the patrol and chain-exploding the walls beside it.
 SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) =>
     simulateDetailed(level, placed).outcome;
 
@@ -158,11 +183,28 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
   final movers = buildMovers(level);
-  // Resolve any patrol(s) sharing the dot's cell. A shield is spent to destroy
-  // the mover(s) and chain-explode adjacent walls (the dot survives); without a
-  // shield the dot dies. Returns true when the collision is fatal.
-  bool moverCollision(int rr, int cc) {
-    final hit = movers.where((mv) => mv.row == rr && mv.col == cc).toList();
+  // Where each patrol stood before this tick's step, so a crossing can be spotted.
+  var was = <MoverState, (int, int)>{};
+  // Resolve any patrol(s) that hit the dot — either by ending on its cell or by
+  // trading places with it. A shield is spent to destroy the mover(s) and
+  // chain-explode adjacent walls (the dot survives); without a shield the dot
+  // dies. [fromR]/[fromC] is the cell the dot just left. Returns true when fatal.
+  bool moverCollision(int rr, int cc, {int? fromR, int? fromC}) {
+    final hit = movers.where((mv) {
+      if (mv.row == rr && mv.col == cc) return true;
+      final w = was[mv];
+      if (w == null || fromR == null || fromC == null) return false;
+      return moversCrossed(
+        dotFromR: fromR,
+        dotFromC: fromC,
+        dotToR: rr,
+        dotToC: cc,
+        moverFromR: w.$1,
+        moverFromC: w.$2,
+        moverToR: mv.row,
+        moverToC: mv.col,
+      );
+    }).toList();
     if (hit.isEmpty) return false;
     if (!shielded) return true;
     shielded = false;
@@ -178,6 +220,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
+    was = {for (final mv in movers) mv: (mv.row, mv.col)};
     for (final mv in movers) {
       mv.step();
     }
@@ -201,11 +244,12 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
       return const SimResult(SimOutcome.lose, DeathCause.wall);
     }
 
+    final fromR = r, fromC = c;
     r = nr;
     c = nc;
-    // Both have moved — collide only on a shared FINAL cell. If the dot and a
-    // mover merely crossed paths (swapped cells) the dot escapes.
-    if (moverCollision(r, c)) {
+    // Both have moved — a patrol kills the dot by sharing its final cell OR by
+    // trading places with it (passing through counts as a hit).
+    if (moverCollision(r, c, fromR: fromR, fromC: fromC)) {
       return const SimResult(SimOutcome.lose, DeathCause.patrol);
     }
     final key = r * n + c;
@@ -281,10 +325,26 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   CellType effBase(int rr, int cc) =>
       removed.contains(rr * n + cc) ? CellType.empty : level.baseTypeAt(rr, cc);
   final movers = buildMovers(level);
-  // See simulate(): a shield destroys the patrol(s) on the dot's cell and
-  // chain-explodes adjacent walls; otherwise the dot dies. Returns true if fatal.
-  bool moverCollision(int rr, int cc) {
-    final hit = movers.where((mv) => mv.row == rr && mv.col == cc).toList();
+  var was = <MoverState, (int, int)>{};
+  // See simulate(): a shield destroys the patrol(s) that hit the dot — by
+  // sharing its cell or by trading places with it — and chain-explodes adjacent
+  // walls; otherwise the dot dies. Returns true if fatal.
+  bool moverCollision(int rr, int cc, {int? fromR, int? fromC}) {
+    final hit = movers.where((mv) {
+      if (mv.row == rr && mv.col == cc) return true;
+      final w = was[mv];
+      if (w == null || fromR == null || fromC == null) return false;
+      return moversCrossed(
+        dotFromR: fromR,
+        dotFromC: fromC,
+        dotToR: rr,
+        dotToC: cc,
+        moverFromR: w.$1,
+        moverFromC: w.$2,
+        moverToR: mv.row,
+        moverToC: mv.col,
+      );
+    }).toList();
     if (hit.isEmpty) return false;
     if (!shielded) return true;
     shielded = false;
@@ -301,6 +361,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final maxTicks = n * n * 4 + 20;
 
   for (var t = 0; t < maxTicks; t++) {
+    was = {for (final mv in movers) mv: (mv.row, mv.col)};
     for (final mv in movers) {
       mv.step();
     }
@@ -314,10 +375,11 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     final nc = c + dc;
     if (nr < 0 || nr >= n || nc < 0 || nc >= n) return null;
     if (effBase(nr, nc) == CellType.wall) return null;
+    final fromR = r, fromC = c;
     r = nr;
     c = nc;
-    // Collide only on a shared FINAL cell; crossing (swapping cells) is safe.
-    if (moverCollision(r, c)) return null;
+    // A shared final cell, or a crossing — both are fatal without a shield.
+    if (moverCollision(r, c, fromR: fromR, fromC: fromC)) return null;
     final base = effBase(r, c);
     if (base == CellType.gap) return null;
     if (base == CellType.destroyer || base == CellType.movingDestroyer) {

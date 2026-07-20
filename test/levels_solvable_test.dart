@@ -454,6 +454,68 @@ void main() {
     }
   });
 
+  // ── Crossing a patrol is a hit ───────────────────────────────────────────
+  // Dot and patrol head straight at each other on the same row. They swap cells
+  // without ever sharing one, so a final-cell-only check let the dot slide
+  // straight through a mine — which is what players saw and reported.
+  group('dot and patrol crossing', () {
+    // Row 2: dot starts at (2,0) heading right; patrol starts at (2,1) heading
+    // left. After one tick the dot is at (2,1) and the patrol at (2,0).
+    const headOn = LevelData(
+      id: 900,
+      size: 5,
+      title: 'crossing',
+      tip: '',
+      start: StartSpec(2, 0, Direction.right),
+      exit: Pos(2, 4),
+      movers: [MovingDestroyer(2, 1, horizontal: true, dir: -1)],
+      toolkit: [],
+    );
+
+    test('the dot dies instead of passing through', () {
+      final res = simulateDetailed(headOn, const {});
+      expect(res.outcome, SimOutcome.lose);
+      expect(res.cause, DeathCause.patrol,
+          reason: 'trading places with a patrol must count as being caught');
+    });
+
+    test('tracePath agrees that the crossing is fatal', () {
+      expect(tracePath(headOn, const {}), isNull);
+    });
+
+    test('a shield still carries the dot through a crossing', () {
+      // Dot and patrol close at two cells a tick, so they SHARE a cell when the
+      // starting gap is even and CROSS when it is odd. Gap 5 => they cross on
+      // tick 3, by which point the dot has collected the shield at (2,1).
+      const shielded = LevelData(
+        id: 901,
+        size: 7,
+        title: 'crossing with shield',
+        tip: '',
+        start: StartSpec(2, 0, Direction.right),
+        exit: Pos(2, 6),
+        movers: [MovingDestroyer(2, 5, horizontal: true, dir: -1)],
+        toolkit: [ToolkitEntry(ToolType.shield, 1)],
+      );
+      // The shield is spent destroying the patrol, exactly as for a shared cell.
+      expect(simulate(shielded, place(shielded, const [], const [(2, 1)])),
+          SimOutcome.win);
+      // Without the shield the same crossing is fatal.
+      expect(simulateDetailed(shielded, const {}).cause, DeathCause.patrol);
+    });
+
+    test('the solver does not offer solutions that cross a patrol', () {
+      // Every solution the search returns must survive the real simulator.
+      for (var n = 31; n <= 50; n++) {
+        final level = levelDataFor(n)!;
+        for (final s in pathSolveAll(level)) {
+          expect(simulate(level, s), SimOutcome.win,
+              reason: 'level $n: solver returned a run the game would kill');
+        }
+      }
+    });
+  });
+
   // World 3 spot-check: the chain explosion is genuinely required.
   test('World 3 — Break Through (24) needs the shield to clear the wall', () {
     final level = levelDataFor(24)!;
