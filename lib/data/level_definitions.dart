@@ -985,25 +985,34 @@ const Map<int, LevelData> levelDefinitions = {
 
   // ----- Final exams (47–50): every mechanic at once. -----
 
-  // 47 — Breach & Wait: breach a wall on the climb with a shielded hit, then
-  // pause for a patrol on the floor. A fixed arrow finishes the run.
+  // 47 — Breach & Wait: the exit at (2,3) is boxed in on all four sides, and
+  // there are no static mines — the only demolition charges are the two patrols
+  // themselves. The column-5 patrol is fenced below row 4 by the wall at (4,5),
+  // so the first shielded hit has to open that wall before the second patrol can
+  // even climb to where its own blast opens the exit.
   47: LevelData(
     id: 47,
-    size: 6,
+    size: 8,
     title: 'Breach & Wait',
-    tip: 'Shield through the wall, then pause for the floor patrol.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [Pos(3, 4), Pos(2, 5)],
-    forcedArrows: [ForcedArrow(0, 5, Direction.left)],
+    tip: 'No mines here — the patrols are your charges. Two shields, two '
+        'breaches.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(2, 3),
+    walls: [
+      Pos(1, 2), Pos(1, 4), Pos(2, 4), Pos(2, 2), Pos(4, 5), Pos(4, 6),
+      Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(1, 3), Pos(4, 1), Pos(4, 0),
+      Pos(0, 0), Pos(0, 1),
+    ],
     movers: [
-      MovingDestroyer(3, 5, horizontal: true, dir: 1), // breach patrol
-      MovingDestroyer(3, 2, horizontal: false, dir: 1), // floor patrol
+      MovingDestroyer(5, 1, horizontal: true, dir: -1),
+      MovingDestroyer(6, 5, horizontal: false, dir: 1),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.pause, 2),
     ],
   ),
 

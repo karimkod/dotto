@@ -147,7 +147,14 @@ void main() {
     // 46: climb column 2, spending a shield on each patrol row that blocks it.
     46: [(0, 2, Direction.right), (6, 2, Direction.up)],
     // 47–50: final exams.
-    47: [(5, 5, Direction.up)],
+    // 47: the exit is boxed in and there are no mines — the two patrols are the
+    // only demolition charges, and the first blast frees the second patrol.
+    47: [
+      (2, 7, Direction.left),
+      (5, 4, Direction.right),
+      (5, 7, Direction.up),
+      (7, 4, Direction.up),
+    ],
     48: [(6, 6, Direction.up)],
     49: [(6, 6, Direction.up)],
     50: [(7, 7, Direction.up)],
@@ -161,7 +168,7 @@ void main() {
     44: [(2, 2), (5, 1)],
     45: [(6, 2), (6, 3)],
     46: [(4, 2), (6, 1)],
-    47: [(5, 1)],
+    47: [(2, 6), (7, 2)],
     48: [(6, 1)],
     49: [(6, 1)],
     50: [(7, 3)],
@@ -187,7 +194,7 @@ void main() {
     44: [(4, 2)],
     45: [(2, 0), (2, 1)],
     46: [(2, 2), (5, 2)],
-    47: [(5, 4)],
+    47: [(4, 7), (5, 5)],
     48: [(6, 5)],
     49: [(6, 5), (3, 6)],
     50: [(7, 6)],
@@ -258,7 +265,8 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 47, 48, 49, 50]) {
+  // 47 is absent: its redesign dropped the forced arrow it used to carry.
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 48, 49, 50]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
