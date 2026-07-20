@@ -953,22 +953,32 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 46 — Grand Timing: three patrols — one on the floor, two on the climb — and
-  // only two pauses. The hardest pure-timing puzzle.
+  // 46 — Grand Timing: five patrols sweep five separate rows, with staggered
+  // wall stubs breaking the climb into sections.
   46: LevelData(
     id: 46,
     size: 7,
     title: 'Grand Timing',
-    tip: 'Three patrols, two pauses. Time the floor and the climb.',
+    tip: 'Five patrols, five rows. Two shields and two pauses — time every '
+        'crossing.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 6),
+    walls: [
+      Pos(5, 5), Pos(5, 6), Pos(4, 3), Pos(4, 4), Pos(3, 2),
+      Pos(3, 1), Pos(2, 3), Pos(2, 4), Pos(1, 5), Pos(1, 6),
+    ],
+    destroyers: [Pos(3, 0)],
     movers: [
-      MovingDestroyer(2, 6, horizontal: true, dir: 1), // climb crosser (row 2)
-      MovingDestroyer(4, 2, horizontal: true, dir: -1), // climb crosser (row 4)
-      MovingDestroyer(1, 3, horizontal: false, dir: 1), // floor crosser (col 3)
+      MovingDestroyer(5, 1, horizontal: true, dir: -1),
+      MovingDestroyer(4, 1, horizontal: true, dir: -1),
+      MovingDestroyer(2, 1, horizontal: true, dir: -1),
+      MovingDestroyer(1, 1, horizontal: true, dir: -1),
+      MovingDestroyer(0, 1, horizontal: true, dir: -1),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
       ToolkitEntry(ToolType.pause, 2),
     ],
   ),

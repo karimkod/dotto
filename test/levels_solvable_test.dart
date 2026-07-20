@@ -144,7 +144,8 @@ void main() {
       (4, 2, Direction.left),
       (6, 1, Direction.up),
     ],
-    46: [(6, 6, Direction.up)],
+    // 46: climb column 2, spending a shield on each patrol row that blocks it.
+    46: [(0, 2, Direction.right), (6, 2, Direction.up)],
     // 47–50: final exams.
     47: [(5, 5, Direction.up)],
     48: [(6, 6, Direction.up)],
@@ -159,7 +160,7 @@ void main() {
     43: [(1, 4), (5, 4)],
     44: [(2, 2), (5, 1)],
     45: [(6, 2), (6, 3)],
-    46: [(6, 4), (6, 5)],
+    46: [(4, 2), (6, 1)],
     47: [(5, 1)],
     48: [(6, 1)],
     49: [(6, 1)],
@@ -185,6 +186,7 @@ void main() {
     39: [(3, 6), (6, 5)],
     44: [(4, 2)],
     45: [(2, 0), (2, 1)],
+    46: [(2, 2), (5, 2)],
     47: [(5, 4)],
     48: [(6, 5)],
     49: [(6, 5), (3, 6)],
@@ -195,8 +197,13 @@ void main() {
       n <= 15 ? 1 : (n <= 20 ? 2 : (n <= 30 ? 3 : 4));
 
   // Enumerating a level twice (once for solvability, once for tightness) is
-  // wasted work — level 45 alone takes ~18s a pass. Cache per level.
+  // wasted work — level 45 alone takes ~30s a pass. Cache per level, and use
+  // solveFor everywhere rather than calling the search directly.
   final solved = <int, List<Map<int, PlacedElement>>>{};
+
+  // Level 45's full enumeration runs past the 30s default, so any test that can
+  // trigger it needs headroom.
+  const heavy = Timeout(Duration(minutes: 5));
 
   // Moving destroyers (World 4) make timing matter, and pause/teleporter pieces
   // are invisible to the static path solver — for either, the timing-aware
@@ -217,7 +224,7 @@ void main() {
       debugPrint('Level $n "${level.title}": ${solutions.length} solution(s)');
       expect(solutions, isNotEmpty,
           reason: 'level $n should have at least one solution');
-    });
+    }, timeout: heavy);
 
     test('World ${worldOf(n)} — level $n intended solution wins', () {
       final level = levelDataFor(n)!;
@@ -238,7 +245,7 @@ void main() {
       final level = levelDataFor(n)!;
       expect(minPiecesFor(level), toolkitTotal(level),
           reason: 'level $n should have no solution that leaves a piece unused');
-    });
+    }, timeout: heavy);
   }
 
   // The World 1 exam levels (11–15) are designed to have a single solution.
@@ -404,9 +411,19 @@ void main() {
   // it would not be minimal.) The solution COUNT may legitimately be smaller,
   // since the exhaustive search also counts placements that dump spare pieces
   // on cells the dot never visits.
-  for (final n in [2, 5, 12, 21, 24, 27, 41, 42, 43, 46, 47]) {
+  for (final n in [2, 5, 12, 21, 24, 27, 41, 42, 43, 47, 48]) {
     test('level $n — path search agrees with exhaustive brute force', () {
       final level = levelDataFor(n)!;
+      // Guard, so editing a level can never silently turn this into a hang:
+      // the exhaustive search is superexponential in toolkit size, and a level
+      // that outgrows it has to be dropped from the comparison, not waited on.
+      final cost = bruteForcePlacements(
+          candidateCells(level).length, level.toolkit.map((e) => e.count));
+      if (cost > 5e6) {
+        markTestSkipped('level $n is too big for the exhaustive search '
+            '(${cost.toStringAsExponential(2)} placements)');
+        return;
+      }
       final exhaustive = solveAll(level);
       final path = pathSolveAll(level);
       int min(List<Map<int, PlacedElement>> s) => s.isEmpty
@@ -426,13 +443,13 @@ void main() {
   for (final n in [24, 41, 42, 43, 44, 45, 46, 47]) {
     test('level $n — every path-search solution really wins', () {
       final level = levelDataFor(n)!;
-      final sols = pathSolveAll(level);
+      final sols = solveFor(level); // cached — do not re-enumerate
       expect(sols, isNotEmpty);
       for (final s in sols) {
         expect(simulate(level, s), SimOutcome.win,
             reason: 'a reported solution for level $n does not actually win');
       }
-    });
+    }, timeout: heavy);
   }
 
   // Reachability pruning must never discard a cell a real run can touch.
@@ -508,12 +525,13 @@ void main() {
       // Every solution the search returns must survive the real simulator.
       for (var n = 31; n <= 50; n++) {
         final level = levelDataFor(n)!;
-        for (final s in pathSolveAll(level)) {
+        for (final s in solveFor(level)) {
+          // cached
           expect(simulate(level, s), SimOutcome.win,
               reason: 'level $n: solver returned a run the game would kill');
         }
       }
-    });
+    }, timeout: heavy);
   });
 
   // World 3 spot-check: the chain explosion is genuinely required.

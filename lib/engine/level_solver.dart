@@ -338,6 +338,10 @@ class PathSearch {
   final List<_Choice> _stack = [];
   late _RunState _cur;
 
+  /// Scratch buffer for pre-step patrol positions, reused every tick. This runs
+  /// millions of times on a heavy level, so it must not allocate.
+  late final List<int> _beforeStep = List<int>.filled(_movers.length, 0);
+
   bool done = false;
 
   /// Step one mover, mirroring [MoverState.step].
@@ -464,8 +468,8 @@ class PathSearch {
       while (_cur.tick < maxTicks) {
         _cur.tick++;
         // Positions before the step, so a crossing can be spotted below.
-        final beforeStep = [..._cur.moverPos];
         for (var i = 0; i < _movers.length; i++) {
+          _beforeStep[i] = _cur.moverPos[i];
           if (_cur.moverPos[i] > -1000) _stepMover(i);
         }
         if (_cur.pause > 0) {
@@ -490,7 +494,7 @@ class PathSearch {
         _cur.r = nr;
         _cur.c = nc;
         if (_moverCollision(
-            fromR: fromR, fromC: fromC, before: beforeStep)) {
+            fromR: fromR, fromC: fromC, before: _beforeStep)) {
           dead = true;
           break;
         }
