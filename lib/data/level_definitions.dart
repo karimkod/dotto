@@ -1054,25 +1054,33 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 49 — Double Down: two shields. One breaches the climb wall; carry the second
-  // to blast a still mine sitting on the fixed-arrow run home.
+  // 49 — Double Down: two full wall barriers (rows 2 and 4) pen the dot into a
+  // corridor along row 3, with the forced arrow at (3,6) sending it down and
+  // away from the exit. Only one shield, but the patrol sharing the corridor
+  // sits between both barriers — so a single shielded hit blasts through row 2
+  // AND row 4 at once. Double down on one blast.
   49: LevelData(
     id: 49,
     size: 7,
     title: 'Double Down',
-    tip: 'Two shields: breach the wall, keep one for the mine up top.',
-    start: StartSpec(6, 0, Direction.right),
+    tip: 'Two walls, one shield. Catch the patrol between them and both come '
+        'down.',
+    start: StartSpec(3, 0, Direction.right),
     exit: Pos(0, 0),
-    walls: [Pos(3, 5), Pos(2, 6)],
+    walls: [
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 5),
+    ],
     destroyers: [Pos(0, 3)],
-    forcedArrows: [ForcedArrow(0, 6, Direction.left)],
+    forcedArrows: [ForcedArrow(3, 6, Direction.down)],
     movers: [
-      MovingDestroyer(3, 6, horizontal: true, dir: 1), // breach patrol
-      MovingDestroyer(4, 2, horizontal: false, dir: 1), // floor patrol
+      MovingDestroyer(5, 2, horizontal: true, dir: -1),
+      MovingDestroyer(3, 3, horizontal: true, dir: 1), // shares the corridor
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowLeft, 2),
+      ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.pause, 1),
     ],
   ),

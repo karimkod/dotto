@@ -158,7 +158,14 @@ void main() {
     // 48: shield through the two floor mines, climb column 7 waiting out three
     // patrols, then run row 0 home past a third mine and two more patrols.
     48: [(0, 7, Direction.left), (7, 7, Direction.up)],
-    49: [(6, 6, Direction.up)],
+    // 49: shield the corridor patrol between the two barriers — one blast opens
+    // row 2 and row 4 at the same column — then climb through and run home.
+    49: [
+      (1, 0, Direction.up),
+      (1, 4, Direction.left),
+      (5, 4, Direction.up),
+      (5, 6, Direction.left),
+    ],
     50: [(7, 7, Direction.up)],
   };
 
@@ -172,7 +179,7 @@ void main() {
     46: [(4, 2), (6, 1)],
     47: [(2, 6), (7, 2)],
     48: [(0, 4), (0, 6), (2, 7), (4, 7), (6, 7)],
-    49: [(6, 1)],
+    49: [(4, 6)],
     50: [(7, 3)],
   };
 
@@ -199,7 +206,7 @@ void main() {
     47: [(4, 7), (5, 5)],
     // 48: one shield per mine — two in the floor run, one on the way home.
     48: [(0, 3), (7, 1), (7, 3)],
-    49: [(6, 5), (3, 6)],
+    49: [(3, 2)],
     50: [(7, 6)],
   };
 
