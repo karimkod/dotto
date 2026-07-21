@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../engine/simulator.dart' show buildPortalPairs;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level_data.dart';
@@ -108,6 +109,61 @@ class _ShieldGlyphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ShieldGlyphPainter old) => old.color != color;
+}
+
+/// Draws a portal: a filled disc with a hole for an ENTRANCE (the dot drops in),
+/// an open ring for an EXIT (it comes back out). Shared by the board and the
+/// toolbar so the tile shows exactly what you are about to place.
+void paintPortalIcon(Canvas canvas, Offset center, double radius, Color color,
+    {required bool entrance, Color hole = Colors.white}) {
+  if (entrance) {
+    canvas.drawCircle(center, radius, Paint()..color = color);
+    canvas.drawCircle(center, radius * 0.40, Paint()..color = hole);
+  } else {
+    canvas.drawCircle(
+      center,
+      radius * 0.78,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = radius * 0.40
+        ..color = color,
+    );
+  }
+}
+
+/// A standalone portal icon for widget contexts (the toolbar tile).
+class PortalGlyph extends StatelessWidget {
+  const PortalGlyph(
+      {super.key,
+      required this.size,
+      required this.entrance,
+      this.color = _C.tele});
+
+  final double size;
+  final bool entrance;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _PortalGlyphPainter(color, entrance)),
+      );
+}
+
+class _PortalGlyphPainter extends CustomPainter {
+  _PortalGlyphPainter(this.color, this.entrance);
+  final Color color;
+  final bool entrance;
+
+  @override
+  void paint(Canvas canvas, Size size) => paintPortalIcon(
+      canvas, size.center(Offset.zero), size.width * 0.42, color,
+      entrance: entrance);
+
+  @override
+  bool shouldRepaint(covariant _PortalGlyphPainter old) =>
+      old.color != color || old.entrance != entrance;
 }
 
 /// A spiky sea-mine destroyer icon, drawn centered in a cell of side [cell].
@@ -329,6 +385,9 @@ class GameGridPainter extends CustomPainter {
   /// Immovable, level-defined arrows (drawn with a fixed "pinned" look).
   final Map<int, PlacedElement> forced;
 
+  /// Cell -> pair index for every portal, so both ends of a pair share a hue.
+  late final Map<int, int> _portalPairs = buildPortalPairs(level, placed);
+
   /// Ordered list of visited cells (most recent last).
   final List<int> trail;
 
@@ -410,7 +469,8 @@ class GameGridPainter extends CustomPainter {
       final p = placeAnim[key];
       final scale = p == null ? 1.0 : popScale(p);
       final border = 2.5 + (p == null ? 0.0 : placeBorderBoost(p));
-      _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale, border);
+      _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale, border,
+          portalPair: _portalPairs[key], portalEntrance: piece.isPortalEntrance);
     });
 
     // Pieces shrinking away.
@@ -645,13 +705,19 @@ class GameGridPainter extends CustomPainter {
   }
 
   void _paintPiece(Canvas canvas, GridGeometry geo, int key, ToolType tool,
-      Direction? dir, double scale, double borderWidth) {
+      Direction? dir, double scale, double borderWidth,
+      {int? portalPair, bool? portalEntrance}) {
     if (scale <= 0) return;
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    final (fill, color, glyph) = _toolStyle(tool, dir);
+    var (fill, color, glyph) = _toolStyle(tool, dir);
+    if (portalPair != null) {
+      final (f, cc) = telePairColors[portalPair % telePairColors.length];
+      fill = f;
+      color = cc;
+    }
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -668,6 +734,9 @@ class GameGridPainter extends CustomPainter {
     );
     if (tool.placedType == PlacedType.shield) {
       paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+    } else if (tool.placedType == PlacedType.teleporter) {
+      _drawPortal(canvas, center, geo.cell * 0.24, color,
+          entrance: portalEntrance ?? true);
     } else {
       _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     }
@@ -676,11 +745,23 @@ class GameGridPainter extends CustomPainter {
 
   /// Distinct hues for teleporter pairs, so both ends of a pair share a colour
   /// and different pairs never look alike. Wraps if a level somehow has more.
-  static const _telePairColors = [
-    (Color(0xFFFFE7DD), Color(0xFFFF7043)), // orange
-    (Color(0xFFE3E0FB), Color(0xFF7E57C2)), // violet
-    (Color(0xFFD9F2EC), Color(0xFF26A69A)), // teal
+  /// One hue per portal pair, so both ends of a pair match and no two pairs
+  /// look alike. Wraps if a level ever has more.
+  static const telePairColors = [
+    (Color(0xFFFFE7DD), Color(0xFFFF7043)), // 1 orange
+    (Color(0xFFDDE9FB), Color(0xFF1E88E5)), // 2 blue
+    (Color(0xFFDDF2E1), Color(0xFF43A047)), // 3 green
+    (Color(0xFFE9E0FB), Color(0xFF7E57C2)), // 4 purple
   ];
+
+  /// Draw a portal: a filled ring for an ENTRANCE (the dot goes in), an open
+  /// outline for an EXIT (it comes out). Both wear the pair's colour, so the
+  /// difference reads as "which end" and never as "which pair".
+  ///
+  /// The distinction is cosmetic — travel works both ways.
+  void _drawPortal(Canvas canvas, Offset center, double radius, Color color,
+          {required bool entrance}) =>
+      paintPortalIcon(canvas, center, radius, color, entrance: entrance);
 
   /// A fixed piece — arrow, shield, pause or teleporter — is drawn exactly like
   /// the player-placed version of itself: same fill, same colour, same glyph or
@@ -698,7 +779,7 @@ class GameGridPainter extends CustomPainter {
     if (piece.type == PlacedType.teleporter) {
       final pair = level.teleporterPairAt(r, c);
       if (pair >= 0) {
-        final (f, cc) = _telePairColors[pair % _telePairColors.length];
+        final (f, cc) = telePairColors[pair % telePairColors.length];
         fill = f;
         color = cc;
       }
@@ -715,6 +796,13 @@ class GameGridPainter extends CustomPainter {
     );
     if (piece.type == PlacedType.shield) {
       paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+    } else if (piece.type == PlacedType.teleporter) {
+      // A level-defined pair lists its ends in order, so the first is the way in.
+      final pair = level.teleporterPairAt(r, c);
+      final entrance =
+          pair < 0 || (level.teleporters[pair].a.r == r &&
+              level.teleporters[pair].a.c == c);
+      _drawPortal(canvas, center, geo.cell * 0.24, color, entrance: entrance);
     } else {
       _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     }

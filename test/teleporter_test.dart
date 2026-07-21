@@ -93,6 +93,95 @@ void main() {
     });
   });
 
+  group('entrance / exit', () {
+    PlacedElement portal(int i) => const PlacedElement(
+            type: PlacedType.teleporter,
+            tool: ToolType.teleporter,
+            direction: null)
+        .withPortalIndex(i);
+
+    test('placements alternate entrance, exit, entrance, exit', () {
+      expect(portal(0).isPortalEntrance, isTrue, reason: '1st is an entrance');
+      expect(portal(1).isPortalEntrance, isFalse, reason: '2nd is an exit');
+      expect(portal(2).isPortalEntrance, isTrue);
+      expect(portal(3).isPortalEntrance, isFalse);
+    });
+
+    test('the nth entrance and the nth exit share a pair', () {
+      expect(portal(0).portalPair, 0);
+      expect(portal(1).portalPair, 0);
+      expect(portal(2).portalPair, 1);
+      expect(portal(3).portalPair, 1);
+    });
+
+    test('index pairing beats board order', () {
+      // Indices deliberately disagree with cell order: the 1st entrance (index
+      // 0) sits at a HIGH cell and its exit (index 1) at a low one. Board-order
+      // pairing would mis-link these once a second pair exists.
+      const bare = LevelData(
+        id: 970,
+        size: 4,
+        title: 'ordering',
+        tip: '',
+        start: StartSpec(0, 0, Direction.right),
+        exit: Pos(3, 3),
+        toolkit: [ToolkitEntry(ToolType.teleporter, 4)],
+      );
+      final links = buildTeleportLinks(bare, {
+        14: portal(0), // pair 0 entrance
+        2: portal(1), // pair 0 exit
+        13: portal(2), // pair 1 entrance
+        5: portal(3), // pair 1 exit
+      });
+      expect(links[14], 2, reason: 'pair 0 links across, not to its neighbour');
+      expect(links[2], 14);
+      expect(links[13], 5, reason: 'pair 1 likewise');
+      expect(links[5], 13);
+    });
+
+    test('travel works both ways — the distinction is cosmetic', () {
+      // Enter via the EXIT end and the dot still comes out at the entrance.
+      const level = LevelData(
+        id: 971,
+        size: 6,
+        title: 'both ways',
+        tip: '',
+        start: StartSpec(2, 5, Direction.left),
+        exit: Pos(2, 0),
+        walls: [
+          Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3),
+        ],
+        toolkit: [ToolkitEntry(ToolType.teleporter, 2)],
+      );
+      // Entrance (index 0) is on the LEFT of the wall; the dot meets the exit
+      // (index 1) first, coming from the right.
+      expect(
+          simulate(level, {2 * 6 + 1: portal(0), 2 * 6 + 4: portal(1)}),
+          SimOutcome.win);
+    });
+
+    test('pair indices drive colouring for both ends', () {
+      const bare = LevelData(
+        id: 972,
+        size: 4,
+        title: 'colours',
+        tip: '',
+        start: StartSpec(0, 0, Direction.right),
+        exit: Pos(3, 3),
+        toolkit: [ToolkitEntry(ToolType.teleporter, 4)],
+      );
+      final pairs = buildPortalPairs(bare, {
+        1: portal(0),
+        9: portal(1),
+        2: portal(2),
+        10: portal(3),
+      });
+      expect(pairs[1], pairs[9], reason: 'pair 0 shares a colour');
+      expect(pairs[2], pairs[10], reason: 'pair 1 shares a colour');
+      expect(pairs[1], isNot(pairs[2]), reason: 'and the pairs differ');
+    });
+  });
+
   group('link table', () {
     test('pairs both directions for a fixed pair', () {
       final links = buildTeleportLinks(crossing, const {});

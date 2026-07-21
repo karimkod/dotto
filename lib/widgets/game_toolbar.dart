@@ -21,7 +21,12 @@ class GameToolbar extends StatelessWidget {
     required this.tileKeys,
     this.draggingTool,
     this.onReset,
+    this.portalNextIsEntrance = true,
   });
+
+  /// Whether the NEXT teleporter dropped will be an entrance. The tile's icon
+  /// follows it, so the player can see which end of the pair they are holding.
+  final bool portalNextIsEntrance;
 
   /// Distinct tools available in this level, in display order.
   final List<ToolType> tools;
@@ -50,6 +55,7 @@ class GameToolbar extends StatelessWidget {
       children: [
         for (final t in tools)
           _ToolTile(
+            portalEntrance: portalNextIsEntrance,
             key: tileKeys[t],
             tool: t,
             count: counts[t] ?? 0,
@@ -122,6 +128,7 @@ class _ToolTile extends StatelessWidget {
     required this.enabled,
     required this.dragging,
     required this.onTap,
+    this.portalEntrance = true,
   });
 
   final ToolType tool;
@@ -130,6 +137,9 @@ class _ToolTile extends StatelessWidget {
   final bool enabled;
   final bool dragging;
   final VoidCallback onTap;
+
+  /// Only meaningful for the teleporter tile: which end comes next.
+  final bool portalEntrance;
 
   bool get _isArrow => tool.direction != null;
 
@@ -175,6 +185,8 @@ class _ToolTile extends StatelessWidget {
             children: [
               if (isShield)
                 const ShieldGlyph(size: 26, color: kShieldColor)
+              else if (tool.placedType == PlacedType.teleporter)
+                PortalGlyph(size: 26, entrance: portalEntrance)
               else
                 Text(
                   tool.glyph,

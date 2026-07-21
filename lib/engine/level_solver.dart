@@ -583,6 +583,27 @@ class PathSearch {
 bool needsExhaustiveSolver(LevelData level) =>
     level.toolkit.any((e) => e.type == ToolType.teleporter);
 
+/// How many teleporters the toolkit hands the player (2 per pair).
+int toolkitTeleporters(LevelData level) => level.toolkit
+    .where((e) => e.type == ToolType.teleporter)
+    .fold(0, (a, e) => a + e.count);
+
+/// The solver builds placements with no placement ORDER, so it pairs portals by
+/// board position. With a single pair that is the same answer the player gets
+/// however they place them. With two or more pairs it is not: the player pairs
+/// by the order they drop portals, and the solver cannot know that — so a level
+/// offering more than one pair cannot be honestly verified, and we refuse it
+/// rather than ship a "TIGHT" verdict that does not match play.
+void _requireSolvablePortals(LevelData level) {
+  final n = toolkitTeleporters(level);
+  if (n > 2) {
+    throw PathSolverUnsupported(
+        'level ${level.id} offers $n teleporters (${n ~/ 2} pairs); the solver '
+        'pairs by board order while the player pairs by placement order, so '
+        'more than one pair cannot be verified');
+  }
+}
+
 /// Every winning placement, found by following the dot's path.
 ///
 /// Throws when handed a level whose toolkit holds a teleporter — see
@@ -600,8 +621,13 @@ List<Map<int, PlacedElement>> pathSolveAll(LevelData level) {
 
 /// Every winning placement, using whichever engine is correct for [level].
 /// This is the entry point callers should reach for.
-List<Map<int, PlacedElement>> enumerateSolutions(LevelData level) =>
-    needsExhaustiveSolver(level) ? solveAll(level) : pathSolveAll(level);
+List<Map<int, PlacedElement>> enumerateSolutions(LevelData level) {
+  if (needsExhaustiveSolver(level)) {
+    _requireSolvablePortals(level);
+    return solveAll(level);
+  }
+  return pathSolveAll(level);
+}
 
 /// The right slice-driver for [level]: the exhaustive search when a teleporter
 /// is in the toolkit, the path search otherwise. Both expose the same

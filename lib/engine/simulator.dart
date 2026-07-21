@@ -90,11 +90,15 @@ Map<int, PlacedElement> buildForcedPieces(LevelData level) {
   return out;
 }
 
-/// Cell -> the cell it teleports to, for every teleporter on the board.
+/// Cell -> the cell it teleports to, for every teleporter on the board. The map
+/// is symmetric: the dot travels BOTH ways, so the entrance/exit distinction is
+/// only there to help the player read the board.
 ///
-/// Level-defined pairs are explicit. Teleporters the PLAYER places have no
-/// declared partner, so they are paired up two at a time in board order — which
-/// makes an odd one out inert rather than ambiguous.
+/// Level-defined pairs are explicit. For placed portals, [PlacedElement
+/// .portalIndex] is authoritative — index `i` pairs with `i ^ 1`, so the 1st
+/// entrance links to the 1st exit. Portals without an index (the solver builds
+/// placements without a placement order) fall back to pairing two at a time in
+/// board order, which is the same thing whenever there is only one pair.
 Map<int, int> buildTeleportLinks(
     LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
@@ -105,16 +109,51 @@ Map<int, int> buildTeleportLinks(
     links[a] = b;
     links[b] = a;
   }
-  final loose = [
-    for (final e in placed.entries)
-      if (e.value.type == PlacedType.teleporter && !links.containsKey(e.key))
-        e.key
-  ]..sort();
-  for (var i = 0; i + 1 < loose.length; i += 2) {
-    links[loose[i]] = loose[i + 1];
-    links[loose[i + 1]] = loose[i];
+
+  final byIndex = <int, int>{}; // portalIndex -> cell
+  final unindexed = <int>[];
+  for (final e in placed.entries) {
+    if (e.value.type != PlacedType.teleporter) continue;
+    if (links.containsKey(e.key)) continue; // already a level-defined pair
+    final i = e.value.portalIndex;
+    if (i == null) {
+      unindexed.add(e.key);
+    } else {
+      byIndex[i] = e.key;
+    }
+  }
+  byIndex.forEach((i, cell) {
+    final partner = byIndex[i ^ 1];
+    if (partner != null) links[cell] = partner;
+  });
+
+  unindexed.sort();
+  for (var i = 0; i + 1 < unindexed.length; i += 2) {
+    links[unindexed[i]] = unindexed[i + 1];
+    links[unindexed[i + 1]] = unindexed[i];
   }
   return links;
+}
+
+/// Which pair each portal cell belongs to, for colour-coding. Level-defined
+/// pairs come first, then placed pairs by index.
+Map<int, int> buildPortalPairs(
+    LevelData level, Map<int, PlacedElement> placed) {
+  final n = level.size;
+  final pairs = <int, int>{};
+  for (var i = 0; i < level.teleporters.length; i++) {
+    final t = level.teleporters[i];
+    pairs[t.a.r * n + t.a.c] = i;
+    pairs[t.b.r * n + t.b.c] = i;
+  }
+  final base = level.teleporters.length;
+  for (final e in placed.entries) {
+    if (e.value.type != PlacedType.teleporter) continue;
+    if (pairs.containsKey(e.key)) continue;
+    final p = e.value.portalPair;
+    if (p != null) pairs[e.key] = base + p;
+  }
+  return pairs;
 }
 
 /// Mutable runtime state of a patrolling (moving) destroyer.
