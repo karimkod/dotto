@@ -13,6 +13,7 @@ import '../engine/simulator.dart'
         adjacentWallKeys,
         buildForcedPieces,
         buildMovers,
+        buildPortalPairs,
         buildTeleportLinks,
         DeathCause,
         MoverState,
@@ -83,7 +84,18 @@ class _GameScreenState extends State<GameScreen>
   Timer? _timer;
   late final AnimationController _dotCtrl; // per-step glide + squish
   late final Animation<double> _dotScale; // arrival squish
+  late final AnimationController _teleportCtrl; // one phase of a teleport
   late final AnimationController _moverCtrl; // patrol glide (every beat)
+
+  /// Teleport animation state. [_teleporting] gates the whole overlay; while it
+  /// runs, [_teleportGrowing] is false during the shrink-out at the entrance and
+  /// true during the grow-in at the exit. The two ring cells and the pair colour
+  /// are fixed for the duration.
+  bool _teleporting = false;
+  bool _teleportGrowing = false;
+  (int, int)? _teleportEntrance;
+  (int, int)? _teleportExit;
+  Color _teleportColor = const Color(0xFFFF8A65);
   late final AnimationController _glowCtrl; // continuous fx driver
   (int, int) _animFrom = (0, 0);
   (int, int) _animTo = (0, 0);
@@ -183,6 +195,10 @@ class _GameScreenState extends State<GameScreen>
       ),
     ]).animate(_dotCtrl);
     // Always-running driver for the dot's glow pulse and cell effect decay.
+    _teleportCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 210),
+    );
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -254,6 +270,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _handTimer?.cancel();
     _dotCtrl.dispose();
+    _teleportCtrl.dispose();
     _moverCtrl.dispose();
     _glowCtrl.dispose();
     _snapCtrl.dispose();
@@ -348,6 +365,8 @@ class _GameScreenState extends State<GameScreen>
   void _resetDot() {
     _timer?.cancel();
     _timer = null;
+    _teleportCtrl.stop();
+    _teleporting = false;
     final s = _level!.start;
     _status = GameStatus.planning;
     _dot = DotState(r: s.r, c: s.c, dir: s.dir);
@@ -962,13 +981,9 @@ class _GameScreenState extends State<GameScreen>
             Sfx.shield();
           }
         case PlacedType.teleporter:
-          // Let the dot finish gliding INTO the portal before moving it. Doing
-          // this inline relocated the dot mid-glide, so it looked like it
-          // teleported before it had arrived.
-          _afterGlide(() {
-            _teleport();
-            if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) _win();
-          });
+          // The whole jump — glide in, animate, land — is driven by _runTeleport,
+          // which holds the beat timer for its full duration.
+          _runTeleport(newKey);
           return; // the exit check below would run on the pre-jump cell
       }
     }
@@ -978,26 +993,99 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// Out the far end of the pair, keeping the heading. Uses the shared link
-  /// table so level-defined pairs and the player's own both work, and so the
-  /// game agrees with the simulator about which end connects to which.
-  void _teleport() {
+  /// The pair colour of the portal at [cell], for the ring pulses. Falls back to
+  /// the generic warm portal tint if the cell somehow isn't a portal.
+  Color _portalColor(int cell) {
+    final pairs = buildPortalPairs(_level!, {..._forced, ..._placed});
+    final p = pairs[cell];
+    if (p == null) return const Color(0xFFFF8A65);
+    return GameGridPainter
+        .telePairColors[p % GameGridPainter.telePairColors.length]
+        .$2;
+  }
+
+  /// Drive a teleport end to end: settle the glide INTO the portal, play the
+  /// shrink-out / jump / grow-in animation, then either win or resume beats. The
+  /// beat timer is held for the whole sequence so nothing steps mid-animation.
+  Future<void> _runTeleport(int fromKey) async {
+    _timer?.cancel();
+    _timer = null;
+    await _settleGlides(); // finish gliding onto the entrance cell first
+    if (!mounted || _status != GameStatus.running) return;
+
     final size = _level!.size;
     final links = buildTeleportLinks(_level!, {..._forced, ..._placed});
-    final from = _idx(_dot.r, _dot.c);
-    final dest = links[from];
-    if (dest == null) return; // an unpaired teleporter is inert
+    final dest = links[fromKey];
+    if (dest == null) {
+      // An unpaired portal is inert — just carry on beating.
+      _timer = Timer.periodic(
+          const Duration(milliseconds: _tickMs), (_) => _beat());
+      return;
+    }
+
+    Sfx.teleport();
     setState(() {
-      // Flash the cell the dot is leaving, then the one it lands on, so the
-      // jump reads as "in here, out there" rather than a silent relocation.
-      _glow(from, const Color(0xFFFF8A65), 1.0);
+      _teleporting = true;
+      _teleportGrowing = false;
+      _teleportEntrance = (fromKey ~/ size, fromKey % size);
+      _teleportExit = (dest ~/ size, dest % size);
+      _teleportColor = _portalColor(fromKey);
+    });
+
+    // Shrink + fade out at the entrance (its ring expands over the same window).
+    try {
+      await _teleportCtrl.forward(from: 0).orCancel;
+    } catch (_) {
+      return; // disposed / reset mid-teleport
+    }
+    if (!mounted || _status != GameStatus.running) {
+      setState(() => _teleporting = false);
+      return;
+    }
+
+    // Relocate while invisible.
+    setState(() {
       _dot.r = dest ~/ size;
       _dot.c = dest % size;
       _trail.add(dest);
-      _glow(dest, const Color(0xFFFF8A65), 1.0);
+      _teleportGrowing = true;
     });
     _jump(_dot.r, _dot.c);
-    Sfx.teleport();
+
+    // A brief hidden hold between the two halves.
+    await Future<void>.delayed(const Duration(milliseconds: 90));
+    if (!mounted || _status != GameStatus.running) {
+      setState(() => _teleporting = false);
+      return;
+    }
+
+    // Grow + fade in at the exit (its ring expands over this window).
+    try {
+      await _teleportCtrl.forward(from: 0).orCancel;
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _teleporting = false);
+    if (_status != GameStatus.running) return;
+
+    if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) {
+      _win();
+      return;
+    }
+    _timer =
+        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
+  }
+
+  /// Ball scale multiplier and opacity for the current teleport phase (1, 1 when
+  /// not teleporting): shrinking to nothing on the way out, growing back on the
+  /// way in.
+  (double scale, double opacity) get _teleportBallTransform {
+    if (!_teleporting) return (1, 1);
+    final v = _teleportCtrl.value;
+    return _teleportGrowing
+        ? (Curves.easeOutBack.transform(v).clamp(0.0, 1.2), v)
+        : (1 - Curves.easeInCubic.transform(v), 1 - v);
   }
 
   void _win() {
@@ -1400,9 +1488,30 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   ),
                 ),
+                // Expanding ring pulses at the entrance and exit portals.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _teleportCtrl,
+                      builder: (_, _) => CustomPaint(
+                        size: Size.square(side),
+                        painter: _TeleportRingPainter(
+                          geo: geo,
+                          active: _teleporting,
+                          growing: _teleportGrowing,
+                          progress: _teleportCtrl.value,
+                          entrance: _teleportEntrance,
+                          exit: _teleportExit,
+                          color: _teleportColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned.fill(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_dotCtrl, _glowCtrl]),
+                    animation:
+                        Listenable.merge([_dotCtrl, _glowCtrl, _teleportCtrl]),
                     builder: (_, _) {
                       // Hidden once the dot has been blown up by a destroyer.
                       if (_dotGone) return const SizedBox.shrink();
@@ -1414,17 +1523,21 @@ class _GameScreenState extends State<GameScreen>
                       // Subtle continuous glow pulse (0..1).
                       final glow =
                           0.5 + 0.5 * math.sin(_glowCtrl.value * 2 * math.pi);
+                      final (telScale, telOpacity) = _teleportBallTransform;
                       return Transform.translate(
                         offset: Offset(pos.dx - d / 2, pos.dy - d / 2),
                         child: Align(
                           alignment: Alignment.topLeft,
-                          child: Transform.scale(
-                            scale: _dotScale.value,
-                            child: _Dot(
-                              size: d,
-                              paused: _dot.pause > 0,
-                              glow: glow,
-                              shielded: _dotShielded,
+                          child: Opacity(
+                            opacity: telOpacity.clamp(0.0, 1.0),
+                            child: Transform.scale(
+                              scale: _dotScale.value * telScale,
+                              child: _Dot(
+                                size: d,
+                                paused: _dot.pause > 0,
+                                glow: glow,
+                                shielded: _dotShielded,
+                              ),
                             ),
                           ),
                         ),
@@ -2155,6 +2268,59 @@ class _BgGridPainter extends CustomPainter {
 /// Draws the moving destroyers as red-tinted mines, gliding from their previous
 /// cell to their current cell over one beat ([t] 0→1). Used as an overlay above
 /// the board so movers animate independently of the grid repaint.
+/// Draws the expanding, fading ring at whichever portal is active this phase:
+/// the entrance while the ball shrinks out, the exit while it grows in. The
+/// ring uses the pair's colour.
+class _TeleportRingPainter extends CustomPainter {
+  _TeleportRingPainter({
+    required this.geo,
+    required this.active,
+    required this.growing,
+    required this.progress,
+    required this.entrance,
+    required this.exit,
+    required this.color,
+  });
+
+  final GridGeometry geo;
+  final bool active;
+  final bool growing;
+  final double progress; // 0..1 within the current phase
+  final (int, int)? entrance;
+  final (int, int)? exit;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!active) return;
+    final cell = growing ? exit : entrance;
+    if (cell == null) return;
+    final center = geo.center(cell.$1, cell.$2);
+    final t = Curves.easeOut.transform(progress.clamp(0.0, 1.0));
+    // Grow from the portal out past the cell edge, fading as it goes.
+    final radius = geo.cell * (0.18 + 0.42 * t);
+    final alpha = (1 - t) * 0.9;
+    if (alpha <= 0) return;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = geo.cell * 0.10 * (1 - 0.5 * t)
+        ..color = color.withValues(alpha: alpha),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TeleportRingPainter old) =>
+      active != old.active ||
+      growing != old.growing ||
+      progress != old.progress ||
+      entrance != old.entrance ||
+      exit != old.exit ||
+      color != old.color;
+}
+
 class _MoverPainter extends CustomPainter {
   _MoverPainter({
     required this.movers,
