@@ -674,70 +674,27 @@ class GameGridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A fixed arrow wears the SAME palette as a player-placed arrow — same fill,
-  /// same blue — but everything that is a solid line on a placed piece is dashed
-  /// here. That reads as "an arrow you cannot pick up" rather than as a wall,
-  /// which is what the old wall-coloured version looked like.
+  /// A fixed arrow is drawn exactly like a player-placed one — same fill, same
+  /// blue, same chevron at the same size — with a single difference: its cell
+  /// border is dashed. Same arrow, dashed outline: "this arrow is locked here."
   void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
+    // Same source of truth as _paintPiece, so the two can never drift apart.
+    final (fill, color, glyph) = _toolStyle(dir.arrowTool, dir);
 
-    canvas.drawRRect(rrect, Paint()..color = _C.arrowFill);
+    canvas.drawRRect(rrect, Paint()..color = fill);
     _drawDashedRRect(
       canvas,
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = _C.arrow,
+        ..strokeWidth = 2.5 // matches a settled placed piece
+        ..color = color,
     );
-
-    // Outline only — no fill. A filled body plus a heavy outline made this read
-    // as bolder than the placed arrow it is meant to echo; the dashes alone
-    // carry the "fixed" meaning.
-    _drawDashedPath(
-      canvas,
-      _arrowPath(center, dir, geo.cell),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..strokeCap = StrokeCap.round
-        ..color = _C.arrow,
-      dash: 3.5,
-      gap: 2.5,
-    );
-  }
-
-  /// Closed outline of an arrow (shaft + head) pointing [dir], centred on
-  /// [center]. Built as geometry rather than a font glyph so it can be both
-  /// filled and dashed.
-  Path _arrowPath(Offset center, Direction dir, double cell) {
-    final (dr, dc) = dir.delta;
-    // Canvas x comes from the column delta, y from the row delta.
-    final v = Offset(dc.toDouble(), dr.toDouble());
-    final perp = Offset(-v.dy, v.dx);
-
-    // Slim proportions, chosen to sit at about the same visual weight as the
-    // placed arrow's chevron rather than dominating the cell.
-    final tip = center + v * (cell * 0.30);
-    final headBase = center + v * (cell * 0.02);
-    final tail = center - v * (cell * 0.26);
-    final headHalf = cell * 0.155;
-    final shaftHalf = cell * 0.05;
-
-    Offset at(Offset base, double along) => base + perp * along;
-
-    return Path()
-      ..moveTo(tip.dx, tip.dy)
-      ..lineTo(at(headBase, headHalf).dx, at(headBase, headHalf).dy)
-      ..lineTo(at(headBase, shaftHalf).dx, at(headBase, shaftHalf).dy)
-      ..lineTo(at(tail, shaftHalf).dx, at(tail, shaftHalf).dy)
-      ..lineTo(at(tail, -shaftHalf).dx, at(tail, -shaftHalf).dy)
-      ..lineTo(at(headBase, -shaftHalf).dx, at(headBase, -shaftHalf).dy)
-      ..lineTo(at(headBase, -headHalf).dx, at(headBase, -headHalf).dy)
-      ..close();
+    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
   }
 
   void _paintGlow(
@@ -895,15 +852,12 @@ class GameGridPainter extends CustomPainter {
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
-  void _drawDashedRRect(Canvas canvas, RRect rrect, Paint paint) {
-    _drawDashedPath(canvas, Path()..addRRect(rrect), paint);
-  }
-
-  /// Stroke [path] as a dashed line. Walks the path's metrics and draws
-  /// [dash]-long slices [gap] apart, which is the only way to dash an arbitrary
-  /// path in Flutter without pulling in a package.
-  void _drawDashedPath(Canvas canvas, Path path, Paint paint,
+  /// Stroke a rounded rect as a dashed outline — used by gap cells and by fixed
+  /// arrows. Walks the path's metrics and draws [dash]-long slices [gap] apart,
+  /// which is how you dash a path in Flutter without pulling in a package.
+  void _drawDashedRRect(Canvas canvas, RRect rrect, Paint paint,
       {double dash = 5, double gap = 4}) {
+    final path = Path()..addRRect(rrect);
     for (final metric in path.computeMetrics()) {
       var d = 0.0;
       while (d < metric.length) {
