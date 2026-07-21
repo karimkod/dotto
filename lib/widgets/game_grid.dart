@@ -111,23 +111,54 @@ class _ShieldGlyphPainter extends CustomPainter {
   bool shouldRepaint(covariant _ShieldGlyphPainter old) => old.color != color;
 }
 
-/// Draws a portal: a filled disc with a hole for an ENTRANCE (the dot drops in),
-/// an open ring for an EXIT (it comes back out). Shared by the board and the
-/// toolbar so the tile shows exactly what you are about to place.
+/// Draws a portal: a rim with a vortex spiral wound inside it, which reads as a
+/// wormhole rather than as a plain dot. The two ends differ in two ways at once
+/// so they stay apart at small sizes — the ENTRANCE winds clockwise into a
+/// solid core (somewhere the dot falls in), the EXIT winds the other way around
+/// an open mouth (somewhere it comes back out).
+///
+/// Shared by the board and the toolbar, so the tile shows exactly what you are
+/// about to place.
 void paintPortalIcon(Canvas canvas, Offset center, double radius, Color color,
-    {required bool entrance, Color hole = Colors.white}) {
+    {required bool entrance}) {
+  // Rim.
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.20
+      ..color = color,
+  );
+
+  // Vortex: just under two turns, spiralling from the rim toward the middle.
+  const turns = 1.8;
+  const steps = 56;
+  final wind = entrance ? 1.0 : -1.0;
+  final spiral = Path();
+  for (var i = 0; i <= steps; i++) {
+    final t = i / steps;
+    final angle = wind * t * turns * 2 * math.pi;
+    final rr = radius * 0.74 * (1 - t * 0.80); // rim -> core
+    final p = center + Offset(math.cos(angle) * rr, math.sin(angle) * rr);
+    if (i == 0) {
+      spiral.moveTo(p.dx, p.dy);
+    } else {
+      spiral.lineTo(p.dx, p.dy);
+    }
+  }
+  canvas.drawPath(
+    spiral,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.20
+      ..strokeCap = StrokeCap.round
+      ..color = color,
+  );
+
+  // Solid core marks the way IN; the exit is left open.
   if (entrance) {
-    canvas.drawCircle(center, radius, Paint()..color = color);
-    canvas.drawCircle(center, radius * 0.40, Paint()..color = hole);
-  } else {
-    canvas.drawCircle(
-      center,
-      radius * 0.78,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = radius * 0.40
-        ..color = color,
-    );
+    canvas.drawCircle(center, radius * 0.17, Paint()..color = color);
   }
 }
 

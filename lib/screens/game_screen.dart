@@ -808,6 +808,9 @@ class _GameScreenState extends State<GameScreen>
     await _settleGlides();
     if (!mounted || _status != GameStatus.running) return;
     blast();
+    // The blast can end the run (a teleport landing on the exit wins), so only
+    // resume beats if it did not.
+    if (!mounted || _status != GameStatus.running) return;
     _timer =
         Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
@@ -959,7 +962,14 @@ class _GameScreenState extends State<GameScreen>
             Sfx.shield();
           }
         case PlacedType.teleporter:
-          _teleport();
+          // Let the dot finish gliding INTO the portal before moving it. Doing
+          // this inline relocated the dot mid-glide, so it looked like it
+          // teleported before it had arrived.
+          _afterGlide(() {
+            _teleport();
+            if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) _win();
+          });
+          return; // the exit check below would run on the pre-jump cell
       }
     }
 
@@ -974,9 +984,13 @@ class _GameScreenState extends State<GameScreen>
   void _teleport() {
     final size = _level!.size;
     final links = buildTeleportLinks(_level!, {..._forced, ..._placed});
-    final dest = links[_idx(_dot.r, _dot.c)];
+    final from = _idx(_dot.r, _dot.c);
+    final dest = links[from];
     if (dest == null) return; // an unpaired teleporter is inert
     setState(() {
+      // Flash the cell the dot is leaving, then the one it lands on, so the
+      // jump reads as "in here, out there" rather than a silent relocation.
+      _glow(from, const Color(0xFFFF8A65), 1.0);
       _dot.r = dest ~/ size;
       _dot.c = dest % size;
       _trail.add(dest);
