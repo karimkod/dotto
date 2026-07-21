@@ -694,21 +694,19 @@ class GameGridPainter extends CustomPainter {
         ..color = _C.arrow,
     );
 
-    // A faint solid body keeps the shape readable at small cell sizes; the
-    // dashed outline on top carries the "fixed" meaning.
-    final body = _arrowPath(center, dir, geo.cell);
-    canvas.drawPath(
-        body, Paint()..color = _C.arrow.withValues(alpha: 0.22));
+    // Outline only — no fill. A filled body plus a heavy outline made this read
+    // as bolder than the placed arrow it is meant to echo; the dashes alone
+    // carry the "fixed" meaning.
     _drawDashedPath(
       canvas,
-      body,
+      _arrowPath(center, dir, geo.cell),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2
+        ..strokeWidth = 1.5
         ..strokeCap = StrokeCap.round
         ..color = _C.arrow,
-      dash: 4,
-      gap: 3,
+      dash: 3.5,
+      gap: 2.5,
     );
   }
 
@@ -721,11 +719,13 @@ class GameGridPainter extends CustomPainter {
     final v = Offset(dc.toDouble(), dr.toDouble());
     final perp = Offset(-v.dy, v.dx);
 
-    final tip = center + v * (cell * 0.32);
+    // Slim proportions, chosen to sit at about the same visual weight as the
+    // placed arrow's chevron rather than dominating the cell.
+    final tip = center + v * (cell * 0.30);
     final headBase = center + v * (cell * 0.02);
-    final tail = center - v * (cell * 0.28);
-    final headHalf = cell * 0.20;
-    final shaftHalf = cell * 0.075;
+    final tail = center - v * (cell * 0.26);
+    final headHalf = cell * 0.155;
+    final shaftHalf = cell * 0.05;
 
     Offset at(Offset base, double along) => base + perp * along;
 
