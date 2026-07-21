@@ -247,14 +247,19 @@ void main() {
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, 8);
+    final geo = GridGeometry(boardRect.width, 9); // the finale is the only 9x9
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: pause for the floor patrol, shield up before the breach, climb
-    // the last column into the wedged patrol (chain-explodes the wall), then the
-    // fixed arrow carries the dot left across the top to the corner exit.
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(7, 6));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 7));
+    // Solution: turn down and back along row 4, collecting a shield, and pause
+    // so the shielded hit lands on the patrol sharing the sealed box — that
+    // blast opens the column-2 wall. Climb the freed left edge, then run row 0
+    // home, spending the second shield on the top-run patrols.
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(3, 6));
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(4, 6));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(4, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(4, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(4, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(0, 3));
 
     await runToWin(tester);
 

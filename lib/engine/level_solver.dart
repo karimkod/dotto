@@ -673,8 +673,13 @@ const Set<ToolType> pathSolverBlindTools = {
 /// force gives a correct answer. This is the single routing predicate: every
 /// caller picks its solver with it, and [pathSolve]/[pathMinPieces] refuse any
 /// level it flags, so the two can never drift apart.
+/// Boards wider than this overflow the static path solver's 64-bit cleared-cell
+/// mask (a 9x9 has keys up to 80), so they are routed to the Set-based search.
+const int kMaxPathSolverSize = 8;
+
 bool needsBruteSolver(LevelData level) =>
     level.movers.isNotEmpty ||
+    level.size > kMaxPathSolverSize ||
     level.toolkit.any((e) => pathSolverBlindTools.contains(e.type));
 
 /// Thrown when the path solver is handed a level only [solveAll] can answer.
@@ -688,6 +693,12 @@ class PathSolverUnsupported implements Exception {
 
 void _requirePathSolvable(LevelData level) {
   if (!needsBruteSolver(level)) return;
+  if (level.size > kMaxPathSolverSize) {
+    throw PathSolverUnsupported(
+        'level ${level.id} is ${level.size}x${level.size}; the path solver\'s '
+        'cleared-cell mask only holds ${kMaxPathSolverSize * kMaxPathSolverSize} '
+        'cells');
+  }
   final blind = level.toolkit
       .map((e) => e.type)
       .where(pathSolverBlindTools.contains)

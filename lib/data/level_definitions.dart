@@ -1085,25 +1085,38 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 50 — The Summit: the ultimate exam. An 8x8 with a shielded breach, a pinned
-  // still mine, a floor patrol to pause, and the fixed arrow home. Minimal kit.
+  // 50 — The Summit: the finale, and the game's only 9x9. The dot starts SEALED
+  // in a box — wall stripes across rows 2 and 6, a wall down column 2, the grid
+  // edge on the right — with no static mines anywhere. The only way out is the
+  // patrol sharing the box: a shielded hit on it blows the column-2 wall open.
+  // Beyond that, three more patrols sweep rows 0-1, the whole run home.
   50: LevelData(
     id: 50,
-    size: 8,
+    size: 9,
     title: 'The Summit',
-    tip: 'Everything, one of each piece. Breach, wait, and ride home.',
-    start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 0),
-    walls: [Pos(3, 6), Pos(2, 7)],
-    destroyers: [Pos(5, 3)],
-    forcedArrows: [ForcedArrow(0, 7, Direction.left)],
+    tip: 'Sealed in with one patrol — that is your key. Then run the top past '
+        'three more.',
+    start: StartSpec(3, 4, Direction.right),
+    exit: Pos(0, 8),
+    walls: [
+      Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5), Pos(2, 6), Pos(2, 7),
+      Pos(2, 8),
+      Pos(3, 2), Pos(4, 2), Pos(5, 2),
+      Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+      Pos(6, 8),
+    ],
     movers: [
-      MovingDestroyer(3, 7, horizontal: true, dir: 1), // breach patrol
-      MovingDestroyer(3, 4, horizontal: false, dir: 1), // top-run patrol
+      MovingDestroyer(4, 5, horizontal: true, dir: 1), // shares the box
+      MovingDestroyer(0, 2, horizontal: false, dir: 1), // top-run patrol
+      MovingDestroyer(1, 4, horizontal: false, dir: -1), // top-run patrol
+      MovingDestroyer(0, 6, horizontal: false, dir: 1), // top-run patrol
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
       ToolkitEntry(ToolType.pause, 1),
     ],
   ),

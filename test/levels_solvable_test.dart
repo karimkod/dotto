@@ -166,7 +166,14 @@ void main() {
       (5, 4, Direction.up),
       (5, 6, Direction.left),
     ],
-    50: [(7, 7, Direction.up)],
+    // 50: blast out of the sealed box through the column-2 wall, climb the free
+    // left edge, then run row 0 home past the three top-run patrols.
+    50: [
+      (0, 0, Direction.right),
+      (3, 6, Direction.down),
+      (4, 0, Direction.up),
+      (4, 6, Direction.left),
+    ],
   };
 
   // Intended pause placements (World 4).
@@ -180,7 +187,7 @@ void main() {
     47: [(2, 6), (7, 2)],
     48: [(0, 4), (0, 6), (2, 7), (4, 7), (6, 7)],
     49: [(4, 6)],
-    50: [(7, 3)],
+    50: [(4, 3)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -207,7 +214,7 @@ void main() {
     // 48: one shield per mine — two in the floor run, one on the way home.
     48: [(0, 3), (7, 1), (7, 3)],
     49: [(3, 2)],
-    50: [(7, 6)],
+    50: [(0, 3), (4, 4)],
   };
 
   int worldOf(int n) =>
@@ -275,8 +282,9 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  // 47 and 48 are absent: their redesigns dropped the forced arrows they carried.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 49, 50]) {
+  // 47, 48 and 50 are absent: their redesigns dropped the forced arrows they
+  // used to carry.
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 49]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
