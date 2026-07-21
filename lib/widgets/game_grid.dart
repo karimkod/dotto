@@ -676,6 +676,9 @@ class GameGridPainter extends CustomPainter {
 
   /// A fixed arrow: solid blue-gray fill (wall family) with a white glyph, so
   /// it reads as part of the level rather than a piece the player placed.
+  /// A fixed arrow shares the wall's colour, so the MARK has to carry the whole
+  /// difference: a solid filled arrow and a heavier border, instead of the thin
+  /// text chevron that used to read as "wall with something on it" at a glance.
   void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
@@ -686,10 +689,47 @@ class GameGridPainter extends CustomPainter {
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
+        ..strokeWidth = 4 // heavier than a wall's 2px edge
         ..color = const Color(0xFF5C6B73),
     );
-    _drawGlyph(canvas, center, dir.glyph, Colors.white, geo.cell * 0.42);
+    _drawSolidArrow(canvas, center, dir, geo.cell);
+  }
+
+  /// A chunky filled arrow — shaft plus a broad head — pointing [dir]. Drawn as
+  /// geometry rather than a font glyph so its weight does not depend on the
+  /// platform's font rendering.
+  void _drawSolidArrow(
+      Canvas canvas, Offset center, Direction dir, double cell) {
+    final (dr, dc) = dir.delta;
+    // Canvas x comes from the column delta, y from the row delta.
+    final v = Offset(dc.toDouble(), dr.toDouble());
+    final perp = Offset(-v.dy, v.dx);
+
+    final tip = center + v * (cell * 0.34);
+    final headBase = center + v * (cell * 0.04);
+    final tail = center - v * (cell * 0.30);
+    final halfWidth = cell * 0.21;
+    final white = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    canvas.drawLine(
+      tail,
+      headBase,
+      Paint()
+        ..color = Colors.white
+        ..strokeWidth = cell * 0.15
+        ..strokeCap = StrokeCap.round,
+    );
+
+    final head = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(headBase.dx + perp.dx * halfWidth,
+          headBase.dy + perp.dy * halfWidth)
+      ..lineTo(headBase.dx - perp.dx * halfWidth,
+          headBase.dy - perp.dy * halfWidth)
+      ..close();
+    canvas.drawPath(head, white);
   }
 
   void _paintGlow(
