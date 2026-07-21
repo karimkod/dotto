@@ -155,7 +155,9 @@ void main() {
       (5, 7, Direction.up),
       (7, 4, Direction.up),
     ],
-    48: [(6, 6, Direction.up)],
+    // 48: one forced route — climb column 7, then run row 0 home. No shields;
+    // the five pauses are the whole puzzle.
+    48: [(0, 7, Direction.left), (7, 7, Direction.up)],
     49: [(6, 6, Direction.up)],
     50: [(7, 7, Direction.up)],
   };
@@ -169,7 +171,7 @@ void main() {
     45: [(6, 2), (6, 3)],
     46: [(4, 2), (6, 1)],
     47: [(2, 6), (7, 2)],
-    48: [(6, 1)],
+    48: [(0, 4), (0, 6), (2, 7), (4, 7), (6, 7)],
     49: [(6, 1)],
     50: [(7, 3)],
   };
@@ -195,7 +197,7 @@ void main() {
     45: [(2, 0), (2, 1)],
     46: [(2, 2), (5, 2)],
     47: [(4, 7), (5, 5)],
-    48: [(6, 5)],
+    // 48 has no shields any more — its toolkit is arrows and pauses only.
     49: [(6, 5), (3, 6)],
     50: [(7, 6)],
   };
@@ -265,8 +267,8 @@ void main() {
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
-  // 47 is absent: its redesign dropped the forced arrow it used to carry.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 48, 49, 50]) {
+  // 47 and 48 are absent: their redesigns dropped the forced arrows they carried.
+  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 49, 50]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(

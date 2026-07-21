@@ -1016,25 +1016,37 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 48 — The Gauntlet: shield-breach the climb, pause the floor patrol, ride the
-  // fixed arrow home. Everything at once on a 7x7.
+  // 48 — The Gauntlet: no shields at all, so timing is the only tool. The wall
+  // stripe across row 6 seals every climb but column 7 (column 0 is unusable —
+  // the start cell can't hold an arrow), which leaves exactly one route: run the
+  // floor, climb the right edge past three patrolled rows, then run row 0 home
+  // across two more patrol columns. Five crossings, five pauses, none spare.
+  //
+  // The phases were found by hill-climbing on the forced piece count: random
+  // layouts bottom out around three or four forced pauses, and needing all five
+  // is roughly 5x rarer again for each one beyond that.
   48: LevelData(
     id: 48,
-    size: 7,
+    size: 8,
     title: 'The Gauntlet',
-    tip: 'Breach, wait, and ride the arrow into the corner.',
-    start: StartSpec(6, 0, Direction.right),
+    tip: 'No shields here — only timing. One way up, and five patrols to '
+        'outwait.',
+    start: StartSpec(7, 0, Direction.right),
     exit: Pos(0, 0),
-    walls: [Pos(3, 5), Pos(2, 6)],
-    forcedArrows: [ForcedArrow(0, 6, Direction.left)],
+    walls: [
+      Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6),
+    ],
     movers: [
-      MovingDestroyer(3, 6, horizontal: true, dir: 1), // breach patrol
-      MovingDestroyer(4, 2, horizontal: false, dir: 1), // floor patrol
+      MovingDestroyer(5, 2, horizontal: true, dir: -1), // climb crosser
+      MovingDestroyer(3, 6, horizontal: true, dir: -1), // climb crosser
+      MovingDestroyer(1, 4, horizontal: true, dir: 1), // climb crosser
+      MovingDestroyer(4, 3, horizontal: false, dir: 1), // row-0 crosser
+      MovingDestroyer(2, 5, horizontal: false, dir: -1), // row-0 crosser
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 5),
     ],
   ),
 
