@@ -46,6 +46,41 @@ List<int> adjacentWallKeys(LevelData level, int key) {
   return out;
 }
 
+/// Every piece the LEVEL pins to the board, keyed by cell: fixed arrows, fixed
+/// shields and fixed pauses. They behave exactly like the player's own pieces
+/// once the run starts — the only difference is that they cannot be placed,
+/// moved or removed, and they are not drawn from the toolkit.
+///
+/// Single source of truth: the simulator, the solver, the live game and the
+/// painter all build their "forced" map from here, so a new kind of fixed piece
+/// only has to be taught to one place.
+Map<int, PlacedElement> buildForcedPieces(LevelData level) {
+  final n = level.size;
+  final out = <int, PlacedElement>{};
+  for (final a in level.forcedArrows) {
+    out[a.r * n + a.c] = PlacedElement(
+      type: PlacedType.arrow,
+      tool: a.dir.arrowTool,
+      direction: a.dir,
+    );
+  }
+  for (final p in level.forcedShields) {
+    out[p.r * n + p.c] = const PlacedElement(
+      type: PlacedType.shield,
+      tool: ToolType.shield,
+      direction: null,
+    );
+  }
+  for (final p in level.forcedPauses) {
+    out[p.r * n + p.c] = const PlacedElement(
+      type: PlacedType.pause,
+      tool: ToolType.pause,
+      direction: null,
+    );
+  }
+  return out;
+}
+
 /// Mutable runtime state of a patrolling (moving) destroyer.
 class MoverState {
   MoverState(this.fixed, this.pos, this.dir, this.size, this.horizontal,
@@ -170,14 +205,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
 
   // Forced arrows behave like immovable placed arrows.
-  final forced = <int, PlacedElement>{};
-  for (final a in level.forcedArrows) {
-    forced[a.r * n + a.c] = PlacedElement(
-      type: PlacedType.arrow,
-      tool: a.dir.arrowTool,
-      direction: a.dir,
-    );
-  }
+  final forced = buildForcedPieces(level);
 
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
@@ -319,14 +347,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
 /// or null if it loses. Used to verify forced arrows lie on the path.
 Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
-  final forced = <int, PlacedElement>{};
-  for (final a in level.forcedArrows) {
-    forced[a.r * n + a.c] = PlacedElement(
-      type: PlacedType.arrow,
-      tool: a.dir.arrowTool,
-      direction: a.dir,
-    );
-  }
+  final forced = buildForcedPieces(level);
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
   var r = level.start.r;

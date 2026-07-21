@@ -421,7 +421,7 @@ class GameGridPainter extends CustomPainter {
 
     // Fixed (forced) arrows — a "pinned" look so they read as immovable.
     forced.forEach((key, piece) {
-      _paintForced(canvas, geo, key, piece.direction!);
+      _paintForced(canvas, geo, key, piece);
     });
 
     if (previewKey != null && previewTool != null) {
@@ -674,16 +674,18 @@ class GameGridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A fixed arrow is drawn exactly like a player-placed one — same fill, same
-  /// blue, same chevron at the same size — with a single difference: its cell
-  /// border is dashed. Same arrow, dashed outline: "this arrow is locked here."
-  void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
+  /// A fixed piece — arrow, shield or pause — is drawn exactly like the
+  /// player-placed version of itself: same fill, same colour, same glyph or
+  /// icon at the same size. The single difference is a dashed cell border:
+  /// "this piece is locked here."
+  void _paintForced(
+      Canvas canvas, GridGeometry geo, int key, PlacedElement piece) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
     // Same source of truth as _paintPiece, so the two can never drift apart.
-    final (fill, color, glyph) = _toolStyle(dir.arrowTool, dir);
+    final (fill, color, glyph) = _toolStyle(piece.tool, piece.direction);
 
     canvas.drawRRect(rrect, Paint()..color = fill);
     _drawDashedRRect(
@@ -694,7 +696,11 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5 // matches a settled placed piece
         ..color = color,
     );
-    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    if (piece.type == PlacedType.shield) {
+      paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+    } else {
+      _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    }
   }
 
   void _paintGlow(

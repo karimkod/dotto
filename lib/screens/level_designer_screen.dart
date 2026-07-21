@@ -14,7 +14,17 @@ import '../widgets/game_grid.dart';
 import 'game_screen.dart';
 
 /// The palette cell types the designer can paint.
-enum DesignTool { empty, start, exit, wall, destroyer, forced, shield, mover }
+enum DesignTool {
+  empty,
+  start,
+  exit,
+  wall,
+  destroyer,
+  forced,
+  shield,
+  pause,
+  mover
+}
 
 /// Rotation cycle for Start / Forced arrow directions.
 const _cycle = [
@@ -55,7 +65,10 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   final Set<int> _walls = {};
   final Set<int> _destroyers = {};
   final Map<int, Direction> _forced = {};
-  final Set<int> _shields = {}; // painted shield markers (design only)
+  // Fixed shields and pauses: real level content, pinned to the board like a
+  // forced arrow and not drawn from the toolkit.
+  final Set<int> _shields = {};
+  final Set<int> _pauses = {};
   // Moving destroyers keyed by cell. Tapping again cycles the patrol axis.
   final Map<int, MovingDestroyer> _movers = {};
 
@@ -130,6 +143,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     for (final f in lvl.forcedArrows) {
       _forced[_key(f.r, f.c)] = f.dir;
     }
+    for (final p in lvl.forcedShields) {
+      _shields.add(_key(p.r, p.c));
+    }
+    for (final p in lvl.forcedPauses) {
+      _pauses.add(_key(p.r, p.c));
+    }
     for (final m in lvl.movers) {
       _movers[_key(m.r, m.c)] = m;
     }
@@ -165,6 +184,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_destroyers.contains(k)) return 'destroyer';
     if (_forced.containsKey(k)) return 'forced';
     if (_shields.contains(k)) return 'shield';
+    if (_pauses.contains(k)) return 'pause';
     if (_movers.containsKey(k)) return 'mover';
     return null;
   }
@@ -174,6 +194,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.remove(k);
     _forced.remove(k);
     _shields.remove(k);
+    _pauses.remove(k);
     _movers.remove(k);
   }
 
@@ -222,6 +243,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             _clearMovable(k);
             _shields.add(k);
           }
+        case DesignTool.pause:
+          if (occ != 'start' && occ != 'exit') {
+            _clearMovable(k);
+            _pauses.add(k);
+          }
         case DesignTool.mover:
           if (occ == 'mover') {
             // Cycle: horizontal dir+1 → horizontal dir-1 → vertical dir+1 →
@@ -259,6 +285,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         forcedArrows: _forced.entries
             .map((e) => ForcedArrow(_row(e.key), _col(e.key), e.value))
             .toList(),
+        forcedShields: _shields.map((k) => Pos(_row(k), _col(k))).toList(),
+        forcedPauses: _pauses.map((k) => Pos(_row(k), _col(k))).toList(),
         movers: _movers.values.toList(),
         toolkit: [
           for (final e in _kit.entries)
@@ -275,12 +303,19 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ),
       };
 
-  /// Painted shield markers, rendered through the painter's `placed` map.
+  /// Fixed shields and pauses, drawn through the painter's `forced` map so they
+  /// get the same dashed "locked" treatment as fixed arrows.
   Map<int, PlacedElement> _shieldPieces() => {
         for (final k in _shields)
           k: const PlacedElement(
             type: PlacedType.shield,
             tool: ToolType.shield,
+            direction: null,
+          ),
+        for (final k in _pauses)
+          k: const PlacedElement(
+            type: PlacedType.pause,
+            tool: ToolType.pause,
             direction: null,
           ),
       };
@@ -307,6 +342,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             'ForcedArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
         .join(', ');
     b.writeln('  forcedArrows: [$fa],');
+    if (_shields.isNotEmpty) {
+      b.writeln('  forcedShields: [${poss(_shields)}],');
+    }
+    if (_pauses.isNotEmpty) {
+      b.writeln('  forcedPauses: [${poss(_pauses)}],');
+    }
     if (_movers.isNotEmpty) {
       final md = _movers.values
           .map((m) =>
@@ -337,10 +378,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       return;
     }
     Clipboard.setData(ClipboardData(text: _toDart()));
-    final extra = _shields.isNotEmpty
-        ? '  (${_shields.length} painted shield marker(s) excluded — use the toolkit shield count)'
-        : '';
-    _snack('Copied!$extra');
+    _snack('Copied!');
   }
 
   // ----- import from clipboard (accepts the Dart we export, or JSON) -----
@@ -390,6 +428,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         _forced[_key(f['row'] as int, f['col'] as int)] =
             _dir(f['dir'] as String?) ?? Direction.right;
       }
+      for (final p in (data['forcedShields'] as List? ?? [])) {
+        _shields.add(_key(p['row'] as int, p['col'] as int));
+      }
+      for (final p in (data['forcedPauses'] as List? ?? [])) {
+        _pauses.add(_key(p['row'] as int, p['col'] as int));
+      }
       final tk = (data['toolkit'] as Map<String, dynamic>?) ?? {};
       _kit[ToolType.arrowUp] = (tk['up'] as num?)?.toInt() ?? 0;
       _kit[ToolType.arrowDown] = (tk['down'] as num?)?.toInt() ?? 0;
@@ -437,6 +481,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
 
       posList('walls', _walls);
       posList('destroyers', _destroyers);
+      posList('forcedShields', _shields);
+      posList('forcedPauses', _pauses);
       final fm =
           RegExp(r'forcedArrows\s*:\s*\[([^\]]*)\]').firstMatch(text);
       if (fm != null) {
@@ -538,13 +584,15 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             _stat('Solver', report.usedBrute ? 'brute (timing)' : 'path',
                 AppColors.textSoft),
             ],
-            if (_shields.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
+            if (_shields.isNotEmpty || _pauses.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Painted shields are design markers only — not part of the '
-                  'solved level. Use the toolkit shield count for play.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSoft),
+                  'Fixed pieces (${_shields.length} shield, ${_pauses.length} '
+                  'pause) are part of the level, not the toolkit — the solver '
+                  'counts them as already on the board.',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSoft),
                 ),
               ),
           ],
@@ -1043,14 +1091,17 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           size: Size.square(side),
           painter: GameGridPainter(
             level: level,
-            placed: {..._shieldPieces()},
-            forced: _forcedPieces(),
+            placed: const {},
+            // Fixed shields/pauses go through `forced` too, so the board shows
+            // them dashed exactly as they will look in play.
+            forced: {..._forcedPieces(), ..._shieldPieces()},
             trail: const [],
             movers: _movers.values.toList(),
             revision: _walls.length * 1000 +
                 _destroyers.length * 100 +
                 _forced.length * 10 +
                 _shields.length +
+                _pauses.length * 7 +
                 _movers.length * 10000,
             placeAnim: const {},
             removing: const [],
@@ -1077,6 +1128,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (DesignTool.destroyer, 'Destroyer', Icons.dangerous_rounded),
       (DesignTool.forced, 'Forced', Icons.double_arrow_rounded),
       (DesignTool.shield, 'Shield', Icons.shield_rounded),
+      (DesignTool.pause, 'Pause', Icons.pause_rounded),
       (DesignTool.mover, 'Patrol', Icons.sync_alt_rounded),
     ];
     return Wrap(
@@ -1097,6 +1149,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.destroyer: Color(0xFFEF5350),
     DesignTool.forced: Color(0xFF607D8B),
     DesignTool.shield: Color(0xFF38BDF8),
+    DesignTool.pause: Color(0xFFBA68C8), // matches the pause piece's purple
     DesignTool.mover: Color(0xFFE53935),
   };
 

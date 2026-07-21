@@ -116,6 +116,10 @@ LevelData levelWithToolkit(LevelData base, Map<ToolType, int> kit) => LevelData(
       destroyers: base.destroyers,
       gaps: base.gaps,
       forcedArrows: base.forcedArrows,
+      // Fixed pieces are LAYOUT, not toolkit — dropping them here would quietly
+      // solve a different level than the designer is looking at.
+      forcedShields: base.forcedShields,
+      forcedPauses: base.forcedPauses,
       movers: base.movers,
       toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
     );

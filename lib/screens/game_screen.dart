@@ -9,7 +9,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
 import '../engine/simulator.dart'
-    show adjacentWallKeys, buildMovers, DeathCause, MoverState, moversCrossed;
+    show
+        adjacentWallKeys,
+        buildForcedPieces,
+        buildMovers,
+        DeathCause,
+        MoverState,
+        moversCrossed;
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
@@ -214,13 +220,9 @@ class _GameScreenState extends State<GameScreen>
       for (final e in _level!.toolkit) {
         _toolKeys[e.type] = GlobalKey();
       }
-      for (final a in _level!.forcedArrows) {
-        _forced[a.r * _level!.size + a.c] = PlacedElement(
-          type: PlacedType.arrow,
-          tool: a.dir.arrowTool,
-          direction: a.dir,
-        );
-      }
+      // Fixed arrows, shields and pauses alike — _canPlace/_canDropAt already
+      // refuse any cell in _forced, so they all become undroppable for free.
+      _forced.addAll(buildForcedPieces(_level!));
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
       // Level 2 teaches drag-and-drop: show the hint hand after a beat.

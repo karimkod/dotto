@@ -62,6 +62,8 @@ class LevelData {
     this.destroyers = const [],
     this.gaps = const [],
     this.forcedArrows = const [],
+    this.forcedShields = const [],
+    this.forcedPauses = const [],
     this.movers = const [],
   });
 
@@ -76,6 +78,14 @@ class LevelData {
   final List<Pos> destroyers;
   final List<Pos> gaps;
   final List<ForcedArrow> forcedArrows;
+
+  /// Shields fixed to the board: collected like a placed shield, but the player
+  /// cannot move or remove them and they are not part of the toolkit.
+  final List<Pos> forcedShields;
+
+  /// Pauses fixed to the board — same deal as [forcedShields].
+  final List<Pos> forcedPauses;
+
   final List<MovingDestroyer> movers;
 
   /// The fixed arrow at (r, c), or null if none.
@@ -84,6 +94,20 @@ class LevelData {
       if (a.r == r && a.c == c) return a.dir;
     }
     return null;
+  }
+
+  /// True when the level pins ANY piece to (r, c) — arrow, shield or pause.
+  /// Placement checks must use this rather than [forcedArrowAt], or the player
+  /// could drop a piece on top of a fixed shield or pause.
+  bool hasForcedPieceAt(int r, int c) {
+    if (forcedArrowAt(r, c) != null) return true;
+    for (final p in forcedShields) {
+      if (p.r == r && p.c == c) return true;
+    }
+    for (final p in forcedPauses) {
+      if (p.r == r && p.c == c) return true;
+    }
+    return false;
   }
 
   /// The level-defined contents of cell (r, c), ignoring placed pieces.

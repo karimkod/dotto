@@ -10,7 +10,7 @@ List<int> placeableCells(LevelData level) {
   for (var r = 0; r < n; r++) {
     for (var c = 0; c < n; c++) {
       if (level.baseTypeAt(r, c) != CellType.empty) continue;
-      if (level.forcedArrowAt(r, c) != null) continue;
+      if (level.hasForcedPieceAt(r, c)) continue;
       cells.add(r * n + c);
     }
   }
@@ -87,9 +87,13 @@ Set<int> reachableCells(LevelData level) {
     cells.add(nr * n + nc);
     final t = level.baseTypeAt(nr, nc);
     if (t == CellType.exit) continue; // the run ends here
-    final forced = level.forcedArrowAt(nr, nc);
-    if (forced != null) {
-      push(nr, nc, forced);
+    final forcedDir = level.forcedArrowAt(nr, nc);
+    if (forcedDir != null) {
+      push(nr, nc, forcedDir);
+    } else if (level.hasForcedPieceAt(nr, nc)) {
+      // A fixed shield or pause: the player can't place here, and neither piece
+      // turns the dot, so the heading carries straight through.
+      push(nr, nc, dir);
     } else if (t == CellType.start) {
       push(nr, nc, level.start.dir); // start permanently redirects
     } else if (t == CellType.empty) {
@@ -305,9 +309,7 @@ class PathSearch {
       : n = level.size,
         maxTicks = level.size * level.size * 4 + 20,
         _movers = buildMovers(level) {
-    for (final a in level.forcedArrows) {
-      _forced[a.r * n + a.c] = a.dir;
-    }
+    _forced.addAll(buildForcedPieces(level));
     for (final k in placeableCells(level)) {
       _placeable.add(k);
     }
@@ -333,7 +335,8 @@ class PathSearch {
   final int maxTicks;
   final WinSink _onWin;
   final List<MoverState> _movers; // templates: lane, size, blocked set
-  final Map<int, Direction> _forced = {};
+  /// Pieces the level pins to the board — arrows, shields and pauses alike.
+  final Map<int, PlacedElement> _forced = {};
   final Set<int> _placeable = {};
   final List<_Choice> _stack = [];
   late _RunState _cur;
@@ -539,13 +542,10 @@ class PathSearch {
           continue; // resume simulating with the chosen option applied
         }
 
-        final placedHere = _cur.placed[key];
-        final forcedDir = _forced[key];
-        if (placedHere != null) {
-          _apply(placedHere, key);
-        } else if (forcedDir != null) {
-          _cur.dir = forcedDir;
-        }
+        // A fixed piece resolves exactly like a placed one — same _apply, so a
+        // fixed shield grants the aura and a fixed pause holds the dot.
+        final here = _cur.placed[key] ?? _forced[key];
+        if (here != null) _apply(here, key);
         if (level.baseTypeAt(_cur.r, _cur.c) == CellType.exit) {
           _onWin(_cur.placed);
           dead = true; // a win ends this run
@@ -784,9 +784,7 @@ Map<ToolType, int> _placeableKit(LevelData level) => {
 int pathMinPieces(LevelData level) {
   _requirePathSolvable(level);
   final n = level.size;
-  final forced = <int, Direction>{
-    for (final a in level.forcedArrows) a.r * n + a.c: a.dir,
-  };
+  final forced = buildForcedPieces(level);
   final remaining = _placeableKit(level);
   final placed = <int, ToolType>{};
   final seen = <String>{};
@@ -827,10 +825,21 @@ int pathMinPieces(LevelData level) {
       advance(nr, nc, bt == CellType.start ? level.start.dir : dir, shielded,
           removed);
     } else {
-      final forcedDir = forced[key];
+      final forcedHere = forced[key];
       final here = placed[key];
-      if (forcedDir != null) {
-        advance(nr, nc, forcedDir, shielded, removed);
+      if (forcedHere != null) {
+        // A fixed arrow turns the dot; a fixed shield grants the aura; a fixed
+        // pause only costs ticks, which this clock-less solver does not model
+        // (it is never used on levels where timing matters).
+        switch (forcedHere.type) {
+          case PlacedType.arrow:
+            advance(nr, nc, forcedHere.direction!, shielded, removed);
+          case PlacedType.shield:
+            advance(nr, nc, dir, true, removed);
+          case PlacedType.pause:
+          case PlacedType.teleporter:
+            advance(nr, nc, dir, shielded, removed);
+        }
       } else if (here != null) {
         if (here.direction != null) {
           advance(nr, nc, here.direction!, shielded, removed);
@@ -869,9 +878,7 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
     {int maxResults = 256}) {
   _requirePathSolvable(level);
   final n = level.size;
-  final forced = <int, Direction>{
-    for (final a in level.forcedArrows) a.r * n + a.c: a.dir,
-  };
+  final forced = buildForcedPieces(level);
   final remaining = _placeableKit(level);
   final placed = <int, ToolType>{};
   final seen = <String>{};
@@ -911,10 +918,21 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
       advance(nr, nc, bt == CellType.start ? level.start.dir : dir, shielded,
           removed);
     } else {
-      final forcedDir = forced[key];
+      final forcedHere = forced[key];
       final here = placed[key];
-      if (forcedDir != null) {
-        advance(nr, nc, forcedDir, shielded, removed);
+      if (forcedHere != null) {
+        // A fixed arrow turns the dot; a fixed shield grants the aura; a fixed
+        // pause only costs ticks, which this clock-less solver does not model
+        // (it is never used on levels where timing matters).
+        switch (forcedHere.type) {
+          case PlacedType.arrow:
+            advance(nr, nc, forcedHere.direction!, shielded, removed);
+          case PlacedType.shield:
+            advance(nr, nc, dir, true, removed);
+          case PlacedType.pause:
+          case PlacedType.teleporter:
+            advance(nr, nc, dir, shielded, removed);
+        }
       } else if (here != null) {
         if (here.direction != null) {
           advance(nr, nc, here.direction!, shielded, removed);
