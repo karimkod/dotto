@@ -674,62 +674,70 @@ class GameGridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A fixed arrow: solid blue-gray fill (wall family) with a white glyph, so
-  /// it reads as part of the level rather than a piece the player placed.
-  /// A fixed arrow shares the wall's colour, so the MARK has to carry the whole
-  /// difference: a solid filled arrow and a heavier border, instead of the thin
-  /// text chevron that used to read as "wall with something on it" at a glance.
+  /// A fixed arrow wears the SAME palette as a player-placed arrow — same fill,
+  /// same blue — but everything that is a solid line on a placed piece is dashed
+  /// here. That reads as "an arrow you cannot pick up" rather than as a wall,
+  /// which is what the old wall-coloured version looked like.
   void _paintForced(Canvas canvas, GridGeometry geo, int key, Direction dir) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    canvas.drawRRect(rrect, Paint()..color = _C.wall);
-    canvas.drawRRect(
+
+    canvas.drawRRect(rrect, Paint()..color = _C.arrowFill);
+    _drawDashedRRect(
+      canvas,
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4 // heavier than a wall's 2px edge
-        ..color = const Color(0xFF5C6B73),
+        ..strokeWidth = 2.5
+        ..color = _C.arrow,
     );
-    _drawSolidArrow(canvas, center, dir, geo.cell);
+
+    // A faint solid body keeps the shape readable at small cell sizes; the
+    // dashed outline on top carries the "fixed" meaning.
+    final body = _arrowPath(center, dir, geo.cell);
+    canvas.drawPath(
+        body, Paint()..color = _C.arrow.withValues(alpha: 0.22));
+    _drawDashedPath(
+      canvas,
+      body,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..color = _C.arrow,
+      dash: 4,
+      gap: 3,
+    );
   }
 
-  /// A chunky filled arrow — shaft plus a broad head — pointing [dir]. Drawn as
-  /// geometry rather than a font glyph so its weight does not depend on the
-  /// platform's font rendering.
-  void _drawSolidArrow(
-      Canvas canvas, Offset center, Direction dir, double cell) {
+  /// Closed outline of an arrow (shaft + head) pointing [dir], centred on
+  /// [center]. Built as geometry rather than a font glyph so it can be both
+  /// filled and dashed.
+  Path _arrowPath(Offset center, Direction dir, double cell) {
     final (dr, dc) = dir.delta;
     // Canvas x comes from the column delta, y from the row delta.
     final v = Offset(dc.toDouble(), dr.toDouble());
     final perp = Offset(-v.dy, v.dx);
 
-    final tip = center + v * (cell * 0.34);
-    final headBase = center + v * (cell * 0.04);
-    final tail = center - v * (cell * 0.30);
-    final halfWidth = cell * 0.21;
-    final white = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
+    final tip = center + v * (cell * 0.32);
+    final headBase = center + v * (cell * 0.02);
+    final tail = center - v * (cell * 0.28);
+    final headHalf = cell * 0.20;
+    final shaftHalf = cell * 0.075;
 
-    canvas.drawLine(
-      tail,
-      headBase,
-      Paint()
-        ..color = Colors.white
-        ..strokeWidth = cell * 0.15
-        ..strokeCap = StrokeCap.round,
-    );
+    Offset at(Offset base, double along) => base + perp * along;
 
-    final head = Path()
+    return Path()
       ..moveTo(tip.dx, tip.dy)
-      ..lineTo(headBase.dx + perp.dx * halfWidth,
-          headBase.dy + perp.dy * halfWidth)
-      ..lineTo(headBase.dx - perp.dx * halfWidth,
-          headBase.dy - perp.dy * halfWidth)
+      ..lineTo(at(headBase, headHalf).dx, at(headBase, headHalf).dy)
+      ..lineTo(at(headBase, shaftHalf).dx, at(headBase, shaftHalf).dy)
+      ..lineTo(at(tail, shaftHalf).dx, at(tail, shaftHalf).dy)
+      ..lineTo(at(tail, -shaftHalf).dx, at(tail, -shaftHalf).dy)
+      ..lineTo(at(headBase, -shaftHalf).dx, at(headBase, -shaftHalf).dy)
+      ..lineTo(at(headBase, -headHalf).dx, at(headBase, -headHalf).dy)
       ..close();
-    canvas.drawPath(head, white);
   }
 
   void _paintGlow(
@@ -888,9 +896,14 @@ class GameGridPainter extends CustomPainter {
   }
 
   void _drawDashedRRect(Canvas canvas, RRect rrect, Paint paint) {
-    final path = Path()..addRRect(rrect);
-    const dash = 5.0;
-    const gap = 4.0;
+    _drawDashedPath(canvas, Path()..addRRect(rrect), paint);
+  }
+
+  /// Stroke [path] as a dashed line. Walks the path's metrics and draws
+  /// [dash]-long slices [gap] apart, which is the only way to dash an arbitrary
+  /// path in Flutter without pulling in a package.
+  void _drawDashedPath(Canvas canvas, Path path, Paint paint,
+      {double dash = 5, double gap = 4}) {
     for (final metric in path.computeMetrics()) {
       var d = 0.0;
       while (d < metric.length) {
