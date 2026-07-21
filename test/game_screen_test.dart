@@ -252,10 +252,13 @@ void main() {
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
-    // Level 51 "Portal": one Up arrow at (5,1) turns the dot into the near
-    // portal, and it reappears past the wall heading for the exit.
-    await _dragArrow(tester, tester.getCenter(find.text('UP')),
-        boardRect.topLeft + geo.center(5, 1));
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+    // Level 51 "Portal": the Up arrow at (5,1) turns the dot into a portal the
+    // player builds at (4,1); its partner at (2,5) is past the wall, and the
+    // dot comes out still heading up, into the exit.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(5, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(4, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(2, 5));
 
     await runToWin(tester);
 

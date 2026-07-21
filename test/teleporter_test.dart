@@ -164,12 +164,40 @@ void main() {
     });
   });
 
-  test('level 51 teaches the mechanic and needs exactly one arrow', () {
+  group('level 51', () {
     final lvl = levelDataFor(51)!;
-    expect(lvl.teleporters, hasLength(1));
-    final sols = pathSolveAll(lvl);
-    expect(sols, hasLength(1), reason: 'the teaching level should be unique');
-    expect(sols.single, hasLength(1), reason: 'one arrow, and it is required');
-    expect(simulate(lvl, sols.single), SimOutcome.win);
+
+    test('hands the player the portal pair rather than pinning it', () {
+      expect(lvl.teleporters, isEmpty, reason: 'nothing pre-placed');
+      final kit = {for (final e in lvl.toolkit) e.type: e.count};
+      expect(kit[ToolType.teleporter], 2, reason: 'exactly one pair');
+      expect(kit[ToolType.arrowUp], 1);
+    });
+
+    test('needs the exhaustive solver, and the path search refuses it', () {
+      // The partner portal is by definition somewhere the dot has not been, so
+      // the path search cannot place it and must not silently say "unsolvable".
+      expect(needsExhaustiveSolver(lvl), isTrue);
+      expect(() => pathSolveAll(lvl), throwsA(isA<PathSolverUnsupported>()));
+    });
+
+    test('is solvable and every solution uses all three pieces', () {
+      final sols = enumerateSolutions(lvl);
+      expect(sols, isNotEmpty);
+      final min = sols.map((s) => s.length).reduce((a, b) => a < b ? a : b);
+      expect(min, 3, reason: 'two portals and the arrow are all required');
+      for (final s in sols) {
+        expect(simulate(lvl, s), SimOutcome.win);
+      }
+    });
+
+    test('cannot be solved without building the pair', () {
+      // The arrow alone just climbs into the ceiling.
+      const arrow = PlacedElement(
+          type: PlacedType.arrow,
+          tool: ToolType.arrowUp,
+          direction: Direction.up);
+      expect(simulate(lvl, {5 * 6 + 1: arrow}), SimOutcome.lose);
+    });
   });
 }

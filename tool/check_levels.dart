@@ -23,7 +23,7 @@ void main(List<String> args) {
     final usesBrute = needsBruteSolver(lvl);
     // Both solvers follow the dot's path, so even level 45's 9-piece toolkit is
     // tractable — no level needs skipping any more.
-    final sols = usesBrute ? pathSolveAll(lvl) : pathSolve(lvl);
+    final sols = usesBrute ? enumerateSolutions(lvl) : pathSolve(lvl);
     // Only pathSolve caps its results; pathSolveAll counts are exact.
     final capped = !usesBrute && sols.length >= 256;
     final minP = sols.isEmpty

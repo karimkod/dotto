@@ -573,12 +573,43 @@ class PathSearch {
   }
 }
 
+/// True when the TOOLKIT hands the player a teleporter.
+///
+/// [PathSearch] only ever places a piece on a cell the dot lands on, but a
+/// teleporter's partner is by definition somewhere the dot has not been — it is
+/// the destination. So these levels need the exhaustive [BruteSearch], which
+/// considers every candidate cell whether or not the dot reaches it. (This is
+/// the same locality assumption [candidateCells] already opts out of.)
+bool needsExhaustiveSolver(LevelData level) =>
+    level.toolkit.any((e) => e.type == ToolType.teleporter);
+
 /// Every winning placement, found by following the dot's path.
+///
+/// Throws when handed a level whose toolkit holds a teleporter — see
+/// [needsExhaustiveSolver]. Failing loud beats quietly reporting "unsolvable".
 List<Map<int, PlacedElement>> pathSolveAll(LevelData level) {
+  if (needsExhaustiveSolver(level)) {
+    throw PathSolverUnsupported(
+        'level ${level.id} has a teleporter in its toolkit; the path search '
+        'cannot place a partner on a cell the dot has not reached');
+  }
   final out = <Map<int, PlacedElement>>[];
   PathSearch(level, (p) => out.add(Map.of(p))).runSlice(_uninterrupted);
   return out;
 }
+
+/// Every winning placement, using whichever engine is correct for [level].
+/// This is the entry point callers should reach for.
+List<Map<int, PlacedElement>> enumerateSolutions(LevelData level) =>
+    needsExhaustiveSolver(level) ? solveAll(level) : pathSolveAll(level);
+
+/// The right slice-driver for [level]: the exhaustive search when a teleporter
+/// is in the toolkit, the path search otherwise. Both expose the same
+/// `runSlice(Duration) -> done` shape.
+bool Function(Duration) _sliceFor(LevelData level, WinSink sink) =>
+    needsExhaustiveSolver(level)
+        ? BruteSearch(level, sink).runSlice
+        : PathSearch(level, sink).runSlice;
 
 /// Brute-force every distinct way to place a subset of the toolkit on the board
 /// and return all configurations that solve the level.
@@ -617,21 +648,25 @@ WinSink _tally(void Function(int count, int minPieces) set) {
   };
 }
 
-/// Solution count and minimum piece count, via the path-following search.
+/// Solution count and minimum piece count.
 ///
-/// Uses [PathSearch], not [BruteSearch]: it gives the same solvability and the
-/// same minimum while skipping placements the dot could never have touched,
-/// which is the difference between 18 seconds and 2.4e12 placements on level 45.
+/// Normally uses [PathSearch]: it gives the same solvability and the same
+/// minimum while skipping placements the dot could never have touched, which is
+/// the difference between 18 seconds and 2.4e12 placements on level 45. Levels
+/// with a toolkit teleporter fall back to [BruteSearch] — see
+/// [needsExhaustiveSolver].
 BruteStats bruteStats(LevelData level, {Duration cap = kSolveCap}) {
   var count = 0;
   var minPieces = -1;
-  final search = PathSearch(level, _tally((c, m) {
-    count = c;
-    minPieces = m;
-  }));
+  final slice = _sliceFor(
+      level,
+      _tally((c, m) {
+        count = c;
+        minPieces = m;
+      }));
   final sw = Stopwatch()..start();
   var finished = false;
-  while (!(finished = search.runSlice(const Duration(milliseconds: 50)))) {
+  while (!(finished = slice(const Duration(milliseconds: 50)))) {
     if (sw.elapsed >= cap) break;
   }
   return BruteStats(count, minPieces, complete: finished);
@@ -646,13 +681,15 @@ Future<BruteStats> bruteStatsPaced(
 }) async {
   var count = 0;
   var minPieces = -1;
-  final search = PathSearch(level, _tally((c, m) {
-    count = c;
-    minPieces = m;
-  }));
+  final step = _sliceFor(
+      level,
+      _tally((c, m) {
+        count = c;
+        minPieces = m;
+      }));
   final sw = Stopwatch()..start();
   var finished = false;
-  while (!(finished = search.runSlice(slice))) {
+  while (!(finished = step(slice))) {
     if (sw.elapsed >= cap) break;
     // A macrotask, not a microtask — microtasks drain before the browser gets
     // to paint, so `Duration.zero` here is what actually frees the frame.

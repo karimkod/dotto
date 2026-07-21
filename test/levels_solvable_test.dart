@@ -15,15 +15,22 @@ import 'package:dotto/models/game_state.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level_data.dart';
 
-/// Build a placement map from arrows ((r,c,dir)), shields ((r,c)) and pauses
-/// ((r,c)).
+/// Build a placement map from arrows ((r,c,dir)), shields, pauses and
+/// teleporters (all (r,c)).
 Map<int, PlacedElement> place(
   LevelData level,
   List<(int, int, Direction)> arrows, [
   List<(int, int)> shields = const [],
   List<(int, int)> pauses = const [],
+  List<(int, int)> teleports = const [],
 ]) {
   return {
+    for (final (r, c) in teleports)
+      r * level.size + c: const PlacedElement(
+        type: PlacedType.teleporter,
+        tool: ToolType.teleporter,
+        direction: null,
+      ),
     for (final (r, c, dir) in arrows)
       r * level.size + c: PlacedElement(
         type: PlacedType.arrow,
@@ -175,9 +182,16 @@ void main() {
       (4, 6, Direction.left),
     ],
     // ----- World 5 (51–): teleporters. -----
-    // 51: turn up into the near portal; the far end drops the dot on the exit
-    // side of a wall that has no way around.
+    // 51: turn up at (5,1) into a portal placed at (4,1); the far end at (2,5)
+    // drops the dot on the exit side of a wall with no way around, still
+    // heading up, and it climbs into the exit.
     51: [(5, 1, Direction.up)],
+  };
+
+  // Intended teleporter placements (World 5). Both ends of a pair, since the
+  // player places them — the level itself pins none.
+  final teleports = <int, List<(int, int)>>{
+    51: [(4, 1), (2, 5)],
   };
 
   // Intended pause placements (World 4).
@@ -243,7 +257,7 @@ void main() {
   // are invisible to the static path solver — for either, the timing-aware
   // path search ([pathSolveAll]) is the reliable one.
   List<Map<int, PlacedElement>> solveFor(LevelData lvl) => solved.putIfAbsent(
-      lvl.id, () => needsBruteSolver(lvl) ? pathSolveAll(lvl) : pathSolve(lvl));
+      lvl.id, () => needsBruteSolver(lvl) ? enumerateSolutions(lvl) : pathSolve(lvl));
   int minPiecesFor(LevelData lvl) {
     final sols = solveFor(lvl);
     return sols.isEmpty
@@ -266,7 +280,7 @@ void main() {
           simulate(
               level,
               place(level, intended[n]!, shields[n] ?? const [],
-                  pauses[n] ?? const [])),
+                  pauses[n] ?? const [], teleports[n] ?? const [])),
           SimOutcome.win,
           reason: 'the recorded solution for level $n must win');
     });
@@ -300,7 +314,7 @@ void main() {
       final visited = tracePath(
           level,
           place(level, intended[n]!, shields[n] ?? const [],
-              pauses[n] ?? const []));
+              pauses[n] ?? const [], teleports[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
         expect(visited!.contains(a.r * level.size + a.c), isTrue,
@@ -492,12 +506,17 @@ void main() {
   test('reachable cells cover every cell the intended solutions visit', () {
     for (final n in allLevels) {
       final level = levelDataFor(n)!;
-      final reach = reachableCells(level);
       final visited = tracePath(
           level,
           place(level, intended[n]!, shields[n] ?? const [],
-              pauses[n] ?? const []));
+              pauses[n] ?? const [], teleports[n] ?? const []));
       expect(visited, isNotNull, reason: 'level $n intended solution must win');
+      // Reachability only has to cover the path on levels where it is actually
+      // used to prune. With a teleporter in the TOOLKIT, candidateCells opts out
+      // of pruning entirely (the partner's cell is chosen by the player, so no
+      // static walk can predict it), and the exhaustive search runs instead.
+      if (needsExhaustiveSolver(level)) continue;
+      final reach = reachableCells(level);
       for (final cell in visited!) {
         if (cell == level.start.r * level.size + level.start.c) continue;
         expect(reach.contains(cell), isTrue,
