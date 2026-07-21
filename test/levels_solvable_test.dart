@@ -155,8 +155,8 @@ void main() {
       (5, 7, Direction.up),
       (7, 4, Direction.up),
     ],
-    // 48: one forced route — climb column 7, then run row 0 home. No shields;
-    // the five pauses are the whole puzzle.
+    // 48: shield through the two floor mines, climb column 7 waiting out three
+    // patrols, then run row 0 home past a third mine and two more patrols.
     48: [(0, 7, Direction.left), (7, 7, Direction.up)],
     49: [(6, 6, Direction.up)],
     50: [(7, 7, Direction.up)],
@@ -197,7 +197,8 @@ void main() {
     45: [(2, 0), (2, 1)],
     46: [(2, 2), (5, 2)],
     47: [(4, 7), (5, 5)],
-    // 48 has no shields any more — its toolkit is arrows and pauses only.
+    // 48: one shield per mine — two in the floor run, one on the way home.
+    48: [(0, 3), (7, 1), (7, 3)],
     49: [(6, 5), (3, 6)],
     50: [(7, 6)],
   };

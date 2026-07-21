@@ -1016,26 +1016,29 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 48 — The Gauntlet: no shields at all, so timing is the only tool. The wall
-  // stripe across row 6 seals every climb but column 7 (column 0 is unusable —
-  // the start cell can't hold an arrow), which leaves exactly one route: run the
-  // floor, climb the right edge past three patrolled rows, then run row 0 home
-  // across two more patrol columns. Five crossings, five pauses, none spare.
+  // 48 — The Gauntlet: every mechanic at once, and the biggest toolkit in the
+  // game (10 pieces). Two mines sit in the floor run and one more guards the way
+  // home along row 0, so all three shields are spent just getting past them. The
+  // wall stripe across row 6 pushes the climb to the right edge, where three
+  // patrolled rows and then two patrolled columns have to be waited out — one
+  // pause each, five in all.
   //
-  // The phases were found by hill-climbing on the forced piece count: random
-  // layouts bottom out around three or four forced pauses, and needing all five
-  // is roughly 5x rarer again for each one beyond that.
+  // Note the two floor mines sit under the stripe: blasting them also demolishes
+  // (6,2) and (6,4), opening extra climbs. That is why this has ~2000 solutions
+  // rather than a handful, even though it is tight.
   48: LevelData(
     id: 48,
     size: 8,
     title: 'The Gauntlet',
-    tip: 'No shields here — only timing. One way up, and five patrols to '
-        'outwait.',
+    tip: 'Three mines to blast through, five patrols to wait out. Nothing to '
+        'spare.',
     start: StartSpec(7, 0, Direction.right),
     exit: Pos(0, 0),
     walls: [
       Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6),
+      Pos(4, 1), Pos(4, 2), Pos(2, 1), Pos(2, 2), Pos(2, 6), Pos(4, 6),
     ],
+    destroyers: [Pos(7, 4), Pos(7, 2), Pos(0, 2)],
     movers: [
       MovingDestroyer(5, 2, horizontal: true, dir: -1), // climb crosser
       MovingDestroyer(3, 6, horizontal: true, dir: -1), // climb crosser
@@ -1046,6 +1049,7 @@ const Map<int, LevelData> levelDefinitions = {
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.shield, 3),
       ToolkitEntry(ToolType.pause, 5),
     ],
   ),
