@@ -1120,6 +1120,27 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.pause, 1),
     ],
   ),
+
+  // ----- World 5 (51–): teleporters. -----
+
+  // 51 — Portal: the teleporter in isolation. A wall runs the full height of
+  // column 3, so the exit side simply cannot be walked to; the pinned portal
+  // pair is the only crossing. One arrow turns the dot up into the near end,
+  // and it comes out the far end still travelling up, into the exit.
+  51: LevelData(
+    id: 51,
+    size: 6,
+    title: 'Portal',
+    tip: 'That wall has no way around. Step into the portal — you come out the '
+        'far side, still moving.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3),
+    ],
+    teleporters: [TeleporterPair(Pos(2, 1), Pos(2, 4))],
+    toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

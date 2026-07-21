@@ -78,7 +78,43 @@ Map<int, PlacedElement> buildForcedPieces(LevelData level) {
       direction: null,
     );
   }
+  for (final t in level.teleporters) {
+    for (final p in [t.a, t.b]) {
+      out[p.r * n + p.c] = const PlacedElement(
+        type: PlacedType.teleporter,
+        tool: ToolType.teleporter,
+        direction: null,
+      );
+    }
+  }
   return out;
+}
+
+/// Cell -> the cell it teleports to, for every teleporter on the board.
+///
+/// Level-defined pairs are explicit. Teleporters the PLAYER places have no
+/// declared partner, so they are paired up two at a time in board order — which
+/// makes an odd one out inert rather than ambiguous.
+Map<int, int> buildTeleportLinks(
+    LevelData level, Map<int, PlacedElement> placed) {
+  final n = level.size;
+  final links = <int, int>{};
+  for (final t in level.teleporters) {
+    final a = t.a.r * n + t.a.c;
+    final b = t.b.r * n + t.b.c;
+    links[a] = b;
+    links[b] = a;
+  }
+  final loose = [
+    for (final e in placed.entries)
+      if (e.value.type == PlacedType.teleporter && !links.containsKey(e.key))
+        e.key
+  ]..sort();
+  for (var i = 0; i + 1 < loose.length; i += 2) {
+    links[loose[i]] = loose[i + 1];
+    links[loose[i + 1]] = loose[i];
+  }
+  return links;
 }
 
 /// Mutable runtime state of a patrolling (moving) destroyer.
@@ -206,6 +242,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
 
   // Forced arrows behave like immovable placed arrows.
   final forced = buildForcedPieces(level);
+  final links = buildTeleportLinks(level, {...forced, ...placed});
 
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
@@ -324,12 +361,12 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
           // Collected once; revisiting the (now-empty) cell re-grants nothing.
           if (takenShields.add(key)) shielded = true;
         case PlacedType.teleporter:
-          for (final e in placed.entries) {
-            if (e.value.type == PlacedType.teleporter && e.key != key) {
-              r = e.key ~/ n;
-              c = e.key % n;
-              break;
-            }
+          // Out the far end, same heading. The destination's own piece is NOT
+          // applied — otherwise a pair would bounce the dot back and forth.
+          final dest = links[key];
+          if (dest != null) {
+            r = dest ~/ n;
+            c = dest % n;
           }
       }
     }
@@ -348,6 +385,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
 Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
   final forced = buildForcedPieces(level);
+  final links = buildTeleportLinks(level, {...forced, ...placed});
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
   var r = level.start.r;
@@ -435,6 +473,13 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
       pause = 2;
     } else if (piece != null && piece.type == PlacedType.shield) {
       if (takenShields.add(r * n + c)) shielded = true; // collected once
+    } else if (piece != null && piece.type == PlacedType.teleporter) {
+      final dest = links[r * n + c];
+      if (dest != null) {
+        r = dest ~/ n;
+        c = dest % n;
+        visited.add(dest); // the far end is on the path too
+      }
     }
     if (level.baseTypeAt(r, c) == CellType.exit) return visited;
   }

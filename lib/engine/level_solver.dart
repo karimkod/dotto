@@ -90,6 +90,14 @@ Set<int> reachableCells(LevelData level) {
     final forcedDir = level.forcedArrowAt(nr, nc);
     if (forcedDir != null) {
       push(nr, nc, forcedDir);
+    } else if (level.teleporterPairAt(nr, nc) >= 0) {
+      // A fixed teleporter: the dot reappears at the far end, same heading, so
+      // reachability has to jump with it or everything past the exit-side
+      // portal looks unreachable.
+      final pair = level.teleporters[level.teleporterPairAt(nr, nc)];
+      final other = (pair.a.r == nr && pair.a.c == nc) ? pair.b : pair.a;
+      cells.add(other.r * n + other.c);
+      push(other.r, other.c, dir);
     } else if (level.hasForcedPieceAt(nr, nc)) {
       // A fixed shield or pause: the player can't place here, and neither piece
       // turns the dot, so the heading carries straight through.
@@ -429,12 +437,13 @@ class PathSearch {
       case PlacedType.shield:
         if (_cur.taken.add(key)) _cur.shielded = true;
       case PlacedType.teleporter:
-        for (final e in _cur.placed.entries) {
-          if (e.value.type == PlacedType.teleporter && e.key != key) {
-            _cur.r = e.key ~/ n;
-            _cur.c = e.key % n;
-            break;
-          }
+        // Links are rebuilt per branch, since the player's own teleporters pair
+        // up by board order and that changes as pieces are placed.
+        final dest =
+            buildTeleportLinks(level, {..._forced, ..._cur.placed})[key];
+        if (dest != null) {
+          _cur.r = dest ~/ n;
+          _cur.c = dest % n;
         }
     }
   }
@@ -680,6 +689,9 @@ const int kMaxPathSolverSize = 8;
 bool needsBruteSolver(LevelData level) =>
     level.movers.isNotEmpty ||
     level.size > kMaxPathSolverSize ||
+    // A teleporter moves the dot off its path; the static solver walks cell by
+    // cell and cannot express that jump.
+    level.teleporters.isNotEmpty ||
     level.toolkit.any((e) => pathSolverBlindTools.contains(e.type));
 
 /// Thrown when the path solver is handed a level only [solveAll] can answer.

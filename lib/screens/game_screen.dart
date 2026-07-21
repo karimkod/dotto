@@ -13,6 +13,7 @@ import '../engine/simulator.dart'
         adjacentWallKeys,
         buildForcedPieces,
         buildMovers,
+        buildTeleportLinks,
         DeathCause,
         MoverState,
         moversCrossed;
@@ -943,23 +944,22 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  /// Out the far end of the pair, keeping the heading. Uses the shared link
+  /// table so level-defined pairs and the player's own both work, and so the
+  /// game agrees with the simulator about which end connects to which.
   void _teleport() {
     final size = _level!.size;
-    for (final entry in _placed.entries) {
-      if (entry.value.type != PlacedType.teleporter) continue;
-      final r = entry.key ~/ size;
-      final c = entry.key % size;
-      if (r == _dot.r && c == _dot.c) continue;
-      setState(() {
-        _dot.r = r;
-        _dot.c = c;
-        _trail.add(entry.key);
-        _glow(entry.key, const Color(0xFFFF8A65), 1.0);
-      });
-      _jump(r, c);
-      Sfx.teleport();
-      return;
-    }
+    final links = buildTeleportLinks(_level!, {..._forced, ..._placed});
+    final dest = links[_idx(_dot.r, _dot.c)];
+    if (dest == null) return; // an unpaired teleporter is inert
+    setState(() {
+      _dot.r = dest ~/ size;
+      _dot.c = dest % size;
+      _trail.add(dest);
+      _glow(dest, const Color(0xFFFF8A65), 1.0);
+    });
+    _jump(_dot.r, _dot.c);
+    Sfx.teleport();
   }
 
   void _win() {

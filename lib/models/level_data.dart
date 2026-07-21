@@ -22,6 +22,15 @@ class ToolkitEntry {
   final int count;
 }
 
+/// Two linked cells. Entering either one moves the dot to the other, keeping
+/// its heading — the piece at the far end is NOT re-applied, or a pair would
+/// bounce the dot between its ends forever.
+class TeleporterPair {
+  const TeleporterPair(this.a, this.b);
+  final Pos a;
+  final Pos b;
+}
+
 /// A pre-placed arrow fixed to the board — it redirects the dot like a placed
 /// arrow but cannot be moved or removed.
 class ForcedArrow {
@@ -64,6 +73,7 @@ class LevelData {
     this.forcedArrows = const [],
     this.forcedShields = const [],
     this.forcedPauses = const [],
+    this.teleporters = const [],
     this.movers = const [],
   });
 
@@ -86,6 +96,9 @@ class LevelData {
   /// Pauses fixed to the board — same deal as [forcedShields].
   final List<Pos> forcedPauses;
 
+  /// Teleporter pairs fixed to the board. Each pair links two cells.
+  final List<TeleporterPair> teleporters;
+
   final List<MovingDestroyer> movers;
 
   /// The fixed arrow at (r, c), or null if none.
@@ -107,7 +120,20 @@ class LevelData {
     for (final p in forcedPauses) {
       if (p.r == r && p.c == c) return true;
     }
+    for (final t in teleporters) {
+      if ((t.a.r == r && t.a.c == c) || (t.b.r == r && t.b.c == c)) return true;
+    }
     return false;
+  }
+
+  /// Index of the teleporter pair covering (r, c), or -1. Lets the painter give
+  /// each pair its own colour so the player can see what links to what.
+  int teleporterPairAt(int r, int c) {
+    for (var i = 0; i < teleporters.length; i++) {
+      final t = teleporters[i];
+      if ((t.a.r == r && t.a.c == c) || (t.b.r == r && t.b.c == c)) return i;
+    }
+    return -1;
   }
 
   /// The level-defined contents of cell (r, c), ignoring placed pieces.

@@ -23,6 +23,7 @@ enum DesignTool {
   forced,
   shield,
   pause,
+  teleporter,
   mover
 }
 
@@ -69,6 +70,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // forced arrow and not drawn from the toolkit.
   final Set<int> _shields = {};
   final Set<int> _pauses = {};
+
+  /// Teleporter cells in placement order; consecutive entries form a pair, so
+  /// painting two cells makes one portal. An odd trailing cell is dropped when
+  /// the level is built rather than shipped as a half-pair.
+  final List<int> _teleports = [];
   // Moving destroyers keyed by cell. Tapping again cycles the patrol axis.
   final Map<int, MovingDestroyer> _movers = {};
 
@@ -149,6 +155,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     for (final p in lvl.forcedPauses) {
       _pauses.add(_key(p.r, p.c));
     }
+    for (final t in lvl.teleporters) {
+      _teleports..add(_key(t.a.r, t.a.c))..add(_key(t.b.r, t.b.c));
+    }
     for (final m in lvl.movers) {
       _movers[_key(m.r, m.c)] = m;
     }
@@ -171,6 +180,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.clear();
     _forced.clear();
     _shields.clear();
+    _pauses.clear();
+    _teleports.clear();
     _movers.clear();
     _startKey = _key(n - 1, 0); // bottom-left, heading right
     _startDir = Direction.right;
@@ -185,6 +196,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_forced.containsKey(k)) return 'forced';
     if (_shields.contains(k)) return 'shield';
     if (_pauses.contains(k)) return 'pause';
+    if (_teleports.contains(k)) return 'teleporter';
     if (_movers.containsKey(k)) return 'mover';
     return null;
   }
@@ -195,6 +207,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _forced.remove(k);
     _shields.remove(k);
     _pauses.remove(k);
+    _teleports.remove(k);
     _movers.remove(k);
   }
 
@@ -248,6 +261,13 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             _clearMovable(k);
             _pauses.add(k);
           }
+        case DesignTool.teleporter:
+          if (occ == 'teleporter') {
+            _teleports.remove(k); // tap again to take it back
+          } else if (occ != 'start' && occ != 'exit') {
+            _clearMovable(k);
+            _teleports.add(k);
+          }
         case DesignTool.mover:
           if (occ == 'mover') {
             // Cycle: horizontal dir+1 → horizontal dir-1 → vertical dir+1 →
@@ -287,6 +307,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             .toList(),
         forcedShields: _shields.map((k) => Pos(_row(k), _col(k))).toList(),
         forcedPauses: _pauses.map((k) => Pos(_row(k), _col(k))).toList(),
+        teleporters: _telePairs(),
         movers: _movers.values.toList(),
         toolkit: [
           for (final e in _kit.entries)
@@ -303,6 +324,16 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ),
       };
 
+  /// Teleporter cells taken two at a time. A trailing odd cell is dropped — a
+  /// half-pair has nowhere to send the dot.
+  List<TeleporterPair> _telePairs() => [
+        for (var i = 0; i + 1 < _teleports.length; i += 2)
+          TeleporterPair(
+            Pos(_row(_teleports[i]), _col(_teleports[i])),
+            Pos(_row(_teleports[i + 1]), _col(_teleports[i + 1])),
+          ),
+      ];
+
   /// Fixed shields and pauses, drawn through the painter's `forced` map so they
   /// get the same dashed "locked" treatment as fixed arrows.
   Map<int, PlacedElement> _shieldPieces() => {
@@ -316,6 +347,12 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           k: const PlacedElement(
             type: PlacedType.pause,
             tool: ToolType.pause,
+            direction: null,
+          ),
+        for (final k in _teleports)
+          k: const PlacedElement(
+            type: PlacedType.teleporter,
+            tool: ToolType.teleporter,
             direction: null,
           ),
       };
@@ -348,6 +385,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_pauses.isNotEmpty) {
       b.writeln('  forcedPauses: [${poss(_pauses)}],');
     }
+    final tp = _telePairs()
+        .map((t) =>
+            'TeleporterPair(Pos(${t.a.r}, ${t.a.c}), Pos(${t.b.r}, ${t.b.c}))')
+        .join(', ');
+    if (tp.isNotEmpty) b.writeln('  teleporters: [$tp],');
     if (_movers.isNotEmpty) {
       final md = _movers.values
           .map((m) =>
@@ -1129,6 +1171,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (DesignTool.forced, 'Forced', Icons.double_arrow_rounded),
       (DesignTool.shield, 'Shield', Icons.shield_rounded),
       (DesignTool.pause, 'Pause', Icons.pause_rounded),
+      (DesignTool.teleporter, 'Portal', Icons.circle_outlined),
       (DesignTool.mover, 'Patrol', Icons.sync_alt_rounded),
     ];
     return Wrap(
@@ -1150,6 +1193,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.forced: Color(0xFF607D8B),
     DesignTool.shield: Color(0xFF38BDF8),
     DesignTool.pause: Color(0xFFBA68C8), // matches the pause piece's purple
+    DesignTool.teleporter: Color(0xFFFF7043), // matches pair 1's orange
     DesignTool.mover: Color(0xFFE53935),
   };
 

@@ -216,6 +216,12 @@ class _MenuScreenState extends State<MenuScreen> {
                             number: 4, subtitle: 'Patrols & Pause'),
                       ]);
                     }
+                    if (level.number == kWorld5Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(number: 5, subtitle: 'Teleporters'),
+                      ]);
+                    }
                     return slot;
                   }(),
               ],

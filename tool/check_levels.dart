@@ -1,5 +1,5 @@
 // ignore_for_file: avoid_print
-// Solver check for all 50 levels — run with: dart run tool/check_levels.dart
+// Solver check for every defined level — run with: dart run tool/check_levels.dart
 // Levels with moving destroyers (World 4) need the timing-aware BRUTE-FORCE
 // solver; the rest use the fast path-based solver. Prints distinct-solution
 // count, min pieces vs toolkit total, tightness, and a sample solution.
@@ -12,9 +12,11 @@ void main(List<String> args) {
         args.firstWhere((a) => int.tryParse(a) != null, orElse: () => ''),
       ) ??
       1;
-  for (var n = from; n <= 50; n++) {
-    final lvl = levelDataFor(n);
-    if (lvl == null) continue;
+  // Walk the definitions themselves rather than a hardcoded range, so adding a
+  // level can never leave it silently unchecked.
+  for (final n in levelDefinitions.keys.toList()..sort()) {
+    if (n < from) continue;
+    final lvl = levelDefinitions[n]!;
     final total = toolkitTotal(lvl);
     // Moving destroyers or pause/teleporter pieces => timing matters => the
     // brute solver is the source of truth.

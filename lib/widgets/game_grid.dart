@@ -674,8 +674,16 @@ class GameGridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A fixed piece — arrow, shield or pause — is drawn exactly like the
-  /// player-placed version of itself: same fill, same colour, same glyph or
+  /// Distinct hues for teleporter pairs, so both ends of a pair share a colour
+  /// and different pairs never look alike. Wraps if a level somehow has more.
+  static const _telePairColors = [
+    (Color(0xFFFFE7DD), Color(0xFFFF7043)), // orange
+    (Color(0xFFE3E0FB), Color(0xFF7E57C2)), // violet
+    (Color(0xFFD9F2EC), Color(0xFF26A69A)), // teal
+  ];
+
+  /// A fixed piece — arrow, shield, pause or teleporter — is drawn exactly like
+  /// the player-placed version of itself: same fill, same colour, same glyph or
   /// icon at the same size. The single difference is a dashed cell border:
   /// "this piece is locked here."
   void _paintForced(
@@ -685,7 +693,16 @@ class GameGridPainter extends CustomPainter {
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
     // Same source of truth as _paintPiece, so the two can never drift apart.
-    final (fill, color, glyph) = _toolStyle(piece.tool, piece.direction);
+    var (fill, color, glyph) = _toolStyle(piece.tool, piece.direction);
+    // ...except teleporters, which are colour-coded per pair.
+    if (piece.type == PlacedType.teleporter) {
+      final pair = level.teleporterPairAt(r, c);
+      if (pair >= 0) {
+        final (f, cc) = _telePairColors[pair % _telePairColors.length];
+        fill = f;
+        color = cc;
+      }
+    }
 
     canvas.drawRRect(rrect, Paint()..color = fill);
     _drawDashedRRect(

@@ -120,6 +120,7 @@ LevelData levelWithToolkit(LevelData base, Map<ToolType, int> kit) => LevelData(
       // solve a different level than the designer is looking at.
       forcedShields: base.forcedShields,
       forcedPauses: base.forcedPauses,
+      teleporters: base.teleporters,
       movers: base.movers,
       toolkit: [for (final e in kit.entries) ToolkitEntry(e.key, e.value)],
     );

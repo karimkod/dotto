@@ -174,6 +174,10 @@ void main() {
       (4, 0, Direction.up),
       (4, 6, Direction.left),
     ],
+    // ----- World 5 (51–): teleporters. -----
+    // 51: turn up into the near portal; the far end drops the dot on the exit
+    // side of a wall that has no way around.
+    51: [(5, 1, Direction.up)],
   };
 
   // Intended pause placements (World 4).
@@ -217,8 +221,14 @@ void main() {
     50: [(0, 3), (4, 4)],
   };
 
-  int worldOf(int n) =>
-      n <= 15 ? 1 : (n <= 20 ? 2 : (n <= 30 ? 3 : 4));
+  // Walk the definitions themselves, so a new level is never silently skipped.
+  final allLevels = levelDefinitions.keys.toList()..sort();
+
+  int worldOf(int n) => n <= 15
+      ? 1
+      : (n <= 20 ? 2 : (n <= 30 ? 3 : (n <= 50 ? 4 : 5)));
+
+
 
   // Enumerating a level twice (once for solvability, once for tightness) is
   // wasted work — level 45 alone takes ~30s a pass. Cache per level, and use
@@ -241,7 +251,7 @@ void main() {
         : sols.map((m) => m.length).reduce((a, b) => a < b ? a : b);
   }
 
-  for (var n = 1; n <= 50; n++) {
+  for (final n in allLevels) {
     test('World ${worldOf(n)} — level $n is solvable', () {
       final level = levelDataFor(n)!;
       final solutions = solveFor(level);
@@ -264,7 +274,7 @@ void main() {
 
   // Every level (with a toolkit) must require its whole toolkit — no piece can
   // be left unused, so the Play-gating never forces a wasted placement.
-  for (var n = 2; n <= 50; n++) {
+  for (final n in allLevels.where((n) => n > 1)) {
     test('World ${worldOf(n)} — level $n requires every toolkit piece', () {
       final level = levelDataFor(n)!;
       expect(minPiecesFor(level), toolkitTotal(level),
@@ -480,7 +490,7 @@ void main() {
 
   // Reachability pruning must never discard a cell a real run can touch.
   test('reachable cells cover every cell the intended solutions visit', () {
-    for (var n = 1; n <= 50; n++) {
+    for (final n in allLevels) {
       final level = levelDataFor(n)!;
       final reach = reachableCells(level);
       final visited = tracePath(
@@ -549,7 +559,7 @@ void main() {
 
     test('the solver does not offer solutions that cross a patrol', () {
       // Every solution the search returns must survive the real simulator.
-      for (var n = 31; n <= 50; n++) {
+      for (final n in allLevels.where((n) => levelDataFor(n)!.movers.isNotEmpty)) {
         final level = levelDataFor(n)!;
         for (final s in solveFor(level)) {
           // cached

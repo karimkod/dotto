@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dotto/data/level_definitions.dart';
+import 'package:dotto/data/levels.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level.dart';
 import 'package:dotto/models/level_data.dart';
@@ -234,7 +236,35 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
   });
 
-  testWidgets('last level (50) shows Back to Menu, not Continue',
+  // Keyed off kLevelCount rather than a hardcoded number, so adding a level
+  // moves this test with it instead of quietly asserting the wrong thing.
+  testWidgets('the last level shows Back to Menu, not Continue', (tester) async {
+    final lastLevel = Level(
+      id: kLevelCount,
+      number: kLevelCount,
+      title: levelDataFor(kLevelCount)!.title,
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester
+        .pumpWidget(MaterialApp(home: GameScreen(level: lastLevel)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
+    // Level 51 "Portal": one Up arrow at (5,1) turns the dot into the near
+    // portal, and it reappears past the wall heading for the exit.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(5, 1));
+
+    await runToWin(tester);
+
+    // Last level → no Continue; the button is Back to Menu.
+    expect(find.text('Continue'), findsNothing);
+    expect(find.text('Back to Menu'), findsOneWidget);
+  });
+
+  testWidgets('level 50 is no longer last, so it offers Continue',
       (tester) async {
     const level50 = Level(
       id: 50,
@@ -247,12 +277,11 @@ void main() {
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, 9); // the finale is the only 9x9
+    final geo = GridGeometry(boardRect.width, 9); // the 9x9 Summit
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Solution: turn down and back along row 4, collecting a shield, and pause
-    // so the shielded hit lands on the patrol sharing the sealed box — that
-    // blast opens the column-2 wall. Climb the freed left edge, then run row 0
-    // home, spending the second shield on the top-run patrols.
+    // Turn down and back along row 4, collecting a shield, and pause so the
+    // shielded hit lands on the patrol sharing the sealed box — that blast opens
+    // the column-2 wall. Climb the freed left edge, then run row 0 home.
     await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(3, 6));
     await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(4, 6));
     await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(4, 4));
@@ -263,9 +292,7 @@ void main() {
 
     await runToWin(tester);
 
-    // Last level → no Continue; the button is Back to Menu.
-    expect(find.text('Continue'), findsNothing);
-    expect(find.text('Back to Menu'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('shield + chain explosion clears the wall and wins (L24)',
