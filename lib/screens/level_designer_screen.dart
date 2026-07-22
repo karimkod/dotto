@@ -85,6 +85,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     ToolType.arrowRight: 0,
     ToolType.shield: 0,
     ToolType.pause: 0,
+    ToolType.teleporter: 0, // 2 per pair
   };
 
   DesignTool _tool = DesignTool.wall;
@@ -482,6 +483,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       _kit[ToolType.arrowLeft] = (tk['left'] as num?)?.toInt() ?? 0;
       _kit[ToolType.arrowRight] = (tk['right'] as num?)?.toInt() ?? 0;
       _kit[ToolType.shield] = (tk['shield'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.pause] = (tk['pause'] as num?)?.toInt() ?? 0;
+      _kit[ToolType.teleporter] = (tk['teleporter'] as num?)?.toInt() ?? 0;
       _formRev++;
     });
     return true;
@@ -1234,6 +1237,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (ToolType.arrowRight, '→ Right'),
       (ToolType.shield, '◯ Shield'),
       (ToolType.pause, '⏸ Pause'),
+      (ToolType.teleporter, '◎ Warp'), // 2 = one pair
     ];
     return Wrap(
       spacing: 10,
