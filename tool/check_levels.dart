@@ -21,6 +21,14 @@ void main(List<String> args) {
     // Moving destroyers or pause/teleporter pieces => timing matters => the
     // brute solver is the source of truth.
     final usesBrute = needsBruteSolver(lvl);
+    // Levels with more than one portal pair can't be solver-verified — the
+    // solver pairs by board order, the player by placement order — so they are
+    // hand-checked in the tests instead. Report and skip.
+    if (toolkitTeleporters(lvl) > 2) {
+      print('L$n "${lvl.title}" ${lvl.size}x${lvl.size}: '
+          '*** two-pair — hand-verified in tests (solver cannot pair) ***');
+      continue;
+    }
     // Both solvers follow the dot's path, so even level 45's 9-piece toolkit is
     // tractable — no level needs skipping any more.
     final sols = usesBrute ? enumerateSolutions(lvl) : pathSolve(lvl);

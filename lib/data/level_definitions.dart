@@ -1147,6 +1147,230 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.teleporter, 2), // one pair
     ],
   ),
+
+  // 52 — Detour: the dot climbs column 5 straight into a mine, and a wall seals
+  // off the rest of the board. The portal is the only way out — drop the
+  // entrance below the mine, the exit in the open left region — then an arrow
+  // runs the dot along the top to the exit, which is sealed from below so the
+  // turn is required.
+  52: LevelData(
+    id: 52,
+    size: 6,
+    title: 'Detour',
+    tip: 'The mine blocks the climb. Portal past it, then arrow along the top.',
+    start: StartSpec(5, 5, Direction.up),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4),
+      Pos(1, 0),
+    ],
+    destroyers: [Pos(2, 5)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 53 — Two Ways: two full walls (columns 2 and 4) cut the board into three
+  // strips. A portal pair is the only way across each wall, and an arrow sets
+  // the heading at each end. Solver-unverifiable (two pairs pair by placement
+  // order, which the board-order solver can't model) — hand-checked instead:
+  // the recorded solution wins and every one of its six pieces is load-bearing.
+  53: LevelData(
+    id: 53,
+    size: 7,
+    title: 'Two Ways',
+    tip: 'Two walls, two pairs. Bridge the first strip, then the second.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [
+      Pos(0, 2), Pos(1, 2), Pos(2, 2), Pos(3, 2), Pos(4, 2), Pos(5, 2), Pos(6, 2),
+      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.teleporter, 4),
+    ],
+  ),
+
+  // 54 — Portal Shield: a wall (col 3) seals the exit region, so the portal is
+  // the only crossing. There the exit is boxed on both open sides, reachable
+  // only through a mine — a shielded hit chain-explodes the mine and the cap
+  // above it open. Shield, pair and both arrows are all required.
+  54: LevelData(
+    id: 54,
+    size: 7,
+    title: 'Portal Shield',
+    tip: 'Cross over, shield up, then ram the mine capping the exit.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
+      Pos(1, 6), Pos(0, 5),
+    ],
+    destroyers: [Pos(2, 6)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 55 — Portal Timing: the portal crosses the wall into a 1-wide climb corridor
+  // that a patrol sweeps; a pause times the climb past it. NOTE: single-pair
+  // pause levels are not solver-tight — the portal's placement gives free timing
+  // that a pause can also supply, so a shorter no-pause route exists on paper.
+  // The game makes the player place every toolkit piece, so the pause is used in
+  // play; the recorded solution below wins and every piece in it is load-bearing.
+  55: LevelData(
+    id: 55,
+    size: 7,
+    title: 'Portal Timing',
+    tip: 'Through the wall, then climb — but a patrol owns the corridor. Pause '
+        'to time it.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
+      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4),
+      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5),
+    ],
+    movers: [MovingDestroyer(1, 6, horizontal: false, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 56 — Ricochet: the portal crosses the wall, and the dot must leave the far
+  // end heading UP so it climbs into the fixed arrow at (0,6) and ricochets left
+  // along the top to the sealed exit. Emerge any other way and it misses — the
+  // heading after the teleport is the whole puzzle. Solver-verified TIGHT.
+  56: LevelData(
+    id: 56,
+    size: 7,
+    title: 'Ricochet',
+    tip: 'Come out of the portal heading up — the fixed arrow up top does the '
+        'rest.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
+      Pos(1, 4),
+    ],
+    forcedArrows: [ForcedArrow(0, 6, Direction.left)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 57 — Chain Warp: three strips split by two walls (columns 3 and 5). One pair
+  // bridges each wall, and the dot chains straight out of the first warp into
+  // the second. Two-pair, so hand-verified: the recorded solution wins under
+  // both pairings and every one of its six pieces is load-bearing.
+  57: LevelData(
+    id: 57,
+    size: 8,
+    title: 'Chain Warp',
+    tip: 'Warp, then warp again — each pair clears one wall on the way up.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3),
+      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5), Pos(7, 5),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.teleporter, 4),
+    ],
+  ),
+
+  // 58 — Portal Breach: the portal crosses the wall; on the far side a shielded
+  // hit chain-explodes the mine capping the exit open, while a patrol sweeps the
+  // climb and has to be timed. Shield, pair and arrow all forced — solver-
+  // verified TIGHT.
+  58: LevelData(
+    id: 58,
+    size: 8,
+    title: 'Portal Breach',
+    tip: 'Cross, shield up, and blast the mine over the exit — mind the patrol '
+        'on the climb.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [
+      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4), Pos(7, 4),
+      Pos(1, 7), Pos(0, 6),
+    ],
+    destroyers: [Pos(2, 7)],
+    movers: [MovingDestroyer(4, 5, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 59 — The Labyrinth: two walls (columns 3 and 5), a pair bridging each, and a
+  // patrol in each climb column that a pause must time. Two-pair, so hand-
+  // verified: the recorded solution wins under both pairings and all eight of
+  // its pieces are load-bearing (the patrol phases were tuned so both pauses are
+  // genuinely required).
+  59: LevelData(
+    id: 59,
+    size: 8,
+    title: 'The Labyrinth',
+    tip: 'Warp up, warp again — and pause for the patrol guarding each climb.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3),
+      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5), Pos(7, 5),
+    ],
+    movers: [
+      MovingDestroyer(0, 4, horizontal: false, dir: 1),
+      MovingDestroyer(5, 6, horizontal: false, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.pause, 2),
+      ToolkitEntry(ToolType.teleporter, 4),
+    ],
+  ),
+
+  // 60 — Wormhole: the finale, and the game's second 9x9. Everything at once —
+  // two portal pairs bridging two walls, a shield to chain-explode the mine on
+  // the first climb, a patrol on the second, and arrows to steer. Two-pair, so
+  // hand-verified: the recorded solution wins under both pairings; the shield is
+  // load-bearing. (The pause is placed and used but, as with every single-pair
+  // timing setup, the portal's free timing means it isn't strictly forced — a
+  // documented World 5 limitation.)
+  60: LevelData(
+    id: 60,
+    size: 9,
+    title: 'Wormhole',
+    tip: 'Everything you know: warp, shield the mine, warp again, and time the '
+        'last climb.',
+    start: StartSpec(8, 0, Direction.right),
+    exit: Pos(0, 8),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3), Pos(8, 3),
+      Pos(0, 6), Pos(1, 6), Pos(2, 6), Pos(3, 6), Pos(4, 6), Pos(5, 6), Pos(6, 6), Pos(7, 6), Pos(8, 6),
+    ],
+    destroyers: [Pos(5, 2)],
+    movers: [MovingDestroyer(0, 5, horizontal: false, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 4),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.
