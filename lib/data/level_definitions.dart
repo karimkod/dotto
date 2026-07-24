@@ -1166,75 +1166,72 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 53 — Two Ways: two full walls (columns 2 and 4) cut the board into three
-  // strips. A portal pair is the only way across each wall, and an arrow sets
-  // the heading at each end. Solver-unverifiable (two pairs pair by placement
-  // order, which the board-order solver can't model) — hand-checked instead:
-  // the recorded solution wins and every one of its six pieces is load-bearing.
+  // 53 — Two Ways: a wall seals the exit column, and a patrol sweeps it. One
+  // portal pair crosses, one shield survives the patrol.
   53: LevelData(
     id: 53,
     size: 7,
     title: 'Two Ways',
-    tip: 'Two walls, two pairs. Bridge the first strip, then the second.',
+    tip: 'A wall and a patrol guard the exit. Warp to the far side, shielded.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 6),
     walls: [
-      Pos(0, 2), Pos(1, 2), Pos(2, 2), Pos(3, 2), Pos(4, 2), Pos(5, 2), Pos(6, 2),
-      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4),
+      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(6, 5), Pos(5, 5),
     ],
+    movers: [MovingDestroyer(4, 4, horizontal: false, dir: -1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.teleporter, 4),
-    ],
-  ),
-
-  // 54 — Portal Shield: a wall (col 3) seals the exit region, so the portal is
-  // the only crossing. There the exit is boxed on both open sides, reachable
-  // only through a mine — a shielded hit chain-explodes the mine and the cap
-  // above it open. Shield, pair and both arrows are all required.
-  54: LevelData(
-    id: 54,
-    size: 7,
-    title: 'Portal Shield',
-    tip: 'Cross over, shield up, then ram the mine capping the exit.',
-    start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 6),
-    walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
-      Pos(1, 6), Pos(0, 5),
-    ],
-    destroyers: [Pos(2, 6)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
-  // 55 — Portal Timing: the portal crosses the wall into a 1-wide climb corridor
-  // that a patrol sweeps; a pause times the climb past it. NOTE: single-pair
-  // pause levels are not solver-tight — the portal's placement gives free timing
-  // that a pause can also supply, so a shorter no-pause route exists on paper.
-  // The game makes the player place every toolkit piece, so the pause is used in
-  // play; the recorded solution below wins and every piece in it is load-bearing.
+  // 54 — Portal Shield: a field of mines walls the exit off; a shielded hit
+  // opens a way through. Portal in, shield up, and ride the fixed arrow home.
+  54: LevelData(
+    id: 54,
+    size: 7,
+    title: 'Portal Shield',
+    tip: 'A minefield walls off the exit. Warp in, shield through, ride the '
+        'fixed arrow home.',
+    start: StartSpec(6, 6, Direction.left),
+    exit: Pos(2, 6),
+    walls: [Pos(3, 6), Pos(3, 5), Pos(1, 6), Pos(1, 5), Pos(2, 5)],
+    destroyers: [
+      Pos(2, 4), Pos(4, 5), Pos(0, 5), Pos(4, 6), Pos(0, 6),
+      Pos(1, 4), Pos(0, 4), Pos(3, 4), Pos(4, 4),
+    ],
+    forcedArrows: [ForcedArrow(0, 2, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 55 — Portal Timing: three walled rows form a serpentine. Warp from the floor
+  // up to the top corner, then snake down each row with a drop arrow, riding the
+  // fixed arrow and picking up the fixed shield along the way. Solvable but heavy
+  // to enumerate (~14 min, seven pieces over an open board), so it's verified by
+  // its recorded solution rather than by the tightness sweep.
   55: LevelData(
     id: 55,
     size: 7,
     title: 'Portal Timing',
-    tip: 'Through the wall, then climb — but a patrol owns the corridor. Pause '
-        'to time it.',
+    tip: 'Warp up top, then serpentine down — one drop arrow per row.',
     start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 6),
+    exit: Pos(6, 4),
     walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
-      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4),
-      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5),
+      Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 3), Pos(3, 4), Pos(3, 6),
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
     ],
-    movers: [MovingDestroyer(1, 6, horizontal: false, dir: 1)],
+    destroyers: [Pos(6, 3), Pos(5, 6)],
+    forcedArrows: [ForcedArrow(6, 6, Direction.left)],
+    forcedShields: [Pos(0, 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.arrowDown, 3),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),

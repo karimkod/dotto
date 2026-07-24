@@ -186,9 +186,16 @@ void main() {
     // (4,4) and step out at (0,3), past the L-wall, then into the exit.
     51: [],
     52: [(0, 3, Direction.left)],
-    53: [(6, 1, Direction.up), (0, 5, Direction.right)],
-    54: [(6, 6, Direction.up)],
-    55: [(6, 2, Direction.up)],
+    53: [], // shield + portal only
+    54: [(2, 2, Direction.right)],
+    // 55: warp up, then a drop arrow per serpentine row plus a left/right turn.
+    55: [
+      (0, 6, Direction.down),
+      (2, 0, Direction.down),
+      (4, 6, Direction.down),
+      (2, 6, Direction.left),
+      (4, 0, Direction.right),
+    ],
     56: [(6, 6, Direction.up)],
     57: [(7, 1, Direction.up), (0, 6, Direction.right)],
     58: [(7, 7, Direction.up)],
@@ -203,9 +210,9 @@ void main() {
   final teleports = <int, List<(int, int)>>{
     51: [(4, 4), (0, 3)],
     52: [(4, 5), (5, 3)],
-    53: [(4, 1), (4, 3), (2, 3), (2, 5)],
-    54: [(6, 2), (6, 4)],
-    55: [(5, 2), (5, 6)],
+    53: [(0, 3), (6, 3)],
+    54: [(0, 3), (6, 2)],
+    55: [(0, 0), (6, 2)],
     56: [(6, 2), (6, 5)],
     57: [(5, 1), (5, 4), (2, 4), (2, 6)],
     58: [(7, 3), (7, 5)],
@@ -226,7 +233,6 @@ void main() {
     49: [(4, 6)],
     50: [(4, 3)],
     // World 5 timing levels.
-    55: [(6, 1)],
     59: [(6, 1), (4, 4)],
     60: [(4, 5)],
   };
@@ -257,7 +263,8 @@ void main() {
     49: [(3, 2)],
     50: [(0, 3), (4, 4)],
     // World 5 chain-explosion levels.
-    54: [(6, 5)],
+    53: [(6, 2)],
+    54: [(6, 3)],
     58: [(7, 6)],
     60: [(8, 1)],
   };
@@ -269,11 +276,13 @@ void main() {
   // portals by board order, the player by placement order. They're checked by
   // their recorded solution winning (under both pairings, per the design tool)
   // rather than by enumeration.
-  const twoPairLevels = {53, 57, 59, 60};
-  // Single-pair portal + pause levels aren't solver-tight — the portal's free
-  // timing means the pause isn't strictly forced — so skip the tightness check
-  // (the recorded solution still wins and uses every piece).
-  const notSolverTight = {55};
+  const twoPairLevels = {57, 59, 60};
+  // Levels whose exhaustive enumeration is too slow for the suite (a full open
+  // board with a teleporter toolkit, so no reachability pruning). Level 55 takes
+  // ~14 minutes to enumerate. Its recorded solution — found by exhaustion, so
+  // solvability IS proven — carries it via the intended-solution-wins test; the
+  // solvable/tight sweeps are skipped.
+  const solverTooSlow = {55};
 
   int worldOf(int n) => n <= 15
       ? 1
@@ -313,7 +322,10 @@ void main() {
         timeout: heavy,
         skip: twoPairLevels.contains(n)
             ? 'two portal pairs — solver cannot verify; see intended-solution test'
-            : null);
+            : solverTooSlow.contains(n)
+                ? 'enumeration too slow — solvability proven by exhaustion, see '
+                    'intended-solution test'
+                : null);
 
     test('World ${worldOf(n)} — level $n intended solution wins', () {
       final level = levelDataFor(n)!;
@@ -336,8 +348,8 @@ void main() {
           reason: 'level $n should have no solution that leaves a piece unused');
     },
         timeout: heavy,
-        skip: (twoPairLevels.contains(n) || notSolverTight.contains(n))
-            ? 'not solver-tight (portal timing / two pairs) — see design notes'
+        skip: (twoPairLevels.contains(n) || solverTooSlow.contains(n))
+            ? 'two pairs, or enumeration too slow — see design notes'
             : null);
   }
 

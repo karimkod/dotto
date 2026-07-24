@@ -1460,7 +1460,9 @@ class _GameScreenState extends State<GameScreen>
                         level: _level!,
                         // Picked-up shields vanish from the grid (the shrink-out
                         // is drawn via `removing`); the placement itself stays
-                        // in _placed so Retry restores it.
+                        // in _placed / _forced so Retry restores it. A collected
+                        // shield can be a placed OR a fixed one, so both maps are
+                        // filtered by _consumedShields.
                         placed: _consumedShields.isEmpty
                             ? _placed
                             : {
@@ -1472,7 +1474,13 @@ class _GameScreenState extends State<GameScreen>
                         revision: _revision,
                         placeAnim: _placeAnim,
                         removing: _removing,
-                        forced: _forced,
+                        forced: _consumedShields.isEmpty
+                            ? _forced
+                            : {
+                                for (final e in _forced.entries)
+                                  if (!_consumedShields.contains(e.key))
+                                    e.key: e.value,
+                              },
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,
