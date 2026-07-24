@@ -1262,105 +1262,101 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 57 — Chain Warp: three strips split by two walls (columns 3 and 5). One pair
-  // bridges each wall, and the dot chains straight out of the first warp into
-  // the second. Two-pair, so hand-verified: the recorded solution wins under
-  // both pairings and every one of its six pieces is load-bearing.
+  // 57 — Chain Warp: a serpentine of mines and walls. Warp out of the start
+  // pocket, climb the shaft, then warp again into the vault, which only opens
+  // from the right. Design by Fable. Two-pair — hand-verified: the recorded
+  // solution wins under both pairings.
   57: LevelData(
     id: 57,
     size: 8,
     title: 'Chain Warp',
-    tip: 'Warp, then warp again — each pair clears one wall on the way up.',
+    tip: 'Warp out, climb the shaft, then warp again — the vault only opens from '
+        'the right.',
     start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 7),
+    exit: Pos(0, 0),
     walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3),
-      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5), Pos(7, 5),
+      Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 5), Pos(2, 6), Pos(2, 7), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 6), Pos(3, 7), Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 5), Pos(4, 6), Pos(4, 7), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 6), Pos(5, 7), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7), Pos(7, 3), Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
     ],
+    destroyers: [Pos(0, 3), Pos(2, 4), Pos(5, 5), Pos(6, 0), Pos(6, 1), Pos(7, 2)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
 
-  // 58 — Portal Breach: the portal crosses the wall; on the far side a shielded
-  // hit chain-explodes the mine capping the exit open, while a patrol sweeps the
-  // climb and has to be timed. Shield, pair and arrow all forced — solver-
-  // verified TIGHT.
+  // 58 — Portal Breach: warp past the barrier, grab the shield, and time the drop
+  // so the patrol takes the shielded hit. Design by Fable. Single pair — solver-
+  // verifiable.
   58: LevelData(
     id: 58,
     size: 8,
     title: 'Portal Breach',
-    tip: 'Cross, shield up, and blast the mine over the exit — mind the patrol '
-        'on the climb.',
-    start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 7),
+    tip: 'Warp past the barrier, grab the shield, and time your drop so the '
+        'patrol takes the hit.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(6, 6),
     walls: [
-      Pos(0, 4), Pos(1, 4), Pos(2, 4), Pos(3, 4), Pos(4, 4), Pos(5, 4), Pos(6, 4), Pos(7, 4),
-      Pos(1, 7), Pos(0, 6),
+      Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 7), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5), Pos(3, 7), Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 7), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6), Pos(5, 7), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 7), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 3), Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
     ],
-    destroyers: [Pos(2, 7)],
+    destroyers: [Pos(0, 3), Pos(1, 0), Pos(1, 1), Pos(1, 2)],
     movers: [MovingDestroyer(4, 5, horizontal: true, dir: 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
-  // 59 — The Labyrinth: two walls (columns 3 and 5), a pair bridging each, and a
-  // patrol in each climb column that a pause must time. Two-pair, so hand-
-  // verified: the recorded solution wins under both pairings and all eight of
-  // its pieces are load-bearing (the patrol phases were tuned so both pauses are
-  // genuinely required).
+  // 59 — The Labyrinth: two patrols guard the crossing in lockstep. Rushing dies;
+  // pause once, then thread the gap. Design by Fable. Two-pair — hand-verified:
+  // the recorded solution wins under both pairings.
   59: LevelData(
     id: 59,
-    size: 8,
+    size: 9,
     title: 'The Labyrinth',
-    tip: 'Warp up, warp again — and pause for the patrol guarding each climb.',
-    start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 7),
+    tip: 'Two patrols guard the crossing in lockstep. Rushing dies — pause once, '
+        'then thread the gap.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(8, 0),
     walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3),
-      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5), Pos(7, 5),
+      Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(0, 8), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(1, 8), Pos(2, 0), Pos(2, 1), Pos(2, 6), Pos(2, 7), Pos(2, 8), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 6), Pos(3, 7), Pos(3, 8), Pos(4, 0), Pos(4, 1), Pos(4, 5), Pos(4, 6), Pos(4, 7), Pos(4, 8), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 7), Pos(5, 8), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 5), Pos(6, 6), Pos(6, 7), Pos(6, 8), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 3), Pos(7, 5), Pos(7, 6), Pos(7, 7), Pos(7, 8), Pos(8, 4), Pos(8, 5), Pos(8, 6), Pos(8, 7), Pos(8, 8),
     ],
+    destroyers: [Pos(0, 2), Pos(1, 0), Pos(1, 1), Pos(2, 5), Pos(3, 3), Pos(7, 4), Pos(8, 3)],
     movers: [
-      MovingDestroyer(0, 4, horizontal: false, dir: 1),
-      MovingDestroyer(5, 6, horizontal: false, dir: -1),
+      MovingDestroyer(4, 4, horizontal: true, dir: -1),
+      MovingDestroyer(5, 6, horizontal: true, dir: -1),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.pause, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
 
-  // 60 — Wormhole: the finale, and the game's second 9x9. Everything at once —
-  // two portal pairs bridging two walls, a shield to chain-explode the mine on
-  // the first climb, a patrol on the second, and arrows to steer. Two-pair, so
-  // hand-verified: the recorded solution wins under both pairings; the shield is
-  // load-bearing. (The pause is placed and used but, as with every single-pair
-  // timing setup, the portal's free timing means it isn't strictly forced — a
-  // documented World 5 limitation.)
+  // 60 — Wormhole: the final exam. Warp, shield, wait, dive between the patrols,
+  // breach the door, and warp home. Design by Fable. Two-pair — hand-verified:
+  // the recorded solution wins under both pairings.
   60: LevelData(
     id: 60,
     size: 9,
     title: 'Wormhole',
-    tip: 'Everything you know: warp, shield the mine, warp again, and time the '
-        'last climb.',
-    start: StartSpec(8, 0, Direction.right),
-    exit: Pos(0, 8),
+    tip: 'Warp, shield, wait, dive between the patrols, breach the door, and '
+        'warp home. The final exam.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(8, 0),
     walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3), Pos(8, 3),
-      Pos(0, 6), Pos(1, 6), Pos(2, 6), Pos(3, 6), Pos(4, 6), Pos(5, 6), Pos(6, 6), Pos(7, 6), Pos(8, 6),
+      Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(0, 8), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(1, 8), Pos(2, 0), Pos(2, 6), Pos(2, 7), Pos(2, 8), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 7), Pos(3, 8), Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 7), Pos(4, 8), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 5), Pos(5, 6), Pos(5, 7), Pos(5, 8), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7), Pos(6, 8), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 5), Pos(7, 6), Pos(7, 7), Pos(7, 8), Pos(8, 4), Pos(8, 5), Pos(8, 6), Pos(8, 7), Pos(8, 8),
     ],
-    destroyers: [Pos(5, 2)],
-    movers: [MovingDestroyer(0, 5, horizontal: false, dir: 1)],
+    destroyers: [Pos(0, 2), Pos(1, 0), Pos(1, 1), Pos(2, 5), Pos(5, 4), Pos(8, 3)],
+    movers: [
+      MovingDestroyer(3, 4, horizontal: true, dir: 1),
+      MovingDestroyer(4, 6, horizontal: true, dir: -1),
+    ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.pause, 1),
       ToolkitEntry(ToolType.teleporter, 4),

@@ -197,10 +197,10 @@ void main() {
       (4, 0, Direction.right),
     ],
     56: [(6, 6, Direction.up), (5, 6, Direction.left)],
-    57: [(7, 1, Direction.up), (0, 6, Direction.right)],
-    58: [(7, 7, Direction.up)],
-    59: [(7, 1, Direction.up), (0, 6, Direction.right)],
-    60: [(8, 2, Direction.up), (0, 7, Direction.right)],
+    57: [(5, 4, Direction.up), (3, 4, Direction.left)],
+    58: [(2, 6, Direction.down)],
+    59: [(2, 4, Direction.down), (6, 4, Direction.left)],
+    60: [(2, 4, Direction.down), (7, 4, Direction.left)],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -214,10 +214,10 @@ void main() {
     54: [(0, 3), (6, 2)],
     55: [(0, 0), (6, 2)],
     56: [(6, 1), (6, 5)],
-    57: [(5, 1), (5, 4), (2, 4), (2, 6)],
-    58: [(7, 3), (7, 5)],
-    59: [(5, 1), (5, 4), (2, 4), (4, 6)],
-    60: [(3, 2), (5, 5), (1, 5), (1, 7)],
+    57: [(7, 1), (5, 3), (3, 3), (0, 2)],
+    58: [(0, 1), (2, 4)],
+    59: [(0, 1), (2, 2), (6, 3), (8, 2)],
+    60: [(0, 1), (2, 1), (7, 3), (8, 2)],
   };
 
   // Intended pause placements (World 4).
@@ -233,8 +233,8 @@ void main() {
     49: [(4, 6)],
     50: [(4, 3)],
     // World 5 timing levels.
-    59: [(6, 1), (4, 4)],
-    60: [(4, 5)],
+    59: [(2, 3)],
+    60: [(2, 3)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -265,8 +265,8 @@ void main() {
     // World 5 chain-explosion levels.
     53: [(6, 2)],
     54: [(6, 3)],
-    58: [(7, 6)],
-    60: [(8, 1)],
+    58: [(2, 5)],
+    60: [(2, 2)],
   };
 
   // Walk the definitions themselves, so a new level is never silently skipped.

@@ -253,16 +253,17 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 60 "Wormhole": the recorded finale solution. Portals are dropped in
-    // pair order (1st pair, then 2nd) so placement-order pairing matches.
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(1, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(1, 7));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(3, 2));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(5, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(8, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(4, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(8, 2));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 7));
+    // Level 60 "Wormhole" (Fable): the recorded finale solution. Portals are
+    // dropped in pair order (1st pair, then 2nd) so placement-order pairing
+    // matches the intended pairing.
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(2, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(7, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(8, 2));
+    await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(2, 2));
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(2, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(2, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(7, 4));
 
     await runToWin(tester);
 
