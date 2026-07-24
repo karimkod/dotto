@@ -1236,25 +1236,28 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 56 — Ricochet: the portal crosses the wall, and the dot must leave the far
-  // end heading UP so it climbs into the fixed arrow at (0,6) and ricochets left
-  // along the top to the sealed exit. Emerge any other way and it misses — the
-  // heading after the teleport is the whole puzzle. Solver-verified TIGHT.
+  // 56 — Ricochet: a teleporter preserves the dot's heading, so the fixed arrows
+  // by the exit only help if the dot arrives at them from below. Design by Fable.
   56: LevelData(
     id: 56,
     size: 7,
     title: 'Ricochet',
-    tip: 'Come out of the portal heading up — the fixed arrow up top does the '
-        'rest.',
+    tip: 'You leave a teleporter the same way you entered it. Those arrows only '
+        'help if you arrive from below.',
     start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 4),
+    exit: Pos(5, 4),
     walls: [
       Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
-      Pos(1, 4),
+      Pos(6, 2), Pos(6, 4),
     ],
-    forcedArrows: [ForcedArrow(0, 6, Direction.left)],
+    destroyers: [Pos(2, 1), Pos(2, 6)],
+    forcedArrows: [
+      ForcedArrow(1, 4, Direction.right),
+      ForcedArrow(1, 5, Direction.down),
+    ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
