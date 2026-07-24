@@ -182,10 +182,9 @@ void main() {
       (4, 6, Direction.left),
     ],
     // ----- World 5 (51–60): teleporters. -----
-    // 51: turn up at (5,1) into a portal placed at (4,1); the far end at (2,5)
-    // drops the dot on the exit side of a wall with no way around, still
-    // heading up, and it climbs into the exit.
-    51: [(5, 1, Direction.up)],
+    // 51: no arrows — just the pair. Run the open bottom row into a portal at
+    // (4,4) and step out at (0,3), past the L-wall, then into the exit.
+    51: [],
     52: [(0, 3, Direction.left)],
     53: [(6, 1, Direction.up), (0, 5, Direction.right)],
     54: [(6, 6, Direction.up)],
@@ -202,7 +201,7 @@ void main() {
   // Intended teleporter placements (World 5). Both ends of each pair, in an
   // order whose board-order pairing matches the intended solution.
   final teleports = <int, List<(int, int)>>{
-    51: [(4, 1), (2, 5)],
+    51: [(4, 4), (0, 3)],
     52: [(4, 5), (5, 3)],
     53: [(4, 1), (4, 3), (2, 3), (2, 5)],
     54: [(6, 2), (6, 4)],

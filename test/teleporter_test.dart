@@ -256,11 +256,11 @@ void main() {
   group('level 51', () {
     final lvl = levelDataFor(51)!;
 
-    test('hands the player the portal pair rather than pinning it', () {
+    test('hands the player the portal pair and nothing else', () {
       expect(lvl.teleporters, isEmpty, reason: 'nothing pre-placed');
       final kit = {for (final e in lvl.toolkit) e.type: e.count};
       expect(kit[ToolType.teleporter], 2, reason: 'exactly one pair');
-      expect(kit[ToolType.arrowUp], 1);
+      expect(kit.length, 1, reason: 'just the pair — the portal in isolation');
     });
 
     test('needs the exhaustive solver, and the path search refuses it', () {
@@ -270,23 +270,19 @@ void main() {
       expect(() => pathSolveAll(lvl), throwsA(isA<PathSolverUnsupported>()));
     });
 
-    test('is solvable and every solution uses all three pieces', () {
+    test('is solvable and every solution uses the whole pair', () {
       final sols = enumerateSolutions(lvl);
       expect(sols, isNotEmpty);
       final min = sols.map((s) => s.length).reduce((a, b) => a < b ? a : b);
-      expect(min, 3, reason: 'two portals and the arrow are all required');
+      expect(min, 2, reason: 'both portals are required');
       for (final s in sols) {
         expect(simulate(lvl, s), SimOutcome.win);
       }
     });
 
     test('cannot be solved without building the pair', () {
-      // The arrow alone just climbs into the ceiling.
-      const arrow = PlacedElement(
-          type: PlacedType.arrow,
-          tool: ToolType.arrowUp,
-          direction: Direction.up);
-      expect(simulate(lvl, {5 * 6 + 1: arrow}), SimOutcome.lose);
+      // No pieces at all — the dot runs the bottom row and off the edge.
+      expect(simulate(lvl, const {}), SimOutcome.lose);
     });
   });
 }

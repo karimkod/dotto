@@ -1123,28 +1123,23 @@ const Map<int, LevelData> levelDefinitions = {
 
   // ----- World 5 (51–): teleporters. -----
 
-  // 51 — Portal: the teleporter in isolation, and the player builds it. A wall
-  // runs the full height of column 3, so the exit side cannot be walked to at
-  // all — the only crossing is a portal pair the player places themselves, one
-  // end on the near side and one beyond the wall. The arrow then turns the dot
-  // up the last column to the exit.
+  // 51 — Portal: the teleporter in isolation, and the player builds it. An
+  // L-shaped wall (down column 2, then along row 3) seals the exit off from the
+  // dot's side, so the only crossing is a portal pair the player places
+  // themselves — one end reachable, one end past the wall.
   51: LevelData(
     id: 51,
-    size: 6,
+    size: 5,
     title: 'Portal',
-    tip: 'That wall has no way around. Drop both portals — one each side — and '
-        'the dot steps straight through.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 5),
+    tip: 'Two portals make one pair — enter either end, come out the other. '
+        'Bridge the wall the dot can\'t walk around.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 4),
     walls: [
-      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3),
-      // Caps the exit's row so a portal cannot simply drop the dot alongside it
-      // — the arrow is needed to climb the last column.
-      Pos(0, 4),
+      Pos(0, 2), Pos(1, 2), Pos(2, 2), Pos(3, 2), Pos(3, 3), Pos(3, 4),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.teleporter, 2), // one pair
+      ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
