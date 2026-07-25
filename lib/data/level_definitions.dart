@@ -1242,13 +1242,12 @@ const Map<int, LevelData> levelDefinitions = {
     id: 56,
     size: 7,
     title: 'Ricochet',
-    tip: 'You leave a teleporter the same way you entered it. Those arrows only '
-        'help if you arrive from below.',
+    tip: 'A portal keeps your heading. Line the dot up first, then step through.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(5, 4),
     walls: [
       Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
-      Pos(6, 2), Pos(6, 4),
+      Pos(6, 2), Pos(6, 4), Pos(6, 5), Pos(6, 6),
     ],
     destroyers: [Pos(2, 1), Pos(2, 6)],
     forcedArrows: [
