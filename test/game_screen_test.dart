@@ -103,6 +103,48 @@ void main() {
     expect(find.text('0'), findsOneWidget);
   });
 
+  testWidgets('a second placement during the snap cannot drive the count '
+      'negative', (tester) async {
+    // Regression: the kit is not decremented until the ~110ms magnet-snap
+    // lands, so a quick second placement (here a tap) slipped past the
+    // _canPlace guard while the first drop was still mid-flight — both commits
+    // decremented, taking the single-arrow count to -1 and stranding Play.
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, gridN);
+    final cellA = boardRect.topLeft + geo.center(2, 2);
+    final cellB = boardRect.topLeft + geo.center(1, 1);
+
+    // Drag the single UP arrow onto cellA and release, but pump only PART of the
+    // way through the snap — the kit still reads 1 because the drop hasn't
+    // committed yet.
+    final g = await tester.startGesture(tester.getCenter(find.text('UP')));
+    await tester.pump(const Duration(milliseconds: 16));
+    await g.moveTo(cellA);
+    await tester.pump(const Duration(milliseconds: 16));
+    await g.up();
+    await tester.pump(const Duration(milliseconds: 20)); // snap still animating
+
+    // While that snap is in flight, tap a different empty cell to place again.
+    await tester.tapAt(cellB);
+    await tester.pump(const Duration(milliseconds: 20));
+
+    // Let the snap (and the glow loop) settle.
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    // The counter must land at 0 — never -1 — with exactly one arrow consumed,
+    // and Play must be reachable rather than stuck on "Place all elements".
+    expect(find.text('-1'), findsNothing,
+        reason: 'the kit count must never go negative');
+    expect(find.text('0'), findsOneWidget, reason: 'one arrow consumed, kit 0');
+    expect(find.textContaining('Place all elements'), findsNothing,
+        reason: 'all pieces placed → Play is ready');
+  });
+
   testWidgets('a placed element can be dragged to another cell', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();

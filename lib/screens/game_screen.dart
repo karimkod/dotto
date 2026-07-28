@@ -643,10 +643,26 @@ class _GameScreenState extends State<GameScreen>
 
   /// Drop a piece onto a cell with the full landing reaction.
   void _commitPlace(int key, PlacedElement el, {required bool decrementKit}) {
+    // A new placement (decrementKit) reserves stock from the kit. The kit is not
+    // decremented until the magnet-snap lands, so a second placement — a quick
+    // tap, or another drop — can slip past _canPlace/_canDropAt while the first
+    // snap is still mid-flight. Re-check the invariants HERE, the single point
+    // every placement funnels through, so the count can never go negative and no
+    // cell is committed twice:
+    //   * out of stock  → refuse (would drive the counter to -1);
+    //   * cell taken     → refuse (a race already committed a piece here).
+    if (decrementKit &&
+        ((_kit[el.tool] ?? 0) <= 0 || _placed.containsKey(key))) {
+      _stopHand();
+      return;
+    }
     _stopHand();
     setState(() {
       _placed[key] = el;
-      if (decrementKit) _kit[el.tool] = (_kit[el.tool] ?? 1) - 1;
+      if (decrementKit) {
+        final left = _kit[el.tool] ?? 0;
+        _kit[el.tool] = left > 0 ? left - 1 : 0; // clamp: never below zero
+      }
       _placeAnim[key] = 0; // weighty pop-in
       _glow(key, toolGlowColor(el.tool), 1.0); // bright flash
       _rippleNeighbors(key); // neighbors react
