@@ -25,12 +25,16 @@ Map<int, PlacedElement> place(
   List<(int, int)> teleports = const [],
 ]) {
   return {
-    for (final (r, c) in teleports)
+    // Portal indices follow list order, so consecutive cells form a pair, index
+    // i pairing with i^1. This lets a teleports list express ANY pairing —
+    // including the "crossing" wirings that board-order pairing cannot (level
+    // 59). It mirrors the game, where portals pair by placement order.
+    for (final (i, (r, c)) in teleports.indexed)
       r * level.size + c: const PlacedElement(
         type: PlacedType.teleporter,
         tool: ToolType.teleporter,
         direction: null,
-      ),
+      ).withPortalIndex(i),
     for (final (r, c, dir) in arrows)
       r * level.size + c: PlacedElement(
         type: PlacedType.arrow,
@@ -199,7 +203,9 @@ void main() {
     56: [(6, 1, Direction.up), (5, 1, Direction.left)],
     57: [(5, 4, Direction.up), (3, 4, Direction.left)],
     58: [(2, 6, Direction.down)],
-    59: [(2, 4, Direction.down), (6, 4, Direction.left)],
+    // 59 hands out only portals — no arrows. The two arrows on the path are
+    // forced (fixed on the board), so the intended arrow list is empty.
+    59: [],
     60: [(2, 4, Direction.down), (7, 4, Direction.left)],
   };
 
@@ -215,8 +221,11 @@ void main() {
     55: [(0, 0), (6, 2)],
     56: [(5, 0), (5, 6)],
     57: [(7, 1), (5, 3), (3, 3), (0, 2)],
-    58: [(0, 1), (2, 4)],
-    59: [(0, 1), (2, 2), (6, 3), (8, 2)],
+    58: [(7, 1), (2, 4)],
+    // 59 — three pairs, in pairing order (a "crossing" wiring board-order can't
+    // express): (0,1)<->(6,5), (0,7)<->(7,6), (2,5)<->(7,1). The dot warps
+    // right→up→left through the maze into the exit.
+    59: [(0, 1), (6, 5), (0, 7), (7, 6), (2, 5), (7, 1)],
     60: [(0, 1), (2, 1), (7, 3), (8, 2)],
   };
 
@@ -232,8 +241,7 @@ void main() {
     48: [(0, 4), (0, 6), (2, 7), (4, 7), (6, 7)],
     49: [(4, 6)],
     50: [(4, 3)],
-    // World 5 timing levels.
-    59: [(2, 3)],
+    // World 5 timing level (60 only; 59 was redesigned to portals-only).
     60: [(2, 3)],
   };
 
@@ -272,11 +280,12 @@ void main() {
   // Walk the definitions themselves, so a new level is never silently skipped.
   final allLevels = levelDefinitions.keys.toList()..sort();
 
-  // Levels with two portal pairs can't be solver-verified: the solver pairs
-  // portals by board order, the player by placement order. They're checked by
-  // their recorded solution winning (under both pairings, per the design tool)
-  // rather than by enumeration.
-  const twoPairLevels = {57, 59, 60};
+  // Levels with more than one portal pair can't be solver-verified: the solver
+  // pairs portals by board order, the player by placement order. They're checked
+  // by their recorded solution winning (the intended-solution test drives the
+  // real pairing via place()'s list order) rather than by enumeration. Level 59
+  // has three pairs in a crossing wiring that no board-order pairing can express.
+  const multiPairLevels = {57, 59, 60};
   // Levels whose exhaustive enumeration is too slow for the suite (a full open
   // board with a teleporter toolkit, so no reachability pruning). Level 55 takes
   // ~14 minutes to enumerate. Its recorded solution — found by exhaustion, so
@@ -320,7 +329,7 @@ void main() {
           reason: 'level $n should have at least one solution');
     },
         timeout: heavy,
-        skip: twoPairLevels.contains(n)
+        skip: multiPairLevels.contains(n)
             ? 'two portal pairs — solver cannot verify; see intended-solution test'
             : solverTooSlow.contains(n)
                 ? 'enumeration too slow — solvability proven by exhaustion, see '
@@ -348,7 +357,7 @@ void main() {
           reason: 'level $n should have no solution that leaves a piece unused');
     },
         timeout: heavy,
-        skip: (twoPairLevels.contains(n) || solverTooSlow.contains(n))
+        skip: (multiPairLevels.contains(n) || solverTooSlow.contains(n))
             ? 'two pairs, or enumeration too slow — see design notes'
             : null);
   }
@@ -635,9 +644,9 @@ void main() {
 
     test('the solver does not offer solutions that cross a patrol', () {
       // Every solution the search returns must survive the real simulator.
-      // Two-pair levels aren't solver-enumerable (see twoPairLevels), so skip.
+      // Two-pair levels aren't solver-enumerable (see multiPairLevels), so skip.
       for (final n in allLevels.where((n) =>
-          levelDataFor(n)!.movers.isNotEmpty && !twoPairLevels.contains(n))) {
+          levelDataFor(n)!.movers.isNotEmpty && !multiPairLevels.contains(n))) {
         final level = levelDataFor(n)!;
         for (final s in solveFor(level)) {
           // cached

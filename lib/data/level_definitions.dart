@@ -1285,20 +1285,18 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // 58 — Portal Breach: warp past the barrier, grab the shield, and time the drop
-  // so the patrol takes the shielded hit. Design by Fable. Single pair — solver-
-  // verifiable.
+  // so the patrol takes the shielded hit. Single pair — solver-verified TIGHT.
   58: LevelData(
     id: 58,
     size: 8,
     title: 'Portal Breach',
-    tip: 'Warp past the barrier, grab the shield, and time your drop so the '
-        'patrol takes the hit.',
-    start: StartSpec(0, 0, Direction.right),
+    tip: 'Warp across, grab the shield, and drop through the patrol\'s lane — '
+        'the shield eats the hit.',
+    start: StartSpec(7, 0, Direction.right),
     exit: Pos(6, 6),
     walls: [
-      Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 7), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 4), Pos(3, 5), Pos(3, 7), Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 7), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6), Pos(5, 7), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 7), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 3), Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
+      Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(3, 4), Pos(5, 6), Pos(5, 7), Pos(5, 5), Pos(4, 4), Pos(5, 4), Pos(6, 5), Pos(7, 5), Pos(7, 6), Pos(7, 7), Pos(6, 7), Pos(0, 3),
     ],
-    destroyers: [Pos(0, 3), Pos(1, 0), Pos(1, 1), Pos(1, 2)],
     movers: [MovingDestroyer(4, 5, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowDown, 1),
@@ -1307,30 +1305,27 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 59 — The Labyrinth: two patrols guard the crossing in lockstep. Rushing dies;
-  // pause once, then thread the gap. Design by Fable. Two-pair — hand-verified:
-  // the recorded solution wins under both pairings.
+  // 59 — The Labyrinth: no arrows in hand, just three portal pairs and two fixed
+  // arrows on the board — bridge the maze in three hops. Three-pair, so the
+  // solver can't pair it; verified by the recorded solution winning.
   59: LevelData(
     id: 59,
-    size: 9,
+    size: 8,
     title: 'The Labyrinth',
-    tip: 'Two patrols guard the crossing in lockstep. Rushing dies — pause once, '
-        'then thread the gap.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(8, 0),
+    tip: 'No arrows — only portals. Chain three jumps through the walls; each '
+        'keeps your heading, the fixed arrows do the turning.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 0),
     walls: [
-      Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(0, 8), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(1, 8), Pos(2, 0), Pos(2, 1), Pos(2, 6), Pos(2, 7), Pos(2, 8), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 6), Pos(3, 7), Pos(3, 8), Pos(4, 0), Pos(4, 1), Pos(4, 5), Pos(4, 6), Pos(4, 7), Pos(4, 8), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 7), Pos(5, 8), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 5), Pos(6, 6), Pos(6, 7), Pos(6, 8), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 3), Pos(7, 5), Pos(7, 6), Pos(7, 7), Pos(7, 8), Pos(8, 4), Pos(8, 5), Pos(8, 6), Pos(8, 7), Pos(8, 8),
+      Pos(4, 0), Pos(4, 2), Pos(4, 1), Pos(4, 3), Pos(5, 3), Pos(6, 3), Pos(7, 3), Pos(7, 4), Pos(6, 4), Pos(5, 4), Pos(4, 4), Pos(4, 5), Pos(4, 6), Pos(4, 7), Pos(3, 3), Pos(3, 2), Pos(3, 1), Pos(3, 0), Pos(3, 4), Pos(3, 5), Pos(3, 6), Pos(3, 7), Pos(2, 4), Pos(1, 4), Pos(0, 4), Pos(2, 3), Pos(1, 3), Pos(0, 3),
     ],
-    destroyers: [Pos(0, 2), Pos(1, 0), Pos(1, 1), Pos(2, 5), Pos(3, 3), Pos(7, 4), Pos(8, 3)],
-    movers: [
-      MovingDestroyer(4, 4, horizontal: true, dir: -1),
-      MovingDestroyer(5, 6, horizontal: true, dir: -1),
+    destroyers: [Pos(1, 0)],
+    forcedArrows: [
+      ForcedArrow(6, 6, Direction.left),
+      ForcedArrow(2, 7, Direction.up),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-      ToolkitEntry(ToolType.pause, 1),
-      ToolkitEntry(ToolType.teleporter, 4),
+      ToolkitEntry(ToolType.teleporter, 6),
     ],
   ),
 
