@@ -401,11 +401,32 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
           if (takenShields.add(key)) shielded = true;
         case PlacedType.teleporter:
           // Out the far end, same heading. The destination's own piece is NOT
-          // applied — otherwise a pair would bounce the dot back and forth.
+          // applied — otherwise a pair would bounce the dot back and forth — but
+          // the landing cell's HAZARDS are faced, exactly like a normal arrival.
           final dest = links[key];
           if (dest != null) {
             r = dest ~/ n;
             c = dest % n;
+            // A patrol sitting on the exit catches the dot as it materialises.
+            if (moverCollision(r, c)) {
+              return const SimResult(SimOutcome.lose, DeathCause.patrol);
+            }
+            final destBase = effBase(r, c);
+            if (destBase == CellType.gap) {
+              return const SimResult(SimOutcome.lose, DeathCause.gap);
+            }
+            if (destBase == CellType.destroyer ||
+                destBase == CellType.movingDestroyer) {
+              if (shielded) {
+                // Same chain explosion as walking into a mine.
+                shielded = false;
+                final dk = r * n + c;
+                removed.add(dk);
+                removed.addAll(adjacentWallKeys(level, dk));
+              } else {
+                return const SimResult(SimOutcome.lose, DeathCause.destroyer);
+              }
+            }
           }
       }
     }
@@ -517,6 +538,20 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
       if (dest != null) {
         r = dest ~/ n;
         c = dest % n;
+        // The landing cell's hazards apply, just like a normal arrival.
+        if (moverCollision(r, c)) return null;
+        final destBase = effBase(r, c);
+        if (destBase == CellType.gap) return null;
+        if (destBase == CellType.destroyer ||
+            destBase == CellType.movingDestroyer) {
+          if (shielded) {
+            shielded = false;
+            removed.add(r * n + c);
+            removed.addAll(adjacentWallKeys(level, r * n + c));
+          } else {
+            return null;
+          }
+        }
         visited.add(dest); // the far end is on the path too
       }
     }

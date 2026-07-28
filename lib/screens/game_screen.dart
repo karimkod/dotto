@@ -1069,6 +1069,34 @@ class _GameScreenState extends State<GameScreen>
     setState(() => _teleporting = false);
     if (_status != GameStatus.running) return;
 
+    // The dot has materialised at the exit — it now faces that cell's hazards,
+    // exactly as a normal arrival does. Its OWN piece is not applied (that would
+    // bounce a pair back and forth), but a patrol, a gap or a mine underfoot
+    // still resolves: die, or survive on a shield and chain-explode.
+    final destKey = _idx(_dot.r, _dot.c);
+    final hit = _moversAt(_dot.r, _dot.c);
+    if (hit.isNotEmpty) {
+      if (_dotShielded) {
+        _shieldDestroyMovers(hit);
+      } else {
+        _fatalHit(destKey, DeathCause.patrol, hit: hit);
+        return;
+      }
+    }
+    final base = _effBase(_dot.r, _dot.c);
+    if (base == CellType.gap) {
+      _die(DeathCause.gap);
+      return;
+    }
+    if (base == CellType.destroyer || base == CellType.movingDestroyer) {
+      if (_dotShielded) {
+        _chainExplode(destKey);
+      } else {
+        _fatalHit(destKey, DeathCause.destroyer);
+        return;
+      }
+    }
+
     if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) {
       _win();
       return;

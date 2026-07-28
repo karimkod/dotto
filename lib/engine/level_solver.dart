@@ -427,8 +427,9 @@ class PathSearch {
       ? CellType.empty
       : level.baseTypeAt(r, c);
 
-  /// Apply a piece's effect to the live state.
-  void _apply(PlacedElement piece, int key) {
+  /// Apply a piece's effect to the live state. Returns false when the piece
+  /// killed the dot — only a teleport can, by dropping it onto a hazard.
+  bool _apply(PlacedElement piece, int key) {
     switch (piece.type) {
       case PlacedType.arrow:
         _cur.dir = piece.direction!;
@@ -444,8 +445,21 @@ class PathSearch {
         if (dest != null) {
           _cur.r = dest ~/ n;
           _cur.c = dest % n;
+          // Face the landing cell's hazards, exactly as a normal arrival does.
+          if (_moverCollision()) return false;
+          final base = _eff(_cur.r, _cur.c);
+          if (base == CellType.gap) return false;
+          if (base == CellType.destroyer ||
+              base == CellType.movingDestroyer) {
+            if (!_cur.shielded) return false;
+            _cur.shielded = false;
+            final dk = _cur.r * n + _cur.c;
+            _cur.removed.add(dk);
+            _cur.removed.addAll(adjacentWallKeys(level, dk));
+          }
         }
     }
+    return true;
   }
 
   /// Take the next untried choice, restoring state. False when exhausted.
@@ -463,7 +477,8 @@ class PathSearch {
         _cur.remaining[opt] = _cur.remaining[opt]! - 1;
         final piece = _element(opt);
         _cur.placed[f.key] = piece;
-        _apply(piece, f.key);
+        // A teleport landing on a hazard kills the dot — that branch is dead.
+        if (!_apply(piece, f.key)) continue;
       }
       // The exit check happens after the piece resolves, as in the simulator.
       if (level.baseTypeAt(_cur.r, _cur.c) == CellType.exit) {
@@ -554,7 +569,10 @@ class PathSearch {
         // A fixed piece resolves exactly like a placed one — same _apply, so a
         // fixed shield grants the aura and a fixed pause holds the dot.
         final here = _cur.placed[key] ?? _forced[key];
-        if (here != null) _apply(here, key);
+        if (here != null && !_apply(here, key)) {
+          dead = true; // a teleport dropped the dot onto a hazard
+          break;
+        }
         if (level.baseTypeAt(_cur.r, _cur.c) == CellType.exit) {
           _onWin(_cur.placed);
           dead = true; // a win ends this run
