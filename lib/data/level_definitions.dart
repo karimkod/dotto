@@ -1400,6 +1400,312 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
+
+  // ============== MASTER TRIALS (61–70) — no new pieces ======================
+  // Ten levels built entirely from rules the game has already taught, each one
+  // starring a consequence of those rules no earlier level ever featured: the
+  // start cell's permanent redirect, two-way portal travel, warp distance as a
+  // timing tool, pinned pieces as machinery, blast-extended patrol lanes,
+  // teleport-arrival collisions, crossing patrol clocks, and a patrol whose
+  // rhythm changes mid-run. All solver-verified TIGHT (61–69 by the shipped
+  // solvers, 70 by tool/verify_pairs.dart); 62, 64 and 70 are UNIQUE.
+
+  // 61 — Boomerang: the start cell re-aims the dot on EVERY visit. The tempting
+  // return along the start's own row relaunches you away from the exit one cell
+  // short of it — go over the top or under the bottom instead.
+  61: LevelData(
+    id: 61,
+    size: 5,
+    title: 'Boomerang',
+    tip: 'The start re-aims the dot every time it crosses it. The way back is '
+        'not the way in.',
+    start: StartSpec(2, 1, Direction.right),
+    exit: Pos(2, 0),
+    walls: [Pos(1, 3), Pos(3, 3)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 62 — Round Trip: one pair, used in BOTH directions. The sealed east chamber
+  // loops the dot over a pinned shield and back onto the portal it arrived by,
+  // spitting it out of the entrance heading up — then the mine by the exit
+  // takes the aura. Solver-verified UNIQUE.
+  62: LevelData(
+    id: 62,
+    size: 6,
+    title: 'Round Trip',
+    tip: 'A pair works both ways. Warp in, ride the ring, and step back '
+        'through the same door — it faces a new direction now.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3),
+      Pos(0, 4), Pos(0, 5), Pos(4, 4), Pos(4, 5), Pos(5, 4), Pos(5, 5),
+      Pos(1, 0), Pos(1, 1),
+    ],
+    destroyers: [Pos(0, 1)],
+    forcedArrows: [
+      ForcedArrow(1, 5, Direction.down),
+      ForcedArrow(3, 5, Direction.left),
+      ForcedArrow(3, 4, Direction.up),
+    ],
+    forcedShields: [Pos(2, 5)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 63 — Warp Clock: a warp skips walking distance, and distance is time — so
+  // WHERE the pair sits decides WHEN the dot lands in the second patrol's row.
+  // Walking dies on the first patrol's column by construction; the mines pin
+  // the landing cell; the climb gate forces the pause.
+  63: LevelData(
+    id: 63,
+    size: 6,
+    title: 'Warp Clock',
+    tip: 'A warp skips distance — and distance is time. Place the pair to '
+        'arrive between the sweeps, and pause once to fit the climb.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [
+      Pos(0, 3), Pos(1, 3), Pos(3, 3), Pos(4, 3),
+      Pos(2, 2), Pos(0, 4), Pos(1, 4), Pos(4, 1),
+    ],
+    destroyers: [Pos(5, 3), Pos(3, 4), Pos(4, 4)],
+    movers: [
+      MovingDestroyer(3, 2, horizontal: false, dir: 1),
+      MovingDestroyer(2, 4, horizontal: true, dir: 1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 64 — The Machine: a serpentine of wall stripes whose two full-row patrols
+  // and two pinned pauses are already wired in; the player's six arrows finish
+  // the circuit. Enter each patrol row mid-lane and it falls in behind you —
+  // enter it anywhere else and the gears bite. Solver-verified UNIQUE.
+  64: LevelData(
+    id: 64,
+    size: 7,
+    title: 'The Machine',
+    tip: 'Six arrows complete the machine. The pinned pauses set its rhythm — '
+        'ride the gears, never fight them.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5),
+      Pos(3, 0), Pos(3, 1), Pos(3, 3), Pos(3, 4), Pos(3, 5), Pos(3, 6),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 6),
+    ],
+    forcedPauses: [Pos(6, 3), Pos(5, 5)],
+    movers: [
+      MovingDestroyer(4, 2, horizontal: true, dir: -1),
+      MovingDestroyer(2, 4, horizontal: true, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 3),
+      ToolkitEntry(ToolType.arrowLeft, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 65 — Lane Breaker: the pen patrol is fenced in by a mine. Blast it and the
+  // wall behind it, and the patrol's lane EXTENDS through the breach — into
+  // the very chimney the dot must climb. The pinned pauses over the chimney
+  // let climbers through but shove row-walkers into the dead end.
+  65: LevelData(
+    id: 65,
+    size: 7,
+    title: 'Lane Breaker',
+    tip: 'Blast the fence and the patrol runs further than it used to. Break '
+        'its lane, then thread the lane you broke.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [
+      Pos(0, 3), Pos(0, 5),
+      Pos(1, 0), Pos(1, 1), Pos(1, 5), Pos(1, 6),
+      Pos(3, 4), Pos(3, 5),
+    ],
+    destroyers: [Pos(3, 3)],
+    forcedPauses: [Pos(2, 4), Pos(1, 4)],
+    movers: [MovingDestroyer(3, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 66 — Hot Landing: the exit pen is sealed on every side and the patrol
+  // inside is the only demolition charge. A teleport arrival faces the landing
+  // cell's hazards — so warp in ON TOP of the patrol, shielded, at the exact
+  // beat it crosses the pen's centre, and the blast opens the roof.
+  66: LevelData(
+    id: 66,
+    size: 7,
+    title: 'Hot Landing',
+    tip: 'The pen is sealed and the patrol inside is the only charge. Warp in '
+        'right on top of it — shielded — as it crosses the middle.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(1, 4),
+    walls: [
+      Pos(1, 3), Pos(1, 5), Pos(0, 4),
+      Pos(2, 3), Pos(2, 4), Pos(2, 5),
+      Pos(4, 3), Pos(4, 4), Pos(4, 5),
+      Pos(3, 6),
+    ],
+    destroyers: [Pos(3, 2)],
+    movers: [MovingDestroyer(3, 4, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 67 — Crossfire Gate: a full-width patrol rides the middle corridor and a
+  // short one ping-pongs in a three-cell pocket of column 4. The slits in the
+  // two wall stripes are offset, so the route crosses the long patrol's lane
+  // going up and the short one's going east — each on its own clock, each
+  // needing its own pause at the right doorstep.
+  67: LevelData(
+    id: 67,
+    size: 7,
+    title: 'Crossfire Gate',
+    tip: 'Two patrols, two crossings, two pauses. The doors are offset — time '
+        'each one on its own clock.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(5, 0), Pos(5, 1), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6),
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 6),
+    ],
+    movers: [
+      MovingDestroyer(3, 3, horizontal: true, dir: -1),
+      MovingDestroyer(4, 4, horizontal: false, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 2),
+    ],
+  ),
+
+  // 68 — Chain Reaction: the first shield blasts the mine fencing the pen, and
+  // the patrol's lane extends through the breach — from period four to period
+  // eight. The second shield kills that same patrol at its NEW far end, the
+  // only blast that can open the exit chimney's door. Cross it at one rhythm,
+  // kill it at another.
+  68: LevelData(
+    id: 68,
+    size: 7,
+    title: 'Chain Reaction',
+    tip: 'The first shield frees the patrol; the second one spends it. Cross '
+        'at period four — kill at period eight.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [
+      Pos(0, 3), Pos(0, 5),
+      Pos(1, 3), Pos(1, 5),
+      Pos(2, 4),
+      Pos(3, 4), Pos(3, 5),
+    ],
+    destroyers: [Pos(3, 3)],
+    movers: [MovingDestroyer(3, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 69 — The Convoy: three patrols share the middle corridor and a fourth owns
+  // the exit row. The only crossing is the aligned shaft at column 3, metered
+  // by a pinned pause — and the convoy's stagger leaves exactly one gap, two
+  // beats later than you can reach it. Both kit pauses go on the doorstep.
+  69: LevelData(
+    id: 69,
+    size: 7,
+    title: 'The Convoy',
+    tip: 'A convoy owns the corridor and one more guards the exit row. Stack '
+        'your waits at the doorstep and take the only gap in the traffic.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    walls: [
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 4), Pos(2, 5), Pos(2, 6),
+      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 4), Pos(4, 5), Pos(4, 6),
+    ],
+    forcedPauses: [Pos(4, 3)],
+    movers: [
+      MovingDestroyer(3, 1, horizontal: true, dir: 1),
+      MovingDestroyer(3, 5, horizontal: true, dir: 1),
+      MovingDestroyer(0, 2, horizontal: true, dir: 1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 2),
+    ],
+  ),
+
+  // 70 — Full Circle: the Master Trials finale. The exit sits ONE CELL above
+  // the start — and the start guards it: anything stepping onto the launch pad
+  // is relaunched west, so the underbelly approach can never work. The circuit
+  // runs the whole board: warp into the pinned ring for the first shield, ride
+  // it back out of the same portal heading down, cut the south row past the
+  // patrol, climb through the pen mine (spending the aura), collect the second
+  // pinned shield, warp over the mined top row, and dive through the mine-door
+  // into the core. Two pairs, chained, one of them used in both directions.
+  // Not solver-verifiable by the shipped solvers (two placeable pairs) —
+  // exhaustively verified by tool/verify_pairs.dart: TIGHT and UNIQUE.
+  70: LevelData(
+    id: 70,
+    size: 8,
+    title: 'Full Circle',
+    tip: 'The exit was one cell above the start all along — and your own '
+        'launch pad guards it. Chain both pairs and come full circle.',
+    start: StartSpec(4, 4, Direction.left),
+    exit: Pos(3, 4),
+    walls: [
+      Pos(3, 3), Pos(3, 5),
+      Pos(1, 3), Pos(1, 5),
+      Pos(2, 3), Pos(0, 5), Pos(2, 5),
+      Pos(3, 6), Pos(3, 7), Pos(4, 5), Pos(4, 6), Pos(4, 7),
+      Pos(1, 1), Pos(1, 2), Pos(3, 1), Pos(3, 2),
+      Pos(2, 1), Pos(2, 2), Pos(4, 1), Pos(4, 2),
+      Pos(5, 4), Pos(5, 5), Pos(5, 6), Pos(5, 7),
+      Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+      Pos(7, 4), Pos(7, 5), Pos(7, 6), Pos(7, 7),
+    ],
+    destroyers: [Pos(0, 2), Pos(1, 4), Pos(2, 0)],
+    forcedArrows: [
+      ForcedArrow(2, 6, Direction.up),
+      ForcedArrow(0, 6, Direction.right),
+      ForcedArrow(0, 7, Direction.down),
+      ForcedArrow(0, 4, Direction.down),
+    ],
+    forcedShields: [Pos(1, 6), Pos(1, 0)],
+    forcedPauses: [Pos(2, 4)],
+    movers: [MovingDestroyer(6, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.teleporter, 4),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

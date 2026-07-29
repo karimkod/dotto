@@ -209,6 +209,59 @@ void main() {
     // 60: turn up at the track corner, left into the inner patrol's lane, and
     // down at the keystone (2,4) where the shielded kill opens the core.
     60: [(8, 8, Direction.up), (2, 6, Direction.left), (2, 4, Direction.down)],
+    // ----- Master Trials (61–70): remixes of taught rules, no new pieces. ----
+    // 61: over the top — the row-2 return would relaunch off the start.
+    61: [(2, 4, Direction.up), (0, 4, Direction.left), (0, 0, Direction.down)],
+    // 62: the ring does all the turning; one arrow aims the shielded dot at
+    // the mine beside the exit.
+    62: [(0, 2, Direction.left)],
+    // 63: the pair is the clock; the single arrow turns the climb.
+    63: [(5, 5, Direction.up)],
+    // 64: six arrows complete the serpentine circuit.
+    64: [
+      (6, 5, Direction.up),
+      (4, 5, Direction.left),
+      (4, 2, Direction.up),
+      (2, 2, Direction.right),
+      (2, 6, Direction.up),
+      (0, 6, Direction.left),
+    ],
+    // 65: climb, hook over the pen, dive through the mine, and climb the
+    // freshly patrolled chimney.
+    65: [
+      (6, 2, Direction.up),
+      (1, 2, Direction.right),
+      (1, 3, Direction.down),
+      (6, 3, Direction.right),
+      (6, 4, Direction.up),
+    ],
+    // 66: one turn up the warp column — the pair does the rest.
+    66: [(6, 5, Direction.up)],
+    // 67: up through the long patrol's lane, east across the short one's.
+    67: [
+      (6, 2, Direction.up),
+      (2, 2, Direction.right),
+      (2, 5, Direction.up),
+      (0, 5, Direction.left),
+    ],
+    // 68: climb, dive through the pen mine, loop under, and climb into the
+    // extended lane for the kill.
+    68: [
+      (6, 2, Direction.up),
+      (2, 2, Direction.right),
+      (2, 3, Direction.down),
+      (5, 3, Direction.right),
+      (5, 4, Direction.up),
+    ],
+    // 69: straight up the shaft, then west along the guarded exit row.
+    69: [(6, 3, Direction.up), (0, 3, Direction.left)],
+    // 70: the circuit's three turns — south-west cut, the climb, and the
+    // launch onto the mined top row.
+    70: [
+      (5, 3, Direction.left),
+      (5, 0, Direction.up),
+      (0, 0, Direction.right),
+    ],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -231,6 +284,16 @@ void main() {
     // 60 — pair 1 warps the dot out of the sealed pocket onto the south
     // track; pair 2 takes it from the east climb into the moat at (4,6).
     60: [(0, 1), (8, 3), (6, 8), (4, 6)],
+    // 62 — one pair, crossed twice: in off the floor run, out of the ring.
+    62: [(5, 2), (1, 4)],
+    // 63 — the warp clock: skip the first patrol's column, land in the
+    // second's row on the safe beat.
+    63: [(5, 2), (5, 4)],
+    // 66 — from the climb into the pen, on top of the patrol.
+    66: [(5, 5), (3, 4)],
+    // 70 — pair 1 into the pinned ring (and back out of it); pair 2 over the
+    // mined top row. Placed in pair order.
+    70: [(4, 3), (2, 7), (0, 1), (0, 3)],
   };
 
   // Intended pause placements (World 4).
@@ -247,10 +310,18 @@ void main() {
     50: [(4, 3)],
     // World 5 timing level (60 only; 59 was redesigned to portals-only).
     // 60: a single pause in the inner lane, holding for the re-phased patrol to
-    // walk back into the keystone kill that blasts the core open. (The finale is
-    // loose — the toolkit's second pause is spare; the game still gates Play on
-    // placing all ten pieces.)
+    // walk back into the keystone kill that blasts the core open.
     60: [(2, 5)],
+    // ----- Master Trials. -----
+    63: [(5, 1)],
+    // 65: wait out the pen patrol on the way up its column.
+    65: [(4, 2)],
+    // 67: one pause per crossing, each at its own doorstep.
+    67: [(2, 3), (4, 2)],
+    68: [(4, 2)],
+    // 69: both waits stacked at the shaft's doorstep to catch the convoy's
+    // only gap.
+    69: [(5, 3), (6, 2)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -285,6 +356,13 @@ void main() {
     // 60: the placed shield that blasts the track's mine-door (the second
     // aura, for the keystone kill, is the level's pinned shield at (8,7)).
     60: [(8, 4)],
+    // ----- Master Trials. -----
+    // 65: armour up before diving into the pen's fence mine.
+    65: [(2, 3)],
+    // 66: carried through the warp into the arrival-collision kill.
+    66: [(6, 4)],
+    // 68: one aura for the fence mine, one for the patrol at its new far end.
+    68: [(3, 2), (4, 4)],
   };
 
   // Walk the definitions themselves, so a new level is never silently skipped.
@@ -294,10 +372,10 @@ void main() {
   // solvers: BruteSearch pairs portals by board order, the player by placement
   // order. In this suite they're checked by their recorded solution winning
   // (the intended-solution test drives the real pairing via place()'s list
-  // order); tool/verify_pairs.dart sweeps them exhaustively out of band — 57
-  // and 59 are tight, and 60 is tight with a unique solution. Level 59 has
+  // order); tool/verify_pairs.dart sweeps them exhaustively out of band — 57,
+  // 59 and 60 are tight, and 70 is tight with a unique solution. Level 59 has
   // three pairs in a crossing wiring no board-order pairing can express.
-  const multiPairLevels = {57, 59, 60};
+  const multiPairLevels = {57, 59, 60, 70};
   // Levels whose exhaustive enumeration is too slow for the suite (a full open
   // board with a teleporter toolkit, so no reachability pruning). Level 55 takes
   // ~14 minutes to enumerate. Its recorded solution — found by exhaustion, so
@@ -307,7 +385,7 @@ void main() {
 
   int worldOf(int n) => n <= 15
       ? 1
-      : (n <= 20 ? 2 : (n <= 30 ? 3 : (n <= 50 ? 4 : 5)));
+      : (n <= 20 ? 2 : (n <= 30 ? 3 : (n <= 50 ? 4 : (n <= 60 ? 5 : 6))));
 
 
 

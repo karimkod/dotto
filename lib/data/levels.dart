@@ -4,8 +4,8 @@ import 'level_definitions.dart';
 
 /// Total number of built, playable levels:
 /// World 1 (1–15) + World 2 (16–20) + World 3 (21–30) + World 4 (31–50)
-/// + World 5 (51–60).
-const int kLevelCount = 60;
+/// + World 5 (51–60) + Master Trials (61–70).
+const int kLevelCount = 70;
 
 /// The level number at which World 2 (Static Destroyers) begins.
 const int kWorld2Start = 16;
@@ -48,7 +48,10 @@ List<Level> buildInitialLevels() {
     // World 5 (51–60): teleporters, ramping again from the start.
     if (number <= 52) return Difficulty.easy; // learn the portal (51–52)
     if (number <= 56) return Difficulty.medium; // combine mechanics (53–56)
-    return Difficulty.hard; // 57–60 the hard teleporter exams
+    if (number <= 60) return Difficulty.hard; // 57–60 the hard teleporter exams
+    // Master Trials (61–70): every level is a remix exam.
+    if (number <= 63) return Difficulty.medium; // gentler re-entry (61–63)
+    return Difficulty.hard; // 64–70 the trials proper
   }
 
   LevelStatus statusFor(int number) {
