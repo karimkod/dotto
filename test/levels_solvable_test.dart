@@ -206,7 +206,9 @@ void main() {
     // 59 hands out only portals — no arrows. The two arrows on the path are
     // forced (fixed on the board), so the intended arrow list is empty.
     59: [],
-    60: [(2, 4, Direction.down), (7, 4, Direction.left)],
+    // 60: turn up at the track corner, left into the inner patrol's lane, and
+    // down at the keystone (2,4) where the shielded kill opens the core.
+    60: [(8, 8, Direction.up), (2, 6, Direction.left), (2, 4, Direction.down)],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -226,7 +228,9 @@ void main() {
     // express): (0,1)<->(6,5), (0,7)<->(7,6), (2,5)<->(7,1). The dot warps
     // right→up→left through the maze into the exit.
     59: [(0, 1), (6, 5), (0, 7), (7, 6), (2, 5), (7, 1)],
-    60: [(0, 1), (2, 1), (7, 3), (8, 2)],
+    // 60 — pair 1 warps the dot out of the sealed pocket onto the south
+    // track; pair 2 takes it from the east climb into the moat at (4,6).
+    60: [(0, 1), (8, 3), (6, 8), (4, 6)],
   };
 
   // Intended pause placements (World 4).
@@ -242,7 +246,9 @@ void main() {
     49: [(4, 6)],
     50: [(4, 3)],
     // World 5 timing level (60 only; 59 was redesigned to portals-only).
-    60: [(2, 3)],
+    // 60: one pause above the track corner to fix warp parity, one in the
+    // inner lane to let the patrol bounce back into the keystone kill.
+    60: [(7, 8), (2, 5)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -274,17 +280,21 @@ void main() {
     53: [(6, 2)],
     54: [(6, 3)],
     58: [(2, 5)],
-    60: [(2, 2)],
+    // 60: the placed shield that blasts the track's mine-door (the second
+    // aura, for the keystone kill, is the level's pinned shield at (8,7)).
+    60: [(8, 4)],
   };
 
   // Walk the definitions themselves, so a new level is never silently skipped.
   final allLevels = levelDefinitions.keys.toList()..sort();
 
-  // Levels with more than one portal pair can't be solver-verified: the solver
-  // pairs portals by board order, the player by placement order. They're checked
-  // by their recorded solution winning (the intended-solution test drives the
-  // real pairing via place()'s list order) rather than by enumeration. Level 59
-  // has three pairs in a crossing wiring that no board-order pairing can express.
+  // Levels with more than one portal pair can't be verified by the SHIPPED
+  // solvers: BruteSearch pairs portals by board order, the player by placement
+  // order. In this suite they're checked by their recorded solution winning
+  // (the intended-solution test drives the real pairing via place()'s list
+  // order); tool/verify_pairs.dart sweeps them exhaustively out of band — 57
+  // and 59 are tight, and 60 is tight with a unique solution. Level 59 has
+  // three pairs in a crossing wiring no board-order pairing can express.
   const multiPairLevels = {57, 59, 60};
   // Levels whose exhaustive enumeration is too slow for the suite (a full open
   // board with a teleporter toolkit, so no reachability pruning). Level 55 takes

@@ -1263,8 +1263,8 @@ const Map<int, LevelData> levelDefinitions = {
 
   // 57 — Chain Warp: a serpentine of mines and walls. Warp out of the start
   // pocket, climb the shaft, then warp again into the vault, which only opens
-  // from the right. Design by Fable. Two-pair — hand-verified: the recorded
-  // solution wins under both pairings.
+  // from the right. Design by Fable. Two-pair, so the shipped solvers cannot
+  // enumerate it — verified TIGHT by tool/verify_pairs.dart.
   57: LevelData(
     id: 57,
     size: 8,
@@ -1307,7 +1307,7 @@ const Map<int, LevelData> levelDefinitions = {
 
   // 59 — The Labyrinth: no arrows in hand, just three portal pairs and two fixed
   // arrows on the board — bridge the maze in three hops. Three-pair, so the
-  // solver can't pair it; verified by the recorded solution winning.
+  // shipped solvers can't pair it — verified TIGHT by tool/verify_pairs.dart.
   59: LevelData(
     id: 59,
     size: 8,
@@ -1329,30 +1329,73 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 60 — Wormhole: the final exam. Warp, shield, wait, dive between the patrols,
-  // breach the door, and warp home. Design by Fable. Two-pair — hand-verified:
-  // the recorded solution wins under both pairings.
+  // 60 — The Core: the final exam. A concentric fortress — the exit dead-centre
+  // behind an inner wall ring, an outer ring around that, a one-cell moat
+  // between them, and an L-shaped track along the south and east edges. The dot
+  // starts sealed in a two-cell pocket, so the very first placement is forced:
+  // warp out. Design by Fable.
+  //
+  // The intended run: pair 1 drops the dot onto the south track at (8,3), one
+  // cell ahead of the track patrol, which chases it the whole way — the placed
+  // shield at (8,4) blasts the mine-door at (8,5), the chain explosion opens
+  // the wall at (8,6), and the patrol follows the dot straight through the
+  // breach. Grab the pinned shield at (8,7), turn up at (8,8) as the patrol
+  // slams into the corner behind, pause at (7,8) to fix the warp parity, and
+  // take pair 2 from (6,8) into the moat at (4,6). Ride the pinned pause at
+  // (3,6), turn left at (2,6) into the inner patrol's lane, pause at (2,5)
+  // while it bounces off the west end and comes back — then step into it at
+  // (2,4). The shielded hit destroys it and blasts open (3,4): the way in.
+  //
+  // Everything else is a trap: the mine-gate at (7,4) right under the core,
+  // the east climb past the mine at (5,8), warping into the moat with the
+  // wrong heading, and ramming the track patrol (mines are not walls, so its
+  // blast opens nothing useful). The pinned pauses at (2,2)/(2,3) seal the
+  // lane's west end against every backdoor route.
+  //
+  // Two placeable pairs, so the shipped solvers cannot enumerate it — instead
+  // exhaustively verified by tool/verify_pairs.dart: solvable, TIGHT, and
+  // UNIQUE (exactly one way to place all ten pieces).
   60: LevelData(
     id: 60,
     size: 9,
-    title: 'Wormhole',
-    tip: 'Warp, shield, wait, dive between the patrols, breach the door, and '
-        'warp home. The final exam.',
+    title: 'The Core',
+    tip: 'Two rings guard the core. Warp out, outrun the moat patrol, blast '
+        'the door, climb, warp in — and meet the last patrol dead-centre.',
     start: StartSpec(0, 0, Direction.right),
-    exit: Pos(8, 0),
+    exit: Pos(4, 4),
     walls: [
-      Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7), Pos(0, 8), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6), Pos(1, 7), Pos(1, 8), Pos(2, 0), Pos(2, 6), Pos(2, 7), Pos(2, 8), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 7), Pos(3, 8), Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 7), Pos(4, 8), Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 5), Pos(5, 6), Pos(5, 7), Pos(5, 8), Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7), Pos(6, 8), Pos(7, 0), Pos(7, 1), Pos(7, 2), Pos(7, 5), Pos(7, 6), Pos(7, 7), Pos(7, 8), Pos(8, 4), Pos(8, 5), Pos(8, 6), Pos(8, 7), Pos(8, 8),
+      // North wall — seals the start pocket and the whole top edge.
+      Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6), Pos(0, 7),
+      Pos(0, 8),
+      // West wall.
+      Pos(1, 0), Pos(2, 0), Pos(3, 0), Pos(4, 0), Pos(5, 0), Pos(6, 0),
+      Pos(7, 0),
+      // Outer ring.
+      Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6),
+      Pos(1, 7),
+      Pos(2, 1), Pos(3, 1), Pos(4, 1), Pos(5, 1), Pos(6, 1),
+      Pos(2, 7), Pos(3, 7), Pos(4, 7), Pos(5, 7), Pos(6, 7),
+      Pos(7, 1), Pos(7, 2), Pos(7, 3), Pos(7, 5), Pos(7, 6), Pos(7, 7),
+      // Inner ring around the core.
+      Pos(3, 3), Pos(3, 4), Pos(3, 5),
+      Pos(4, 3), Pos(4, 5),
+      Pos(5, 3), Pos(5, 4), Pos(5, 5),
+      // The wall the door-blast opens.
+      Pos(8, 6),
     ],
-    destroyers: [Pos(0, 2), Pos(1, 0), Pos(1, 1), Pos(2, 5), Pos(5, 4), Pos(8, 3)],
+    destroyers: [Pos(8, 5), Pos(5, 6), Pos(5, 8), Pos(7, 4)],
+    forcedShields: [Pos(8, 7)],
+    forcedPauses: [Pos(2, 2), Pos(2, 3), Pos(3, 6)],
     movers: [
-      MovingDestroyer(3, 4, horizontal: true, dir: 1),
-      MovingDestroyer(4, 6, horizontal: true, dir: -1),
+      MovingDestroyer(2, 2, horizontal: true, dir: 1), // inner-lane patrol
+      MovingDestroyer(8, 1, horizontal: true, dir: 1), // track patrol
     ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.pause, 2),
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
