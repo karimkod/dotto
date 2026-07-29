@@ -210,8 +210,9 @@ void main() {
     // down at the keystone (2,4) where the shielded kill opens the core.
     60: [(8, 8, Direction.up), (2, 6, Direction.left), (2, 4, Direction.down)],
     // ----- Master Trials (61–70): remixes of taught rules, no new pieces. ----
-    // 61: over the top — the row-2 return would relaunch off the start.
-    61: [(2, 4, Direction.up), (0, 4, Direction.left), (0, 0, Direction.down)],
+    // 61: over the top, trailing the patrol — the row-2 return would relaunch
+    // off the start.
+    61: [(2, 2, Direction.up), (0, 2, Direction.left), (0, 0, Direction.down)],
     // 62: the ring does all the turning; one arrow aims the shielded dot at
     // the mine beside the exit.
     62: [(0, 2, Direction.left)],
@@ -313,6 +314,8 @@ void main() {
     // walk back into the keystone kill that blasts the core open.
     60: [(2, 5)],
     // ----- Master Trials. -----
+    // 61: hold one cell beneath the patrol's lane while it sweeps past.
+    61: [(1, 2)],
     63: [(5, 1)],
     // 65: wait out the pen patrol on the way up its column.
     65: [(4, 2)],

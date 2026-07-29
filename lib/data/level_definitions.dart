@@ -1410,22 +1410,26 @@ const Map<int, LevelData> levelDefinitions = {
   // rhythm changes mid-run. All solver-verified TIGHT (61–69 by the shipped
   // solvers, 70 by tool/verify_pairs.dart); 62, 64 and 70 are UNIQUE.
 
-  // 61 — Boomerang: the start cell re-aims the dot on EVERY visit. The tempting
-  // return along the start's own row relaunches you away from the exit one cell
-  // short of it — go over the top or under the bottom instead.
+  // 61 — Boomerang: the start cell re-aims the dot on EVERY visit, so the
+  // tempting return along the start's own row relaunches you away from the
+  // exit one cell short of it. The real way is over the top — through the
+  // patrol's row, pausing one cell beneath its lane while it sweeps past,
+  // then trailing it to the corner. Solver-verified UNIQUE.
   61: LevelData(
     id: 61,
-    size: 5,
+    size: 6,
     title: 'Boomerang',
-    tip: 'The start re-aims the dot every time it crosses it. The way back is '
-        'not the way in.',
+    tip: 'The start re-aims the dot every time it crosses it — the way back '
+        'is not the way in. Go over the top, and let the patrol pass first.',
     start: StartSpec(2, 1, Direction.right),
     exit: Pos(2, 0),
-    walls: [Pos(1, 3), Pos(3, 3)],
+    walls: [Pos(1, 1), Pos(1, 3), Pos(3, 3), Pos(3, 0)],
+    movers: [MovingDestroyer(0, 1, horizontal: true, dir: -1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
     ],
   ),
 
