@@ -298,16 +298,13 @@ void main() {
     // Level 60 "The Core" (Fable): the recorded finale solution (see
     // tool/verify_pairs.dart). Portals are dropped in pair order (1st pair,
     // then 2nd) so placement-order pairing matches the intended pairing. The
-    // run needs only one pause — at (2,5), for the inner-lane kill; the toolkit
-    // hands out two, so the spare goes on an inert cell at (8,2) (west of the
-    // warp-in, never visited) to satisfy the place-all-ten Play gate.
+    // run needs a single pause — at (2,5), for the inner-lane kill.
     await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 1));
     await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(8, 3));
     await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(6, 8));
     await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(4, 6));
     await _dragArrow(tester, tester.getCenter(find.text('SHIELD')), cell(8, 4));
     await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(2, 5));
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(8, 2));
     await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(8, 8));
     await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(2, 6));
     await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(2, 4));

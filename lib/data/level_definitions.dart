@@ -1354,9 +1354,8 @@ const Map<int, LevelData> levelDefinitions = {
   //
   // Two placeable pairs, so the shipped solvers cannot enumerate it — instead
   // exhaustively verified by tool/verify_pairs.dart: solvable, and the intended
-  // run above wins under the real simulator. It needs only nine of the ten
-  // pieces (one pause is spare), so the finale is LOOSE rather than tight — the
-  // game still gates Play on placing all ten, so the journey stands.
+  // run above wins under the real simulator. The toolkit hands out exactly the
+  // nine pieces the run uses (one pause, not two), so every piece is load-bearing.
   60: LevelData(
     id: 60,
     size: 9,
@@ -1397,7 +1396,7 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.pause, 2),
+      ToolkitEntry(ToolType.pause, 1),
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
