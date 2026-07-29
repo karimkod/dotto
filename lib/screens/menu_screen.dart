@@ -222,6 +222,13 @@ class _MenuScreenState extends State<MenuScreen> {
                         const _WorldBanner(number: 5, subtitle: 'Teleporters'),
                       ]);
                     }
+                    if (level.number == kWorld6Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 6, subtitle: 'Rotating Arrows'),
+                      ]);
+                    }
                     return slot;
                   }(),
               ],

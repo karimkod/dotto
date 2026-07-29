@@ -295,17 +295,11 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 70 "Full Circle" (Fable): the recorded finale solution — the
-    // unique one (see tool/verify_pairs.dart). Portals are dropped in pair
-    // order (1st pair, then 2nd) so placement-order pairing matches the
-    // intended pairing.
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(4, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(2, 7));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('LEFT')), cell(5, 3));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(5, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(0, 0));
+    // Level 71 "Rotor": the DOWN arrow at the top of column 2 bounces the dot
+    // back into the rotating arrow at (2,2) for a second pass — which, having
+    // turned up → right, sends it to the exit. Also covers the live rotation
+    // state end to end, through the real widget.
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(0, 2));
 
     await runToWin(tester);
 

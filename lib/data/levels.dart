@@ -4,8 +4,8 @@ import 'level_definitions.dart';
 
 /// Total number of built, playable levels:
 /// World 1 (1–15) + World 2 (16–20) + World 3 (21–30) + World 4 (31–50)
-/// + World 5 (51–60) + Master Trials (61–70).
-const int kLevelCount = 70;
+/// + World 5 (51–60) + Master Trials (61–70) + World 6 (71–).
+const int kLevelCount = 71;
 
 /// The level number at which World 2 (Static Destroyers) begins.
 const int kWorld2Start = 16;
@@ -18,6 +18,10 @@ const int kWorld4Start = 31;
 
 /// The level number at which World 5 (Teleporters) begins.
 const int kWorld5Start = 51;
+
+/// The level number at which World 6 (Rotating Arrows) begins — the Master
+/// Trials (61–70) sit between the two as a no-new-pieces interlude.
+const int kWorld6Start = 71;
 
 /// Hardcoded menu level list — World 1 (1–15), World 2 (16–20), World 3 (21–30),
 /// World 4 (31–50).
@@ -51,7 +55,9 @@ List<Level> buildInitialLevels() {
     if (number <= 60) return Difficulty.hard; // 57–60 the hard teleporter exams
     // Master Trials (61–70): every level is a remix exam.
     if (number <= 63) return Difficulty.medium; // gentler re-entry (61–63)
-    return Difficulty.hard; // 64–70 the trials proper
+    if (number <= 70) return Difficulty.hard; // 64–70 the trials proper
+    // World 6 (71–): rotating arrows, teaching the new piece from scratch.
+    return Difficulty.easy; // 71 the opener
   }
 
   LevelStatus statusFor(int number) {

@@ -263,6 +263,10 @@ void main() {
       (5, 0, Direction.up),
       (0, 0, Direction.right),
     ],
+    // ----- World 6 (71–): rotating arrows. -----
+    // 71: the DOWN arrow at the top of column 2 bounces the dot back into the
+    // rotor for a second pass — by then it has turned up → right, into the exit.
+    71: [(0, 2, Direction.down)],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -386,6 +390,8 @@ void main() {
   // solvable/tight sweeps are skipped.
   const solverTooSlow = {55};
 
+  // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
+  // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.
   int worldOf(int n) => n <= 15
       ? 1
       : (n <= 20 ? 2 : (n <= 30 ? 3 : (n <= 50 ? 4 : (n <= 60 ? 5 : 6))));

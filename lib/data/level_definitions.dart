@@ -1710,6 +1710,31 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
+
+  // ============== WORLD 6 (71–) — ROTATING ARROWS ============================
+  // The first mechanic with per-pass state: a pinned arrow that turns a quarter
+  // turn clockwise every time the dot goes through it, so the same cell plays
+  // differently on the second visit.
+
+  // 71 — Rotor: the World 6 opener, and a pure teaching board. Nothing to dodge,
+  // one arrow in the kit. The dot runs east into the rotor at (2,2), which points
+  // UP on the first pass and throws it off the top of the board — the bare-board
+  // loss the player is meant to see first. Bouncing it back down (the DOWN arrow
+  // anywhere in column 2 above the rotor) buys a second pass, and by then the
+  // rotor has turned up → right: straight into the exit. Solver-verified via the
+  // exhaustive BruteSearch (rotating arrows route away from the path solver) —
+  // solvable and TIGHT.
+  71: LevelData(
+    id: 71,
+    size: 5,
+    title: 'Rotor',
+    tip: 'This arrow turns a quarter-turn each time you pass. Send the dot up, '
+        'bounce it back — the second pass points the way out.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 4),
+    rotatingArrows: [RotatingArrow(2, 2, Direction.up)],
+    toolkit: [ToolkitEntry(ToolType.arrowDown, 1)],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.
