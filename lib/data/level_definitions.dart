@@ -1349,12 +1349,14 @@ const Map<int, LevelData> levelDefinitions = {
   // Everything else is a trap: the mine-gate at (7,4) right under the core,
   // the east climb past the mine at (5,8), warping into the moat with the
   // wrong heading, and ramming the track patrol (mines are not walls, so its
-  // blast opens nothing useful). The pinned pauses at (2,2)/(2,3) seal the
-  // lane's west end against every backdoor route.
+  // blast opens nothing useful).
   //
   // Two placeable pairs, so the shipped solvers cannot enumerate it — instead
-  // exhaustively verified by tool/verify_pairs.dart: solvable, TIGHT, and
-  // UNIQUE (exactly one way to place all ten pieces).
+  // exhaustively verified by tool/verify_pairs.dart: solvable, and the intended
+  // ten-piece run above wins under the real simulator. Without the old pinned
+  // pauses at (2,2)/(2,3) a shorter six-piece route through the inner lane also
+  // exists, so the finale is LOOSE rather than tight — the game still gates Play
+  // on placing all ten pieces, so the intended journey remains the throughline.
   60: LevelData(
     id: 60,
     size: 9,
@@ -1385,10 +1387,10 @@ const Map<int, LevelData> levelDefinitions = {
     ],
     destroyers: [Pos(8, 5), Pos(5, 6), Pos(5, 8), Pos(7, 4)],
     forcedShields: [Pos(8, 7)],
-    forcedPauses: [Pos(2, 2), Pos(2, 3), Pos(3, 6)],
+    forcedPauses: [Pos(3, 6)],
     movers: [
-      MovingDestroyer(2, 2, horizontal: true, dir: 1), // inner-lane patrol
       MovingDestroyer(8, 1, horizontal: true, dir: 1), // track patrol
+      MovingDestroyer(2, 2, horizontal: true, dir: 1), // inner-lane patrol
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
