@@ -90,6 +90,12 @@ Set<int> reachableCells(LevelData level) {
     final forcedDir = level.forcedArrowAt(nr, nc);
     if (forcedDir != null) {
       push(nr, nc, forcedDir);
+    } else if (level.rotatingArrowAt(nr, nc) != null) {
+      // Over successive passes a rotating arrow can send the dot any of the four
+      // ways, so explore them all — a generous superset keeps pruning safe.
+      for (final d in Direction.values) {
+        push(nr, nc, d);
+      }
     } else if (level.teleporterPairAt(nr, nc) >= 0) {
       // A fixed teleporter: the dot reappears at the far end, same heading, so
       // reachability has to jump with it or everything past the exit-side
@@ -599,7 +605,10 @@ class PathSearch {
 /// considers every candidate cell whether or not the dot reaches it. (This is
 /// the same locality assumption [candidateCells] already opts out of.)
 bool needsExhaustiveSolver(LevelData level) =>
-    level.toolkit.any((e) => e.type == ToolType.teleporter);
+    level.toolkit.any((e) => e.type == ToolType.teleporter) ||
+    // Rotating arrows carry per-pass state; only the simulate-based [BruteSearch]
+    // models it faithfully, so route these away from [PathSearch] too.
+    level.rotatingArrows.isNotEmpty;
 
 /// How many teleporters the toolkit hands the player (2 per pair).
 int toolkitTeleporters(LevelData level) => level.toolkit
@@ -773,6 +782,9 @@ bool needsBruteSolver(LevelData level) =>
     // A teleporter moves the dot off its path; the static solver walks cell by
     // cell and cannot express that jump.
     level.teleporters.isNotEmpty ||
+    // A rotating arrow's heading changes per pass — that is runtime state the
+    // static, clockless path solver cannot represent.
+    level.rotatingArrows.isNotEmpty ||
     level.toolkit.any((e) => pathSolverBlindTools.contains(e.type));
 
 /// Thrown when the path solver is handed a level only [solveAll] can answer.
@@ -791,6 +803,11 @@ void _requirePathSolvable(LevelData level) {
         'level ${level.id} is ${level.size}x${level.size}; the path solver\'s '
         'cleared-cell mask only holds ${kMaxPathSolverSize * kMaxPathSolverSize} '
         'cells');
+  }
+  if (level.rotatingArrows.isNotEmpty) {
+    throw PathSolverUnsupported(
+        'level ${level.id} has rotating arrows (their heading changes per pass, '
+        'which the clockless path solver cannot model)');
   }
   final blind = level.toolkit
       .map((e) => e.type)

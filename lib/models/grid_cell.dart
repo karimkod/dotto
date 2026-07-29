@@ -16,6 +16,21 @@ extension DirectionX on Direction {
     }
   }
 
+  /// This heading turned 90° clockwise: up → right → down → left → up. Drives
+  /// the rotating-arrow mechanic, which advances one quarter-turn per pass.
+  Direction get rotatedCW {
+    switch (this) {
+      case Direction.up:
+        return Direction.right;
+      case Direction.right:
+        return Direction.down;
+      case Direction.down:
+        return Direction.left;
+      case Direction.left:
+        return Direction.up;
+    }
+  }
+
   /// Unicode chevron used to render the direction.
   String get glyph {
     switch (this) {

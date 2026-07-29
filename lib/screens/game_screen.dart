@@ -13,6 +13,7 @@ import '../engine/simulator.dart'
         adjacentWallKeys,
         buildForcedPieces,
         buildMovers,
+        buildRotations,
         buildPortalPairs,
         buildTeleportLinks,
         DeathCause,
@@ -68,6 +69,11 @@ class _GameScreenState extends State<GameScreen>
 
   /// Immovable, level-defined arrows (rendered + simulated, never interactive).
   final Map<int, PlacedElement> _forced = {};
+
+  /// Rotating arrows: cell -> current heading. Seeded from the level and
+  /// advanced a quarter-turn clockwise each time the dot passes through; reset
+  /// to the level's initial headings on Retry.
+  final Map<int, Direction> _rotations = {};
 
   Map<ToolType, int> _kit = {};
   ToolType? _selected;
@@ -240,6 +246,7 @@ class _GameScreenState extends State<GameScreen>
       // Fixed arrows, shields and pauses alike — _canPlace/_canDropAt already
       // refuse any cell in _forced, so they all become undroppable for free.
       _forced.addAll(buildForcedPieces(_level!));
+      _rotations.addAll(buildRotations(_level!));
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
       // Level 2 teaches drag-and-drop: show the hint hand after a beat.
@@ -380,6 +387,10 @@ class _GameScreenState extends State<GameScreen>
     _explosions.clear();
     _destroyedCells.clear();
     _consumedShields.clear();
+    // Rotating arrows spin back to their level-defined starting headings.
+    _rotations
+      ..clear()
+      ..addAll(buildRotations(_level!));
     _dotShielded = false;
     _dotGone = false;
     _movers = buildMovers(_level!);
@@ -967,6 +978,18 @@ class _GameScreenState extends State<GameScreen>
       Sfx.arrow();
     }
 
+    // A rotating arrow redirects the dot to its current heading, then spins a
+    // quarter-turn clockwise — the repaint shows the new heading for next time.
+    final rot = _rotations[newKey];
+    if (rot != null) {
+      setState(() {
+        _dot.dir = rot;
+        _rotations[newKey] = rot.rotatedCW;
+        _glow(newKey, const Color(0xFF7E3FF2), 1.0); // violet, matches the badge
+      });
+      Sfx.arrow();
+    }
+
     final piece = _pieceAt(newKey);
     if (piece != null) {
       switch (piece.type) {
@@ -1525,6 +1548,7 @@ class _GameScreenState extends State<GameScreen>
                                   if (!_consumedShields.contains(e.key))
                                     e.key: e.value,
                               },
+                        rotations: _rotations,
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,

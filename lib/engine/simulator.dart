@@ -90,6 +90,17 @@ Map<int, PlacedElement> buildForcedPieces(LevelData level) {
   return out;
 }
 
+/// The live rotation state for a run: cell -> the heading its rotating arrow
+/// currently points. Seeded from the level's initial headings; each pass through
+/// advances that cell one quarter-turn clockwise, so this map MUTATES during the
+/// simulation and must be rebuilt fresh per run.
+Map<int, Direction> buildRotations(LevelData level) {
+  final n = level.size;
+  return {
+    for (final a in level.rotatingArrows) a.r * n + a.c: a.dir,
+  };
+}
+
 /// Cell -> the cell it teleports to, for every teleporter on the board. The map
 /// is symmetric: the dot travels BOTH ways, so the entrance/exit distinction is
 /// only there to help the player read the board.
@@ -282,6 +293,8 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   // Forced arrows behave like immovable placed arrows.
   final forced = buildForcedPieces(level);
   final links = buildTeleportLinks(level, {...forced, ...placed});
+  // Rotating arrows keep their own live heading, advancing per pass.
+  final rotations = buildRotations(level);
 
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
@@ -389,6 +402,15 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
     // The start cell acts as a permanent forced arrow on every visit.
     if (base == CellType.start) dir = level.start.dir;
 
+    // A rotating arrow turns the dot to its current heading, then advances one
+    // quarter-turn clockwise for the next pass. It is not a placed piece, so it
+    // is handled here rather than in the switch below.
+    final rot = rotations[key];
+    if (rot != null) {
+      dir = rot;
+      rotations[key] = rot.rotatedCW;
+    }
+
     final piece = pieceAt(key);
     if (piece != null) {
       switch (piece.type) {
@@ -446,6 +468,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final n = level.size;
   final forced = buildForcedPieces(level);
   final links = buildTeleportLinks(level, {...forced, ...placed});
+  final rotations = buildRotations(level);
   PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
 
   var r = level.start.r;
@@ -526,6 +549,11 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     }
     visited.add(r * n + c);
     if (base == CellType.start) dir = level.start.dir; // permanent redirector
+    final rot = rotations[r * n + c];
+    if (rot != null) {
+      dir = rot;
+      rotations[r * n + c] = rot.rotatedCW;
+    }
     final piece = pieceAt(r * n + c);
     if (piece != null && piece.type == PlacedType.arrow) {
       dir = piece.direction!;

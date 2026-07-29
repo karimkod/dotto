@@ -21,6 +21,7 @@ enum DesignTool {
   wall,
   destroyer,
   forced,
+  rotating,
   shield,
   pause,
   teleporter,
@@ -66,6 +67,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   final Set<int> _walls = {};
   final Set<int> _destroyers = {};
   final Map<int, Direction> _forced = {};
+  // Rotating arrows: cell -> initial heading. Pinned like a forced arrow, but
+  // they turn a quarter-turn clockwise per pass at runtime.
+  final Map<int, Direction> _rotating = {};
   // Fixed shields and pauses: real level content, pinned to the board like a
   // forced arrow and not drawn from the toolkit.
   final Set<int> _shields = {};
@@ -180,6 +184,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _walls.clear();
     _destroyers.clear();
     _forced.clear();
+    _rotating.clear();
     _shields.clear();
     _pauses.clear();
     _teleports.clear();
@@ -195,6 +200,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_walls.contains(k)) return 'wall';
     if (_destroyers.contains(k)) return 'destroyer';
     if (_forced.containsKey(k)) return 'forced';
+    if (_rotating.containsKey(k)) return 'rotating';
     if (_shields.contains(k)) return 'shield';
     if (_pauses.contains(k)) return 'pause';
     if (_teleports.contains(k)) return 'teleporter';
@@ -206,6 +212,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _walls.remove(k);
     _destroyers.remove(k);
     _forced.remove(k);
+    _rotating.remove(k);
     _shields.remove(k);
     _pauses.remove(k);
     _teleports.remove(k);
@@ -241,6 +248,14 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           } else if (occ != 'start' && occ != 'exit') {
             _clearMovable(k);
             _forced[k] = _paintDir;
+          }
+        case DesignTool.rotating:
+          if (occ == 'rotating') {
+            _rotating[k] = _rotate(_rotating[k]!); // tap again to set initial dir
+            _paintDir = _rotating[k]!;
+          } else if (occ != 'start' && occ != 'exit') {
+            _clearMovable(k);
+            _rotating[k] = _paintDir;
           }
         case DesignTool.wall:
           if (occ != 'start' && occ != 'exit') {
@@ -305,6 +320,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         destroyers: _destroyers.map((k) => Pos(_row(k), _col(k))).toList(),
         forcedArrows: _forced.entries
             .map((e) => ForcedArrow(_row(e.key), _col(e.key), e.value))
+            .toList(),
+        rotatingArrows: _rotating.entries
+            .map((e) => RotatingArrow(_row(e.key), _col(e.key), e.value))
             .toList(),
         forcedShields: _shields.map((k) => Pos(_row(k), _col(k))).toList(),
         forcedPauses: _pauses.map((k) => Pos(_row(k), _col(k))).toList(),
@@ -380,6 +398,13 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             'ForcedArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
         .join(', ');
     b.writeln('  forcedArrows: [$fa],');
+    if (_rotating.isNotEmpty) {
+      final ra = _rotating.entries
+          .map((e) =>
+              'RotatingArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
+          .join(', ');
+      b.writeln('  rotatingArrows: [$ra],');
+    }
     if (_shields.isNotEmpty) {
       b.writeln('  forcedShields: [${poss(_shields)}],');
     }
@@ -471,6 +496,10 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         _forced[_key(f['row'] as int, f['col'] as int)] =
             _dir(f['dir'] as String?) ?? Direction.right;
       }
+      for (final f in (data['rotatingArrows'] as List? ?? [])) {
+        _rotating[_key(f['row'] as int, f['col'] as int)] =
+            _dir(f['dir'] as String?) ?? Direction.right;
+      }
       for (final p in (data['forcedShields'] as List? ?? [])) {
         _shields.add(_key(p['row'] as int, p['col'] as int));
       }
@@ -535,6 +564,16 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                 r'ForcedArrow\(\s*(?:Pos\(\s*)?(\d+)\s*,\s*(\d+)\s*\)?\s*,\s*Direction\.(\w+)')
             .allMatches(fm.group(1)!)) {
           _forced[_key(int.parse(am.group(1)!), int.parse(am.group(2)!))] =
+              _dir(am.group(3)) ?? Direction.right;
+        }
+      }
+      final rm =
+          RegExp(r'rotatingArrows\s*:\s*\[([^\]]*)\]').firstMatch(text);
+      if (rm != null) {
+        for (final am in RegExp(
+                r'RotatingArrow\(\s*(?:Pos\(\s*)?(\d+)\s*,\s*(\d+)\s*\)?\s*,\s*Direction\.(\w+)')
+            .allMatches(rm.group(1)!)) {
+          _rotating[_key(int.parse(am.group(1)!), int.parse(am.group(2)!))] =
               _dir(am.group(3)) ?? Direction.right;
         }
       }
@@ -1140,6 +1179,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             // Fixed shields/pauses go through `forced` too, so the board shows
             // them dashed exactly as they will look in play.
             forced: {..._forcedPieces(), ..._shieldPieces()},
+            rotations: Map.of(_rotating),
             trail: const [],
             movers: _movers.values.toList(),
             revision: _walls.length * 1000 +
@@ -1147,7 +1187,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
                 _forced.length * 10 +
                 _shields.length +
                 _pauses.length * 7 +
-                _movers.length * 10000,
+                _movers.length * 10000 +
+                _rotating.length * 100000 +
+                _rotating.values.fold(0, (a, d) => a + d.index),
             placeAnim: const {},
             removing: const [],
             cellGlow: const {},
@@ -1172,6 +1214,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (DesignTool.wall, 'Wall', Icons.crop_square_rounded),
       (DesignTool.destroyer, 'Destroyer', Icons.dangerous_rounded),
       (DesignTool.forced, 'Forced', Icons.double_arrow_rounded),
+      (DesignTool.rotating, 'Rotating', Icons.rotate_right_rounded),
       (DesignTool.shield, 'Shield', Icons.shield_rounded),
       (DesignTool.pause, 'Pause', Icons.pause_rounded),
       (DesignTool.teleporter, 'Portal', Icons.circle_outlined),
@@ -1194,6 +1237,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.wall: Color(0xFF78909C),
     DesignTool.destroyer: Color(0xFFEF5350),
     DesignTool.forced: Color(0xFF607D8B),
+    DesignTool.rotating: Color(0xFF7E3FF2), // violet, matches the in-game badge
     DesignTool.shield: Color(0xFF38BDF8),
     DesignTool.pause: Color(0xFFBA68C8), // matches the pause piece's purple
     DesignTool.teleporter: Color(0xFFFF7043), // matches pair 1's orange

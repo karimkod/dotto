@@ -393,6 +393,7 @@ class GameGridPainter extends CustomPainter {
     required this.level,
     required this.placed,
     required this.forced,
+    required this.rotations,
     required this.trail,
     required this.revision,
     required this.placeAnim,
@@ -415,6 +416,11 @@ class GameGridPainter extends CustomPainter {
 
   /// Immovable, level-defined arrows (drawn with a fixed "pinned" look).
   final Map<int, PlacedElement> forced;
+
+  /// Rotating arrows: cell -> the heading it CURRENTLY points (advances one
+  /// quarter-turn clockwise each time the dot passes through). Drawn like a
+  /// forced arrow but with a rotation cue.
+  final Map<int, Direction> rotations;
 
   /// Cell -> pair index for every portal, so both ends of a pair share a hue.
   late final Map<int, int> _portalPairs = buildPortalPairs(level, placed);
@@ -513,6 +519,11 @@ class GameGridPainter extends CustomPainter {
     // Fixed (forced) arrows — a "pinned" look so they read as immovable.
     forced.forEach((key, piece) {
       _paintForced(canvas, geo, key, piece);
+    });
+
+    // Rotating arrows — pinned, plus a rotation cue and a distinct hue.
+    rotations.forEach((key, dir) {
+      _paintRotating(canvas, geo, key, dir);
     });
 
     if (previewKey != null && previewTool != null) {
@@ -837,6 +848,60 @@ class GameGridPainter extends CustomPainter {
     } else {
       _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     }
+  }
+
+  /// A rotating arrow: drawn like a forced arrow (dashed "pinned" border) but in
+  /// a distinct violet hue and with a small circular-arrow badge in the corner,
+  /// so it reads as "this one turns." The glyph shows its CURRENT heading, which
+  /// advances a quarter-turn each time the dot passes through.
+  void _paintRotating(
+      Canvas canvas, GridGeometry geo, int key, Direction dir) {
+    final r = key ~/ geo.n;
+    final c = key % geo.n;
+    final center = geo.center(r, c);
+    final rrect = _cellRRect(geo, center);
+    const fill = Color(0xFFEDE3FB); // pale violet
+    const color = Color(0xFF7E3FF2); // violet ink
+
+    canvas.drawRRect(rrect, Paint()..color = fill);
+    _drawDashedRRect(
+      canvas,
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = color,
+    );
+    _drawGlyph(canvas, center, dir.glyph, color, geo.cell * 0.42);
+    _drawRotateBadge(canvas, center, geo.cell, color);
+  }
+
+  /// A small clockwise circular-arrow badge in the top-right of a cell — the
+  /// "this arrow rotates" cue.
+  void _drawRotateBadge(
+      Canvas canvas, Offset center, double cell, Color color) {
+    final badge = center + Offset(cell * 0.30, -cell * 0.30);
+    final radius = cell * 0.11;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = cell * 0.035
+      ..color = color;
+    // A ~270° arc, leaving a gap where the arrowhead sits.
+    final rect = Rect.fromCircle(center: badge, radius: radius);
+    canvas.drawArc(rect, -1.2, 4.9, false, paint);
+    // Arrowhead at the arc's leading end (top), pointing clockwise (rightward).
+    final tip = badge + Offset(0, -radius);
+    final head = Path()
+      ..moveTo(tip.dx - radius * 0.5, tip.dy - radius * 0.1)
+      ..lineTo(tip.dx + radius * 0.1, tip.dy)
+      ..lineTo(tip.dx - radius * 0.15, tip.dy + radius * 0.55);
+    canvas.drawPath(
+        head,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.035
+          ..strokeJoin = StrokeJoin.round
+          ..color = color);
   }
 
   void _paintGlow(

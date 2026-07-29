@@ -40,6 +40,19 @@ class ForcedArrow {
   final Direction dir;
 }
 
+/// A fixed arrow that turns a quarter-turn CLOCKWISE every time the dot passes
+/// through it. [dir] is the heading it points on the FIRST pass; the second
+/// pass sends the dot [dir].rotatedCW, and so on (right → down → left → up).
+/// Like [ForcedArrow] it is pinned to the board — the player can't move it — but
+/// its state advances during a run, so it is the first piece that makes the same
+/// board play differently on a later visit.
+class RotatingArrow {
+  const RotatingArrow(this.r, this.c, this.dir);
+  final int r;
+  final int c;
+  final Direction dir;
+}
+
 /// A destroyer that patrols a row ([horizontal]) or column, moving one cell per
 /// beat and bouncing off the grid edges and any solid cell (wall, static
 /// destroyer, exit) in its lane. [r],[c] is its starting cell; [dir] is the
@@ -71,6 +84,7 @@ class LevelData {
     this.destroyers = const [],
     this.gaps = const [],
     this.forcedArrows = const [],
+    this.rotatingArrows = const [],
     this.forcedShields = const [],
     this.forcedPauses = const [],
     this.teleporters = const [],
@@ -88,6 +102,10 @@ class LevelData {
   final List<Pos> destroyers;
   final List<Pos> gaps;
   final List<ForcedArrow> forcedArrows;
+
+  /// Arrows fixed to the board that turn 90° clockwise each time the dot passes
+  /// through — see [RotatingArrow].
+  final List<RotatingArrow> rotatingArrows;
 
   /// Shields fixed to the board: collected like a placed shield, but the player
   /// cannot move or remove them and they are not part of the toolkit.
@@ -109,11 +127,20 @@ class LevelData {
     return null;
   }
 
+  /// The INITIAL heading of the rotating arrow at (r, c), or null if none.
+  Direction? rotatingArrowAt(int r, int c) {
+    for (final a in rotatingArrows) {
+      if (a.r == r && a.c == c) return a.dir;
+    }
+    return null;
+  }
+
   /// True when the level pins ANY piece to (r, c) — arrow, shield or pause.
   /// Placement checks must use this rather than [forcedArrowAt], or the player
   /// could drop a piece on top of a fixed shield or pause.
   bool hasForcedPieceAt(int r, int c) {
     if (forcedArrowAt(r, c) != null) return true;
+    if (rotatingArrowAt(r, c) != null) return true;
     for (final p in forcedShields) {
       if (p.r == r && p.c == c) return true;
     }
