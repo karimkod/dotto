@@ -1340,23 +1340,23 @@ const Map<int, LevelData> levelDefinitions = {
   // shield at (8,4) blasts the mine-door at (8,5), the chain explosion opens
   // the wall at (8,6), and the patrol follows the dot straight through the
   // breach. Grab the pinned shield at (8,7), turn up at (8,8) as the patrol
-  // slams into the corner behind, pause at (7,8) to fix the warp parity, and
-  // take pair 2 from (6,8) into the moat at (4,6). Ride the pinned pause at
-  // (3,6), turn left at (2,6) into the inner patrol's lane, pause at (2,5)
-  // while it bounces off the west end and comes back — then step into it at
-  // (2,4). The shielded hit destroys it and blasts open (3,4): the way in.
+  // slams into the corner behind, climb the east edge and take pair 2 from
+  // (6,8) into the moat at (4,6). Ride the pinned pause at (3,6), turn left at
+  // (2,6) into the inner patrol's lane, pause at (2,5) while the patrol walks
+  // back — then step into it at (2,4). The shielded hit destroys it and blasts
+  // open (3,4): the way in.
   //
-  // Everything else is a trap: the mine-gate at (7,4) right under the core,
-  // the east climb past the mine at (5,8), warping into the moat with the
-  // wrong heading, and ramming the track patrol (mines are not walls, so its
-  // blast opens nothing useful).
+  // Everything else is a trap: the mine-gate at (7,4) right under the core, the
+  // east mine at (4,8), warping into the moat with the wrong heading, and
+  // ramming the track patrol (mines are not walls, so its blast opens nothing
+  // useful). The pinned pauses at (2,2)/(2,3) seal the inner lane's west end,
+  // closing the direct-warp shortcut into it.
   //
   // Two placeable pairs, so the shipped solvers cannot enumerate it — instead
   // exhaustively verified by tool/verify_pairs.dart: solvable, and the intended
-  // ten-piece run above wins under the real simulator. Without the old pinned
-  // pauses at (2,2)/(2,3) a shorter six-piece route through the inner lane also
-  // exists, so the finale is LOOSE rather than tight — the game still gates Play
-  // on placing all ten pieces, so the intended journey remains the throughline.
+  // run above wins under the real simulator. It needs only nine of the ten
+  // pieces (one pause is spare), so the finale is LOOSE rather than tight — the
+  // game still gates Play on placing all ten, so the journey stands.
   60: LevelData(
     id: 60,
     size: 9,
@@ -1385,12 +1385,12 @@ const Map<int, LevelData> levelDefinitions = {
       // The wall the door-blast opens.
       Pos(8, 6),
     ],
-    destroyers: [Pos(8, 5), Pos(5, 6), Pos(5, 8), Pos(7, 4)],
+    destroyers: [Pos(8, 5), Pos(5, 6), Pos(7, 4), Pos(4, 8)],
     forcedShields: [Pos(8, 7)],
-    forcedPauses: [Pos(3, 6)],
+    forcedPauses: [Pos(3, 6), Pos(2, 3), Pos(2, 2)],
     movers: [
       MovingDestroyer(8, 1, horizontal: true, dir: 1), // track patrol
-      MovingDestroyer(2, 2, horizontal: true, dir: 1), // inner-lane patrol
+      MovingDestroyer(2, 4, horizontal: true, dir: 1), // inner-lane patrol
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),

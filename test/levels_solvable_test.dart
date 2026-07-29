@@ -246,9 +246,11 @@ void main() {
     49: [(4, 6)],
     50: [(4, 3)],
     // World 5 timing level (60 only; 59 was redesigned to portals-only).
-    // 60: one pause above the track corner to fix warp parity, one in the
-    // inner lane to let the patrol bounce back into the keystone kill.
-    60: [(7, 8), (2, 5)],
+    // 60: a single pause in the inner lane, holding for the re-phased patrol to
+    // walk back into the keystone kill that blasts the core open. (The finale is
+    // loose — the toolkit's second pause is spare; the game still gates Play on
+    // placing all ten pieces.)
+    60: [(2, 5)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
