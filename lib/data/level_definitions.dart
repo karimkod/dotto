@@ -1735,6 +1735,465 @@ const Map<int, LevelData> levelDefinitions = {
     rotatingArrows: [RotatingArrow(2, 2, Direction.up)],
     toolkit: [ToolkitEntry(ToolType.arrowDown, 1)],
   ),
+
+  // World 6 proper (72–91): twenty rotating-arrow levels, easy to brutal. Each
+  // is built around a different consequence of the dial's one rule — it fires
+  // its current heading, then advances a quarter-turn clockwise per pass. All
+  // solver-verified TIGHT (the suite's BruteSearch for 72–90, and 91 — too
+  // heavy to enumerate there — by tool/verify_pairs.dart); 75, 79, 80, 81 and
+  // 89 are UNIQUE.
+
+  // 72 — Second Pass: build one loop and spin the dial to its third heading.
+  72: LevelData(
+    id: 72,
+    size: 5,
+    title: 'Second Pass',
+    tip: 'The dial turns every time you pass. Loop it twice — the third '
+        'heading points home.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(4, 2),
+    walls: [Pos(3, 3), Pos(0, 2)],
+    rotatingArrows: [RotatingArrow(2, 2, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 73 — Four Winds: all four headings in one run — the second pass fires
+  // west into the start, whose relaunch is the free return leg.
+  73: LevelData(
+    id: 73,
+    size: 6,
+    title: 'Four Winds',
+    tip: 'Four passes, four winds. Bounce below, ride your own launch pad '
+        'back, bounce above, fly east.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(3, 5),
+    rotatingArrows: [RotatingArrow(3, 3, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 74 — Meshed Gears: two dials feeding each other; the pinned pause between
+  // them stops cheap ping-pong bounces.
+  74: LevelData(
+    id: 74,
+    size: 6,
+    title: 'Meshed Gears',
+    tip: 'Two gears, one mesh. Spin them against each other until both point '
+        'your way.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [Pos(1, 2), Pos(0, 3), Pos(0, 5)],
+    forcedPauses: [Pos(2, 3)],
+    rotatingArrows: [
+      RotatingArrow(2, 2, Direction.right),
+      RotatingArrow(2, 4, Direction.left),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+    ],
+  ),
+
+  // 75 — Overwind: 72's loop with live ammunition — mines one cell beyond
+  // both bounce spots keep the return arrows honest. Solver-verified UNIQUE.
+  75: LevelData(
+    id: 75,
+    size: 6,
+    title: 'Overwind',
+    tip: 'Same trick, live ammunition — overshoot either bounce and the mines '
+        'collect.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(5, 3),
+    destroyers: [Pos(1, 3), Pos(3, 5)],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 76 — Figure Eight: a self-crossing course through one dial. The west lobe
+  // earns the pinned shield the exit-stem mine demands; pinned pauses on the
+  // dial's doorsteps keep cheap bounces out; the drop only opens from above.
+  76: LevelData(
+    id: 76,
+    size: 7,
+    title: 'Figure Eight',
+    tip: 'One dial, two lobes. The west loop earns the shield; the east fold '
+        'spends the third pass on the drop.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(5, 3),
+    walls: [Pos(4, 2), Pos(4, 4)],
+    destroyers: [Pos(4, 3)],
+    forcedShields: [Pos(1, 1)],
+    forcedPauses: [Pos(2, 3), Pos(3, 4)],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 2),
+    ],
+  ),
+
+  // 77 — Demolition Dial: the dial's first pass bounces off the start, its
+  // second rams the mine that opens the exit pocket — while a patrol sweeps
+  // the corridor the dot crosses three times.
+  77: LevelData(
+    id: 77,
+    size: 7,
+    title: 'Demolition Dial',
+    tip: 'The dial rams the mine on its second try — shield up, and mind the '
+        'corridor patrol on all three crossings.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(1, 4),
+    walls: [Pos(1, 3), Pos(1, 5), Pos(0, 4), Pos(2, 4)],
+    destroyers: [Pos(3, 4)],
+    rotatingArrows: [RotatingArrow(4, 4, Direction.left)],
+    movers: [MovingDestroyer(2, 2, horizontal: false, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 78 — Gear Train: no pause in the kit — the dial bounce IS the clock, and
+  // the bounce row decides how late you cross the patrol.
+  78: LevelData(
+    id: 78,
+    size: 7,
+    title: 'Gear Train',
+    tip: 'No pause in the kit: the bounce IS the clock. The deeper the '
+        'bounce, the later the crossing.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6),
+    ],
+    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+    movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 79 — Ratchet: the dial's advanced state makes the second start-crossing
+  // genuinely different — and the two patrol clocks only fit the long lap, so
+  // the relaunch is mandatory. Solver-verified UNIQUE.
+  79: LevelData(
+    id: 79,
+    size: 6,
+    title: 'Ratchet',
+    tip: 'The bounces are watched. Only the long way — back across your own '
+        'launch pad — arrives when the lanes are clear.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(3, 5),
+    destroyers: [Pos(0, 2)],
+    rotatingArrows: [RotatingArrow(3, 2, Direction.up)],
+    movers: [
+      MovingDestroyer(2, 3, horizontal: false, dir: 1),
+      MovingDestroyer(1, 4, horizontal: false, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 80 — Tumblers: two dials in the corridor, each pre-spun with one exact
+  // click — mines a cell beyond both bounce spots keep you honest.
+  // Solver-verified UNIQUE.
+  80: LevelData(
+    id: 80,
+    size: 7,
+    title: 'Tumblers',
+    tip: 'Two tumblers, one click each. Set both to the corridor, then make '
+        'the run.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(3, 6),
+    walls: [Pos(5, 0), Pos(5, 1), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6)],
+    destroyers: [Pos(1, 2), Pos(1, 4)],
+    rotatingArrows: [
+      RotatingArrow(3, 2, Direction.up),
+      RotatingArrow(3, 4, Direction.up),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 2),
+    ],
+  ),
+
+  // 81 — Roundabout: four dials at the ring's corners. One lap clockwise, one
+  // lap counter-clockwise as they all advance, then the machine flings the
+  // dot out west. The pinned pause guards the exit's doorstep.
+  // Solver-verified UNIQUE.
+  81: LevelData(
+    id: 81,
+    size: 7,
+    title: 'Roundabout',
+    tip: 'Step in and watch: one lap clockwise, one lap back, then the '
+        'machine throws you out. Be standing in the right place to catch it.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(6, 1),
+    forcedPauses: [Pos(5, 1)],
+    rotatingArrows: [
+      RotatingArrow(2, 2, Direction.right),
+      RotatingArrow(2, 4, Direction.down),
+      RotatingArrow(4, 4, Direction.left),
+      RotatingArrow(4, 2, Direction.up),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+    ],
+  ),
+
+  // 82 — Odometer: the dial's up-ray is the clock face; where you park the
+  // portal pair on it decides when you land in the patrol's row.
+  82: LevelData(
+    id: 82,
+    size: 7,
+    title: 'Odometer',
+    tip: 'The pair is the clock: park it deeper along the ray to arrive '
+        'later. Two portals, no second chances.',
+    start: StartSpec(6, 3, Direction.up),
+    exit: Pos(0, 2),
+    walls: [Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6)],
+    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+    movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
+    toolkit: [ToolkitEntry(ToolType.teleporter, 2)],
+  ),
+
+  // 83 — Spin Doctor: the delay dial re-aims the shielded dot at the pen once
+  // per cycle — pick the cycle the patrol is home, and the kill at the pen's
+  // centre blasts open the exit door above it.
+  83: LevelData(
+    id: 83,
+    size: 7,
+    title: 'Spin Doctor',
+    tip: 'The machine re-aims you at the pen every cycle. Choose the cycle '
+        'the patrol is home.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 3),
+    walls: [Pos(2, 0), Pos(2, 6), Pos(1, 3), Pos(0, 2), Pos(0, 4)],
+    rotatingArrows: [RotatingArrow(4, 2, Direction.up)],
+    movers: [MovingDestroyer(2, 2, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // 84 — Escapement: the patrol sweeps straight over the dial's own cell.
+  // Slip into the tooth twice between sweeps, then ride the lane home in the
+  // patrol's wake.
+  84: LevelData(
+    id: 84,
+    size: 7,
+    title: 'Escapement',
+    tip: 'The patrol rides right over the dial. Slip in twice between '
+        'sweeps, then follow it home.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(3, 6),
+    walls: [Pos(4, 6)],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    movers: [MovingDestroyer(3, 2, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 85 — Moulinet: one bounce dial, two patrol rows on the climb, one pause —
+  // three clocks that all have to agree.
+  85: LevelData(
+    id: 85,
+    size: 7,
+    title: 'Moulinet',
+    tip: 'One bounce, two patrol rows, one pause — three clocks, and they all '
+        'have to agree.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6),
+      Pos(1, 3), Pos(2, 6),
+    ],
+    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+    movers: [
+      MovingDestroyer(2, 4, horizontal: true, dir: 1),
+      MovingDestroyer(0, 0, horizontal: true, dir: 1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 86 — Winding Key: wind the dial to its second pass to sweep over the
+  // pinned shield, fold back, and climb into the mine-door under the sealed
+  // exit chimney.
+  86: LevelData(
+    id: 86,
+    size: 7,
+    title: 'Winding Key',
+    tip: 'Wind the dial to reach the shield, then climb into the mine under '
+        'the sealed chimney.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(0, 4),
+    walls: [Pos(0, 3), Pos(0, 5), Pos(1, 3), Pos(1, 5)],
+    destroyers: [Pos(1, 4)],
+    forcedShields: [Pos(3, 4)],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+    ],
+  ),
+
+  // 87 — Caught Ray: the second dial catches the first one's ray, sweeps the
+  // dot west over the shield cell, and the start relaunches it into the
+  // first dial's second pass — straight through the mine-door.
+  87: LevelData(
+    id: 87,
+    size: 7,
+    title: 'Caught Ray',
+    tip: 'The second dial catches the first one\'s throw. Ride it home '
+        'across your launch pad — the second pass breaks through.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(3, 6),
+    destroyers: [Pos(3, 5), Pos(4, 2), Pos(0, 2)],
+    forcedPauses: [Pos(2, 2)],
+    rotatingArrows: [
+      RotatingArrow(3, 2, Direction.up),
+      RotatingArrow(1, 2, Direction.left),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.shield, 1),
+    ],
+  ),
+
+  // 88 — Stopwatch: the pinned machine ticks the dial through two counts by
+  // itself; the player's bounce is the third tick — placed inside the
+  // patrol's lane, with the wait sized to fit both clocks.
+  88: LevelData(
+    id: 88,
+    size: 7,
+    title: 'Stopwatch',
+    tip: 'The machine counts one and two on its own. Your bounce is the '
+        'third tick — inside the patrol\'s lane.',
+    start: StartSpec(3, 6, Direction.left),
+    exit: Pos(3, 0),
+    forcedArrows: [
+      ForcedArrow(2, 3, Direction.down),
+      ForcedArrow(3, 4, Direction.left),
+    ],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    movers: [MovingDestroyer(4, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 89 — Flywheel: the Roundabout's double orbit with a patrol threading the
+  // ring's heart — enter on the right beat, and both laps clear it.
+  // Solver-verified UNIQUE.
+  89: LevelData(
+    id: 89,
+    size: 7,
+    title: 'Flywheel',
+    tip: 'The flywheel spins both ways with a patrol through its heart. Enter '
+        'on the right beat and catch the throw.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(6, 1),
+    forcedPauses: [Pos(5, 1)],
+    rotatingArrows: [
+      RotatingArrow(2, 2, Direction.right),
+      RotatingArrow(2, 4, Direction.down),
+      RotatingArrow(4, 4, Direction.left),
+      RotatingArrow(4, 2, Direction.up),
+    ],
+    movers: [MovingDestroyer(3, 0, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 90 — Grand Clockwork: the meshed gears at scale, with a patrol corridor
+  // under the gearbox crossed on the down-stroke and again on the up-stroke.
+  90: LevelData(
+    id: 90,
+    size: 8,
+    title: 'Grand Clockwork',
+    tip: 'Two gears above, one patrol below. Cross on the down-stroke, again '
+        'on the up-stroke, and out through the chimney.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [
+      Pos(1, 2), Pos(0, 4), Pos(1, 4), Pos(6, 2), Pos(6, 5), Pos(1, 7),
+      Pos(3, 3), Pos(1, 6),
+    ],
+    forcedPauses: [Pos(2, 3), Pos(2, 4)],
+    rotatingArrows: [
+      RotatingArrow(2, 2, Direction.right),
+      RotatingArrow(2, 5, Direction.left),
+    ],
+    movers: [MovingDestroyer(4, 2, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 91 — Clock Tower: the World 6 summit. Warp out of the pocket, collect the
+  // pinned shield (the south's toll — no warp shortcut survives the mine
+  // without it), climb through the patrol lane into the dial, ride the caught
+  // ray and the wound-up passes across the tower, blast the mine, and drop
+  // down the far shaft. Too heavy for the suite's exhaustive solver —
+  // verified TIGHT by tool/verify_pairs.dart (2 solutions, all 7 pieces).
+  91: LevelData(
+    id: 91,
+    size: 8,
+    title: 'Clock Tower',
+    tip: 'Warp in, pay the shield toll, cross the lane twice, catch the ray, '
+        'wind the dial to three — and drop home. The final exam.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(7, 7),
+    walls: [
+      Pos(0, 2), Pos(0, 4), Pos(0, 6),
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 3), Pos(1, 5), Pos(1, 6),
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3),
+      Pos(2, 5), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3), Pos(3, 5),
+      Pos(3, 6), Pos(3, 7), Pos(4, 0),
+      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 5),
+      Pos(5, 6), Pos(6, 5), Pos(6, 6), Pos(7, 6),
+    ],
+    destroyers: [Pos(4, 6)],
+    forcedShields: [Pos(7, 1)],
+    forcedPauses: [Pos(4, 2), Pos(4, 3), Pos(2, 4), Pos(3, 4)],
+    rotatingArrows: [RotatingArrow(4, 4, Direction.left)],
+    movers: [MovingDestroyer(6, 2, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

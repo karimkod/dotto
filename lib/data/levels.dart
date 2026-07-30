@@ -4,8 +4,8 @@ import 'level_definitions.dart';
 
 /// Total number of built, playable levels:
 /// World 1 (1–15) + World 2 (16–20) + World 3 (21–30) + World 4 (31–50)
-/// + World 5 (51–60) + Master Trials (61–70) + World 6 (71–).
-const int kLevelCount = 71;
+/// + World 5 (51–60) + Master Trials (61–70) + World 6 (71–91).
+const int kLevelCount = 91;
 
 /// The level number at which World 2 (Static Destroyers) begins.
 const int kWorld2Start = 16;
@@ -56,8 +56,10 @@ List<Level> buildInitialLevels() {
     // Master Trials (61–70): every level is a remix exam.
     if (number <= 63) return Difficulty.medium; // gentler re-entry (61–63)
     if (number <= 70) return Difficulty.hard; // 64–70 the trials proper
-    // World 6 (71–): rotating arrows, teaching the new piece from scratch.
-    return Difficulty.easy; // 71 the opener
+    // World 6 (71–91): rotating arrows, teaching the new piece from scratch.
+    if (number <= 74) return Difficulty.easy; // learn the dial (71–74)
+    if (number <= 82) return Difficulty.medium; // combine mechanics (75–82)
+    return Difficulty.hard; // 83–91 the clockwork exams
   }
 
   LevelStatus statusFor(int number) {

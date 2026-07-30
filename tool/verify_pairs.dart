@@ -56,6 +56,7 @@ class _State {
     required this.links,
     required this.portalOrder,
     required this.remaining,
+    required this.rotations,
   });
 
   int r, c, pause, tick;
@@ -63,6 +64,10 @@ class _State {
   bool shielded;
   Set<int> taken, removed, decided;
   List<int> moverPos, moverDir;
+
+  /// Live rotating-arrow headings (cell -> current direction) — advances one
+  /// quarter-turn CW per pass, exactly as in the simulator.
+  Map<int, Direction> rotations;
 
   /// Cell -> tool placed there (portals included, one entry per end).
   Map<int, ToolType> placed;
@@ -91,6 +96,7 @@ class _State {
         links: {...links},
         portalOrder: [...portalOrder],
         remaining: {...remaining},
+        rotations: {...rotations},
       );
 }
 
@@ -287,6 +293,7 @@ class PairSearch {
       links: {},
       portalOrder: [],
       remaining: {for (final e in level.toolkit) e.type: e.count},
+      rotations: buildRotations(level),
     );
     _advance(s0);
   }
@@ -327,6 +334,15 @@ class PairSearch {
         s.removed.addAll(adjacentWallKeys(level, key));
       }
       if (base == CellType.start) s.dir = level.start.dir;
+
+      // A rotating arrow turns the dot to its current heading, then advances a
+      // quarter-turn clockwise — mirrors simulateDetailed exactly. Rotor cells
+      // are never placeable, so this cannot collide with the branch below.
+      final rot = s.rotations[key];
+      if (rot != null) {
+        s.dir = rot;
+        s.rotations[key] = rot.rotatedCW;
+      }
 
       // Branch point: an undecided placeable cell the dot just landed on.
       if (placeable.contains(key) &&

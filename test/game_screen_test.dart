@@ -47,9 +47,9 @@ void main() {
   Future<void> runToWin(WidgetTester tester) async {
     await tester.tap(find.text('Play'));
     await tester.pump();
-    // Enough ticks for the longest World 1 path (the 8x8 exam) plus the ~2.2s
-    // celebration.
-    for (var i = 0; i < 48; i++) {
+    // Enough ticks for the longest run in the game (level 91's ~44-tick
+    // clockwork) plus the ~2.2s celebration.
+    for (var i = 0; i < 60; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
   }
@@ -295,11 +295,16 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 71 "Rotor": the DOWN arrow at the top of column 2 bounces the dot
-    // back into the rotating arrow at (2,2) for a second pass — which, having
-    // turned up → right, sends it to the exit. Also covers the live rotation
-    // state end to end, through the real widget.
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(0, 2));
+    // Level 91 "Clock Tower": the recorded finale solution (verified TIGHT by
+    // tool/verify_pairs.dart). Portals dropped in pair order; also covers the
+    // live rotation state end to end, through the real widget.
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(7, 0));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(1, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(4, 7));
+    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(4, 1));
+    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 4));
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 3));
 
     await runToWin(tester);
 

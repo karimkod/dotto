@@ -263,10 +263,61 @@ void main() {
       (5, 0, Direction.up),
       (0, 0, Direction.right),
     ],
-    // ----- World 6 (71–): rotating arrows. -----
+    // ----- World 6 (71–91): rotating arrows. -----
     // 71: the DOWN arrow at the top of column 2 bounces the dot back into the
     // rotor for a second pass — by then it has turned up → right, into the exit.
     71: [(0, 2, Direction.down)],
+    72: [(1, 2, Direction.down), (2, 4, Direction.left)],
+    73: [(0, 3, Direction.down), (5, 3, Direction.up)],
+    74: [(5, 2, Direction.right), (5, 4, Direction.up)],
+    75: [(2, 3, Direction.down), (3, 4, Direction.left)],
+    76: [
+      (1, 0, Direction.down),
+      (1, 3, Direction.left),
+      (3, 6, Direction.left),
+    ],
+    77: [], // shield + pause only (below)
+    78: [
+      (2, 3, Direction.down),
+      (4, 5, Direction.up),
+      (6, 3, Direction.up),
+    ],
+    79: [(2, 0, Direction.down), (2, 2, Direction.left)],
+    80: [
+      (2, 2, Direction.down),
+      (2, 4, Direction.down),
+      (6, 2, Direction.up),
+    ],
+    81: [(4, 1, Direction.down), (5, 2, Direction.up)],
+    82: [], // portals only (below)
+    83: [(2, 2, Direction.down), (4, 3, Direction.up)],
+    84: [(2, 3, Direction.down), (5, 3, Direction.up)],
+    85: [
+      (0, 5, Direction.right),
+      (2, 3, Direction.down),
+      (4, 5, Direction.up),
+      (6, 3, Direction.up),
+    ],
+    86: [
+      (2, 3, Direction.down),
+      (2, 4, Direction.up),
+      (2, 6, Direction.left),
+      (3, 6, Direction.up),
+    ],
+    87: [(1, 0, Direction.down)],
+    88: [(5, 3, Direction.up)],
+    89: [(4, 1, Direction.down), (5, 2, Direction.up)],
+    90: [
+      (0, 5, Direction.right),
+      (4, 2, Direction.right),
+      (4, 5, Direction.up),
+    ],
+    91: [
+      (1, 4, Direction.down),
+      (4, 1, Direction.right),
+      (4, 7, Direction.down),
+      (7, 4, Direction.up),
+    ],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -299,6 +350,11 @@ void main() {
     // 70 — pair 1 into the pinned ring (and back out of it); pair 2 over the
     // mined top row. Placed in pair order.
     70: [(4, 3), (2, 7), (0, 1), (0, 3)],
+    // ----- World 6. -----
+    // 82 — the warp clock: park the pair on the dial's ray.
+    82: [(0, 3), (1, 2)],
+    // 91 — out of the pocket onto the tower's ground floor.
+    91: [(0, 1), (7, 0)],
   };
 
   // Intended pause placements (World 4).
@@ -329,6 +385,14 @@ void main() {
     // 69: both waits stacked at the shaft's doorstep to catch the convoy's
     // only gap.
     69: [(5, 3), (6, 2)],
+    // ----- World 6. -----
+    77: [(4, 1)],
+    84: [(4, 3)],
+    85: [(1, 5)],
+    88: [(3, 5)],
+    89: [(2, 3)],
+    90: [(3, 2)],
+    91: [(7, 3)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -370,6 +434,10 @@ void main() {
     66: [(6, 4)],
     // 68: one aura for the fence mine, one for the patrol at its new far end.
     68: [(3, 2), (4, 4)],
+    // ----- World 6. -----
+    77: [(4, 3)],
+    83: [(3, 3)],
+    87: [(3, 4)],
   };
 
   // Walk the definitions themselves, so a new level is never silently skipped.
@@ -385,10 +453,11 @@ void main() {
   const multiPairLevels = {57, 59, 60, 70};
   // Levels whose exhaustive enumeration is too slow for the suite (a full open
   // board with a teleporter toolkit, so no reachability pruning). Level 55 takes
-  // ~14 minutes to enumerate. Its recorded solution — found by exhaustion, so
-  // solvability IS proven — carries it via the intended-solution-wins test; the
+  // ~14 minutes to enumerate; level 91's seven-piece kit is likewise beyond the
+  // budget, and is verified TIGHT out of band by tool/verify_pairs.dart. Their
+  // recorded solutions carry them via the intended-solution-wins test; the
   // solvable/tight sweeps are skipped.
-  const solverTooSlow = {55};
+  const solverTooSlow = {55, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.
