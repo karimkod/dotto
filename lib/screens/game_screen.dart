@@ -92,6 +92,13 @@ class _GameScreenState extends State<GameScreen>
   late final Animation<double> _dotScale; // arrival squish
   late final AnimationController _teleportCtrl; // one phase of a teleport
   late final AnimationController _moverCtrl; // patrol glide (every beat)
+  late final AnimationController _spinCtrl; // a rotating arrow's quarter-turn
+
+  /// The rotating arrow currently mid-turn, if any. Claimed synchronously when
+  /// the dot passes through, so [_afterGlide] can see that the spin has taken
+  /// the beat timer over; cleared when the turn lands. [_rotations] keeps the
+  /// pre-turn heading until then — the painter turns the glyph off it.
+  int? _spinCell;
 
   /// Teleport animation state. [_teleporting] gates the whole overlay; while it
   /// runs, [_teleportGrowing] is false during the shrink-out at the entrance and
@@ -205,6 +212,11 @@ class _GameScreenState extends State<GameScreen>
       vsync: this,
       duration: const Duration(milliseconds: 210),
     );
+    // One quarter-turn of a rotating arrow — the beat is held while it plays.
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -278,6 +290,7 @@ class _GameScreenState extends State<GameScreen>
     _handTimer?.cancel();
     _dotCtrl.dispose();
     _teleportCtrl.dispose();
+    _spinCtrl.dispose();
     _moverCtrl.dispose();
     _glowCtrl.dispose();
     _snapCtrl.dispose();
@@ -374,6 +387,8 @@ class _GameScreenState extends State<GameScreen>
     _timer = null;
     _teleportCtrl.stop();
     _teleporting = false;
+    _spinCtrl.stop();
+    _spinCell = null;
     final s = _level!.start;
     _status = GameStatus.planning;
     _dot = DotState(r: s.r, c: s.c, dir: s.dir);
@@ -855,8 +870,9 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted || _status != GameStatus.running) return;
     blast();
     // The blast can end the run (a teleport landing on the exit wins), so only
-    // resume beats if it did not.
-    if (!mounted || _status != GameStatus.running) return;
+    // resume beats if it did not — and not while a rotor spin owns the timer
+    // (the blast resolved onto a rotating arrow), or two timers would step.
+    if (!mounted || _status != GameStatus.running || _spinCell != null) return;
     _timer =
         Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
@@ -978,16 +994,19 @@ class _GameScreenState extends State<GameScreen>
       Sfx.arrow();
     }
 
-    // A rotating arrow redirects the dot to its current heading, then spins a
-    // quarter-turn clockwise — the repaint shows the new heading for next time.
+    // A rotating arrow redirects the dot to its current heading, then turns a
+    // quarter-turn clockwise on screen. The turn — and the new heading it
+    // commits — is driven by [_runRotorSpin], which holds the beat timer for its
+    // duration and finishes the cell itself, so nothing steps mid-spin.
     final rot = _rotations[newKey];
     if (rot != null) {
       setState(() {
         _dot.dir = rot;
-        _rotations[newKey] = rot.rotatedCW;
-        _glow(newKey, const Color(0xFF7E3FF2), 1.0); // violet, matches the badge
+        _glow(newKey, const Color(0xFF1E88E5), 1.0); // arrow flash
       });
       Sfx.arrow();
+      _runRotorSpin(newKey, rot);
+      return;
     }
 
     final piece = _pieceAt(newKey);
@@ -1030,6 +1049,47 @@ class _GameScreenState extends State<GameScreen>
     if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) {
       _win();
     }
+  }
+
+  /// Play a rotating arrow's quarter-turn: settle the glide ONTO the arrow, turn
+  /// it 90° clockwise, commit the new heading, then resume beats. Like a
+  /// teleport, the beat timer is held for the whole animation, so the dot waits
+  /// on the arrow and the turn is never half-drawn when the next step lands.
+  ///
+  /// [from] is the heading the arrow just sent the dot; it points [from]
+  /// .rotatedCW once this returns.
+  Future<void> _runRotorSpin(int cell, Direction from) async {
+    _timer?.cancel();
+    _timer = null;
+    // Claimed before the first await: _afterGlide resumes beats as soon as the
+    // blast it ran returns, and must not do so on top of this.
+    setState(() => _spinCell = cell);
+    await _settleGlides(); // let the dot land on the arrow before it turns
+    if (!mounted || _status != GameStatus.running) {
+      _spinCell = null;
+      return;
+    }
+
+    try {
+      await _spinCtrl.forward(from: 0).orCancel;
+    } catch (_) {
+      return; // disposed / reset mid-spin (_resetDot already cleared the state)
+    }
+    if (!mounted) return;
+    // The glyph has arrived on the next heading — make it official.
+    setState(() {
+      _rotations[cell] = from.rotatedCW;
+      _spinCell = null;
+    });
+    if (_status != GameStatus.running) return;
+
+    // The arrow could sit on the exit cell; resolve that before beating on.
+    if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) {
+      _win();
+      return;
+    }
+    _timer =
+        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
   /// The pair colour of the portal at [cell], for the ring pulses. Falls back to
@@ -1520,7 +1580,8 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 RepaintBoundary(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_glowCtrl, _winCtrl]),
+                    animation:
+                        Listenable.merge([_glowCtrl, _winCtrl, _spinCtrl]),
                     builder: (_, _) => CustomPaint(
                       size: Size.square(side),
                       painter: GameGridPainter(
@@ -1549,6 +1610,8 @@ class _GameScreenState extends State<GameScreen>
                                     e.key: e.value,
                               },
                         rotations: _rotations,
+                        spinCell: _spinCell,
+                        spinProgress: _spinCtrl.value,
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
                         cellPulse: _cellPulse,

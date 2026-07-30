@@ -1237,7 +1237,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.wall: Color(0xFF78909C),
     DesignTool.destroyer: Color(0xFFEF5350),
     DesignTool.forced: Color(0xFF607D8B),
-    DesignTool.rotating: Color(0xFF7E3FF2), // violet, matches the in-game badge
+    DesignTool.rotating: Color(0xFF1E88E5), // matches the in-game arrow blue
     DesignTool.shield: Color(0xFF38BDF8),
     DesignTool.pause: Color(0xFFBA68C8), // matches the pause piece's purple
     DesignTool.teleporter: Color(0xFFFF7043), // matches pair 1's orange

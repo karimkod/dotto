@@ -2,6 +2,8 @@
 // passes through (right → down → left → up → right ...). The state persists
 // during a run, so the same arrow sends the dot a different way on a later pass.
 
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dotto/engine/level_solver.dart';
@@ -9,8 +11,12 @@ import 'package:dotto/engine/simulator.dart';
 import 'package:dotto/models/game_state.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level_data.dart';
+import 'package:dotto/widgets/game_grid.dart';
 
 void main() {
+  // The painting tests lay out text glyphs, which needs a binding.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   const down = PlacedElement(
       type: PlacedType.arrow, tool: ToolType.arrowDown, direction: Direction.down);
 
@@ -131,6 +137,53 @@ void main() {
       for (final s in sols) {
         expect(simulate(learn, s), SimOutcome.win,
             reason: 'a reported solution does not actually win');
+      }
+    });
+  });
+
+  // The quarter-turn is drawn by the grid painter off (spinCell, spinProgress),
+  // which the game screen advances every frame from its spin controller.
+  group('painting the quarter-turn', () {
+    const rotor = 2 * 5 + 2; // the rotating cell in `learn`
+    GameGridPainter painter({int? spinCell, double spin = 0}) => GameGridPainter(
+          level: learn,
+          placed: const {},
+          forced: const {},
+          rotations: const {rotor: Direction.up},
+          trail: const [],
+          revision: 0,
+          placeAnim: const {},
+          removing: const [],
+          cellGlow: const {},
+          cellGlowColor: const {},
+          cellPulse: const {},
+          explosions: const [],
+          destroyedCells: const {},
+          glowTick: 0,
+          showStartHint: false,
+          winProgress: 0,
+          spinCell: spinCell,
+          spinProgress: spin,
+        );
+
+    test('a change in spin state forces a repaint', () {
+      // shouldRepaint compares an explicit field list. If the spin is not on it
+      // the turn never redraws and the arrow just jumps to its new heading.
+      expect(
+          painter(spinCell: rotor, spin: 0.4)
+              .shouldRepaint(painter(spinCell: rotor, spin: 0.1)),
+          isTrue);
+      expect(painter(spinCell: rotor).shouldRepaint(painter()), isTrue);
+      expect(painter().shouldRepaint(painter()), isFalse,
+          reason: 'an idle board must not repaint every frame for nothing');
+    });
+
+    test('paints at rest and at every stage of the turn', () {
+      for (final spin in [0.0, 0.25, 0.5, 0.99, 1.0]) {
+        final recorder = PictureRecorder();
+        painter(spinCell: rotor, spin: spin)
+            .paint(Canvas(recorder), const Size(300, 300));
+        recorder.endRecording().dispose();
       }
     });
   });

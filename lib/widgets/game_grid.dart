@@ -409,6 +409,8 @@ class GameGridPainter extends CustomPainter {
     this.previewKey,
     this.previewTool,
     this.movers = const [],
+    this.spinCell,
+    this.spinProgress = 0,
   });
 
   final LevelData level;
@@ -421,6 +423,13 @@ class GameGridPainter extends CustomPainter {
   /// quarter-turn clockwise each time the dot passes through). Drawn like a
   /// forced arrow but with a rotation cue.
   final Map<int, Direction> rotations;
+
+  /// The rotating arrow mid-turn, if any, and how far through its quarter-turn
+  /// it is (0→1). [rotations] still holds the PRE-turn heading while this runs —
+  /// the new one is committed when the animation lands, which is exactly where
+  /// the drawn glyph has arrived by then.
+  final int? spinCell;
+  final double spinProgress;
 
   /// Cell -> pair index for every portal, so both ends of a pair share a hue.
   late final Map<int, int> _portalPairs = buildPortalPairs(level, placed);
@@ -521,9 +530,10 @@ class GameGridPainter extends CustomPainter {
       _paintForced(canvas, geo, key, piece);
     });
 
-    // Rotating arrows — pinned, plus a rotation cue and a distinct hue.
+    // Rotating arrows — a pinned arrow plus its rotation cue, mid-turn or at rest.
     rotations.forEach((key, dir) {
-      _paintRotating(canvas, geo, key, dir);
+      _paintRotating(
+          canvas, geo, key, dir, key == spinCell ? spinProgress : 0.0);
     });
 
     if (previewKey != null && previewTool != null) {
@@ -850,18 +860,33 @@ class GameGridPainter extends CustomPainter {
     }
   }
 
-  /// A rotating arrow: drawn like a forced arrow (dashed "pinned" border) but in
-  /// a distinct violet hue and with a small circular-arrow badge in the corner,
-  /// so it reads as "this one turns." The glyph shows its CURRENT heading, which
-  /// advances a quarter-turn each time the dot passes through.
+  /// A rotating arrow is a fixed arrow first: the same arrow fill, the same ink,
+  /// the same heading glyph at the same size, the same dashed "pinned" cell
+  /// border. It belongs to that family and should read as one of them. The only
+  /// addition is the cue that it turns — a dashed ring around the glyph carrying
+  /// a clockwise arrowhead, one thin stroke so it stays legible on small cells.
+  ///
+  /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). Glyph and
+  /// ring turn together, the ring brightens through the turn and the cell swells
+  /// a little; at 1 the glyph sits exactly on the next heading's glyph, so
+  /// committing the new heading and dropping back to 0 is invisible.
   void _paintRotating(
-      Canvas canvas, GridGeometry geo, int key, Direction dir) {
+      Canvas canvas, GridGeometry geo, int key, Direction dir, double spin) {
     final r = key ~/ geo.n;
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    const fill = Color(0xFFEDE3FB); // pale violet
-    const color = Color(0xFF7E3FF2); // violet ink
+    final (fill, color, glyph) = _toolStyle(dir.arrowTool, dir);
+    final t = spin.clamp(0.0, 1.0);
+    // Peaks in the middle of the turn: drives the swell and the ring's
+    // brightness, so the spin reads without changing colour.
+    final emphasis = t <= 0 ? 0.0 : math.sin(t * math.pi);
+    final turn = Curves.easeInOutCubic.transform(t) * math.pi / 2;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(1 + 0.07 * emphasis);
+    canvas.translate(-center.dx, -center.dy);
 
     canvas.drawRRect(rrect, Paint()..color = fill);
     _drawDashedRRect(
@@ -869,39 +894,58 @@ class GameGridPainter extends CustomPainter {
       rrect,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
+        ..strokeWidth = 2.5 // matches a fixed arrow
         ..color = color,
     );
-    _drawGlyph(canvas, center, dir.glyph, color, geo.cell * 0.42);
-    _drawRotateBadge(canvas, center, geo.cell, color);
+    _drawRotateRing(canvas, center, geo.cell, color, turn, emphasis);
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(turn);
+    canvas.translate(-center.dx, -center.dy);
+    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    canvas.restore();
+
+    canvas.restore();
   }
 
-  /// A small clockwise circular-arrow badge in the top-right of a cell — the
-  /// "this arrow rotates" cue.
-  void _drawRotateBadge(
-      Canvas canvas, Offset center, double cell, Color color) {
-    final badge = center + Offset(cell * 0.30, -cell * 0.30);
-    final radius = cell * 0.11;
-    final paint = Paint()
+  /// The "this arrow rotates" cue: a dashed ring around the glyph with a
+  /// clockwise arrowhead riding it. [angle] turns the whole ring with the arrow,
+  /// [emphasis] (0→1) brightens it mid-turn.
+  void _drawRotateRing(Canvas canvas, Offset center, double cell, Color color,
+      double angle, double emphasis) {
+    final radius = cell * 0.31;
+    final ink = color.withValues(alpha: 0.34 + 0.56 * emphasis);
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final stroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = cell * 0.035
-      ..color = color;
-    // A ~270° arc, leaving a gap where the arrowhead sits.
-    final rect = Rect.fromCircle(center: badge, radius: radius);
-    canvas.drawArc(rect, -1.2, 4.9, false, paint);
-    // Arrowhead at the arc's leading end (top), pointing clockwise (rightward).
-    final tip = badge + Offset(0, -radius);
-    final head = Path()
-      ..moveTo(tip.dx - radius * 0.5, tip.dy - radius * 0.1)
-      ..lineTo(tip.dx + radius * 0.1, tip.dy)
-      ..lineTo(tip.dx - radius * 0.15, tip.dy + radius * 0.55);
+      ..strokeWidth = cell * 0.03
+      ..strokeCap = StrokeCap.round
+      ..color = ink;
+    // Three evenly spaced dashes; the first ends where the arrowhead sits, which
+    // at rest is the 1-o'clock corner — the familiar ↻ reading.
+    const dash = 1.35; // radians
+    const step = 2 * math.pi / 3;
+    final start = angle - dash - math.pi / 4;
+    for (var i = 0; i < 3; i++) {
+      canvas.drawArc(rect, start + i * step, dash, false, stroke);
+    }
+    // A small filled head at the leading end of the first dash, pointing the way
+    // the arrow turns (on a screen y-down canvas, increasing angle IS clockwise).
+    final a = start + dash;
+    final out = Offset(math.cos(a), math.sin(a)); // radially outward
+    final along = Offset(-out.dy, out.dx); // tangent, clockwise
+    final base = center + out * radius;
+    final half = cell * 0.062;
     canvas.drawPath(
-        head,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = cell * 0.035
-          ..strokeJoin = StrokeJoin.round
-          ..color = color);
+      Path()
+        ..moveTo(base.dx + along.dx * cell * 0.115,
+            base.dy + along.dy * cell * 0.115)
+        ..lineTo(base.dx + out.dx * half, base.dy + out.dy * half)
+        ..lineTo(base.dx - out.dx * half, base.dy - out.dy * half)
+        ..close(),
+      Paint()..color = ink,
+    );
   }
 
   void _paintGlow(
@@ -1085,6 +1129,8 @@ class GameGridPainter extends CustomPainter {
       old.revision != revision ||
       old.level != level ||
       old.winProgress != winProgress ||
+      old.spinCell != spinCell ||
+      old.spinProgress != spinProgress ||
       old.previewKey != previewKey ||
       old.previewTool != previewTool;
 }
