@@ -867,10 +867,13 @@ class GameGridPainter extends CustomPainter {
   /// arrowhead framing them both. One element, concentric: the ring is the thing
   /// the arrow is mounted in, not a decoration parked beside it.
   ///
+  /// The heading is drawn by [_drawDialArrow] as geometry, NOT as the shared text
+  /// glyph the other arrows use — see there for why a glyph cannot pivot cleanly.
+  ///
   /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). The whole
   /// dial turns together about its centre, the ring brightens through the turn
-  /// and the cell swells a little; at 1 the arrow sits exactly on the next
-  /// heading's glyph, so committing that heading and dropping back to 0 is
+  /// and the cell swells a little; at 1 the arrow sits exactly where the next
+  /// heading draws it, so committing that heading and dropping back to 0 is
   /// invisible.
   void _paintRotating(
       Canvas canvas, GridGeometry geo, int key, Direction dir, double spin) {
@@ -878,7 +881,7 @@ class GameGridPainter extends CustomPainter {
     final c = key % geo.n;
     final center = geo.center(r, c);
     final rrect = _cellRRect(geo, center);
-    final (fill, color, glyph) = _toolStyle(dir.arrowTool, dir);
+    final (fill, color, _) = _toolStyle(dir.arrowTool, dir);
     final t = spin.clamp(0.0, 1.0);
     // Peaks in the middle of the turn: drives the swell and the ring's
     // brightness, so the spin reads without changing colour.
@@ -909,7 +912,7 @@ class GameGridPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, geo.cell * _kRingRadius,
         Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.62));
     _drawRotateRing(canvas, Offset.zero, geo.cell, color, emphasis);
-    _drawGlyph(canvas, Offset.zero, glyph, color, geo.cell * 0.34);
+    _drawDialArrow(canvas, Offset.zero, geo.cell, color, dir);
     canvas.restore();
 
     canvas.restore();
@@ -919,6 +922,48 @@ class GameGridPainter extends CustomPainter {
   /// arrow inside it keeps clear air on every side and the ring itself stays well
   /// in from the cell border — otherwise it reads as a second border.
   static const double _kRingRadius = 0.28;
+
+  /// The dial's heading arrow, drawn as GEOMETRY — a shaft and a filled head,
+  /// reaching exactly the same distance either side of [center] so the shape is
+  /// balanced on the pivot.
+  ///
+  /// The other arrows on the board are text glyphs (↑→↓←) and stay that way. A
+  /// glyph is positioned by its line box, not by its ink, and the two centres do
+  /// not coincide: rotating one walks the arrow around a small arc instead of
+  /// spinning it in place, which reads as the arrow jumping mid-turn. Only this
+  /// piece rotates, so only this piece needs to be geometry.
+  void _drawDialArrow(
+      Canvas canvas, Offset center, double cell, Color color, Direction dir) {
+    final (dr, dc) = dir.delta;
+    final v = Offset(dc.toDouble(), dr.toDouble()); // heading, in screen axes
+    final perp = Offset(-v.dy, v.dx);
+    final half = cell * 0.155; // tip and tail both land exactly this far out
+    final headLen = cell * 0.14;
+    final headHalf = cell * 0.105;
+    final width = cell * 0.072;
+
+    final tip = center + v * half;
+    final base = tip - v * headLen;
+    // A round cap paints half a stroke width past the line's end, so the tail is
+    // pulled in by that much and the drawn shape stays exactly ±half about the
+    // centre.
+    canvas.drawLine(
+      center - v * (half - width / 2),
+      base + v * (headLen * 0.4), // overlap the head so there is no seam
+      Paint()
+        ..color = color
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(base.dx + perp.dx * headHalf, base.dy + perp.dy * headHalf)
+        ..lineTo(base.dx - perp.dx * headHalf, base.dy - perp.dy * headHalf)
+        ..close(),
+      Paint()..color = color,
+    );
+  }
 
   /// The dial's rim: a dashed ring with a clockwise arrowhead riding it, drawn
   /// around [center] in the caller's (already rotated) frame. [emphasis] (0→1)
