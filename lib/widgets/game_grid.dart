@@ -861,15 +861,17 @@ class GameGridPainter extends CustomPainter {
   }
 
   /// A rotating arrow is a fixed arrow first: the same arrow fill, the same ink,
-  /// the same heading glyph at the same size, the same dashed "pinned" cell
-  /// border. It belongs to that family and should read as one of them. The only
-  /// addition is the cue that it turns — a dashed ring around the glyph carrying
-  /// a clockwise arrowhead, one thin stroke so it stays legible on small cells.
+  /// the same dashed "pinned" cell border. It belongs to that family and should
+  /// read as one of them. What makes it its own piece is a DIAL — a pale hub
+  /// disc, the heading arrow centred on it, and a dashed ring with a clockwise
+  /// arrowhead framing them both. One element, concentric: the ring is the thing
+  /// the arrow is mounted in, not a decoration parked beside it.
   ///
-  /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). Glyph and
-  /// ring turn together, the ring brightens through the turn and the cell swells
-  /// a little; at 1 the glyph sits exactly on the next heading's glyph, so
-  /// committing the new heading and dropping back to 0 is invisible.
+  /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). The whole
+  /// dial turns together about its centre, the ring brightens through the turn
+  /// and the cell swells a little; at 1 the arrow sits exactly on the next
+  /// heading's glyph, so committing that heading and dropping back to 0 is
+  /// invisible.
   void _paintRotating(
       Canvas canvas, GridGeometry geo, int key, Direction dir, double spin) {
     final r = key ~/ geo.n;
@@ -897,42 +899,52 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5 // matches a fixed arrow
         ..color = color,
     );
-    _drawRotateRing(canvas, center, geo.cell, color, turn, emphasis);
 
+    // The dial, drawn as one unit about the cell centre so the arrow can never
+    // drift off the ring's axis.
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(turn);
-    canvas.translate(-center.dx, -center.dy);
-    _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    // Hub: a pale disc the arrow sits on, tying it to the ring around it.
+    canvas.drawCircle(Offset.zero, geo.cell * _kRingRadius,
+        Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.62));
+    _drawRotateRing(canvas, Offset.zero, geo.cell, color, emphasis);
+    _drawGlyph(canvas, Offset.zero, glyph, color, geo.cell * 0.34);
     canvas.restore();
 
     canvas.restore();
   }
 
-  /// The "this arrow rotates" cue: a dashed ring around the glyph with a
-  /// clockwise arrowhead riding it. [angle] turns the whole ring with the arrow,
-  /// [emphasis] (0→1) brightens it mid-turn.
+  /// Radius of the rotation dial's ring, as a fraction of the cell. Sized so the
+  /// arrow inside it keeps clear air on every side and the ring itself stays well
+  /// in from the cell border — otherwise it reads as a second border.
+  static const double _kRingRadius = 0.28;
+
+  /// The dial's rim: a dashed ring with a clockwise arrowhead riding it, drawn
+  /// around [center] in the caller's (already rotated) frame. [emphasis] (0→1)
+  /// brightens it through the turn.
   void _drawRotateRing(Canvas canvas, Offset center, double cell, Color color,
-      double angle, double emphasis) {
-    final radius = cell * 0.31;
-    final ink = color.withValues(alpha: 0.34 + 0.56 * emphasis);
+      double emphasis) {
+    final radius = cell * _kRingRadius;
+    final ink = color.withValues(alpha: 0.38 + 0.52 * emphasis);
     final rect = Rect.fromCircle(center: center, radius: radius);
     final stroke = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = cell * 0.03
       ..strokeCap = StrokeCap.round
       ..color = ink;
-    // Three evenly spaced dashes; the first ends where the arrowhead sits, which
-    // at rest is the 1-o'clock corner — the familiar ↻ reading.
-    const dash = 1.35; // radians
+    // Three long dashes with short breaks, so the rim reads as a circle rather
+    // than as three marks. The first ends where the arrowhead sits: the
+    // 1-o'clock corner, the familiar ↻ reading.
+    const dash = 1.62; // radians
     const step = 2 * math.pi / 3;
-    final start = angle - dash - math.pi / 4;
+    const start = -dash - math.pi / 4;
     for (var i = 0; i < 3; i++) {
       canvas.drawArc(rect, start + i * step, dash, false, stroke);
     }
     // A small filled head at the leading end of the first dash, pointing the way
     // the arrow turns (on a screen y-down canvas, increasing angle IS clockwise).
-    final a = start + dash;
+    const a = start + dash;
     final out = Offset(math.cos(a), math.sin(a)); // radially outward
     final along = Offset(-out.dy, out.dx); // tangent, clockwise
     final base = center + out * radius;

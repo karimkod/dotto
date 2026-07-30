@@ -388,6 +388,7 @@ class _GameScreenState extends State<GameScreen>
     _teleportCtrl.stop();
     _teleporting = false;
     _spinCtrl.stop();
+    _spinCtrl.value = 0;
     _spinCell = null;
     final s = _level!.start;
     _status = GameStatus.planning;
@@ -1063,6 +1064,13 @@ class _GameScreenState extends State<GameScreen>
     _timer = null;
     // Claimed before the first await: _afterGlide resumes beats as soon as the
     // blast it ran returns, and must not do so on top of this.
+    //
+    // The controller is wound back HERE, not at forward(from: 0) below, because
+    // the cell counts as spinning from this moment while the glide settles. Left
+    // at the 1.0 it ended the previous turn on, the painter would draw this
+    // arrow fully turned for the whole glide — the arrow appearing to rotate
+    // before the dot ever reached it, on every pass after the first.
+    _spinCtrl.value = 0;
     setState(() => _spinCell = cell);
     await _settleGlides(); // let the dot land on the arrow before it turns
     if (!mounted || _status != GameStatus.running) {

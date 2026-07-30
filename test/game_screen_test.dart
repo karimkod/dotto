@@ -308,6 +308,56 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
+  // A rotating arrow must not begin turning until the dot has actually glided
+  // onto it. The regression this guards: the spin controller was left at 1.0 by
+  // the previous turn and only wound back when the animation started, so for the
+  // whole settle window the painter drew the arrow ALREADY fully turned. It
+  // looked right on the first pass and pre-turned on every pass after.
+  testWidgets('a rotating arrow only turns once the dot has arrived',
+      (tester) async {
+    const rotor = Level(
+      id: 71,
+      number: 71,
+      title: 'Rotor',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: rotor)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    await _dragArrow(tester, tester.getCenter(find.text('DOWN')),
+        boardRect.topLeft + geo.center(0, 2));
+
+    GameGridPainter grid() => tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('gameBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+
+    // Sample every frame and check each turn STARTS from rest: on the frame the
+    // arrow is first claimed, none of the quarter-turn may have been drawn yet.
+    int? claimed;
+    var spins = 0;
+    for (var i = 0; i < 250 && spins < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final g = grid();
+      if (g.spinCell != null && g.spinCell != claimed) {
+        spins++;
+        expect(g.spinProgress, lessThan(0.05),
+            reason: 'the arrow was already part-turned as the spin began');
+      }
+      claimed = g.spinCell;
+    }
+    expect(spins, 2, reason: 'level 71 sends the dot through its rotor twice');
+  });
+
   testWidgets('level 50 is no longer last, so it offers Continue',
       (tester) async {
     const level50 = Level(
