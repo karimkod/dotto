@@ -308,12 +308,12 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
-  // A rotating arrow must not begin turning until the dot has actually glided
-  // onto it. The regression this guards: the spin controller was left at 1.0 by
-  // the previous turn and only wound back when the animation started, so for the
-  // whole settle window the painter drew the arrow ALREADY fully turned. It
-  // looked right on the first pass and pre-turned on every pass after.
-  testWidgets('a rotating arrow only turns once the dot has arrived',
+  // A rotating arrow turns BEHIND the dot: it redirects the dot, the dot leaves
+  // on the same beat, and only then does the arrow swing to its next heading.
+  // So whenever a turn is on screen, the dot must already be off that cell —
+  // which also pins down that the beat is never held for the turn, since a held
+  // beat would leave the dot standing on the arrow while it swung.
+  testWidgets('a rotating arrow turns only after the dot has left it',
       (tester) async {
     const rotor = Level(
       id: 71,
@@ -341,19 +341,19 @@ void main() {
     await tester.tap(find.text('Play'));
     await tester.pump();
 
-    // Sample every frame and check each turn STARTS from rest: on the frame the
-    // arrow is first claimed, none of the quarter-turn may have been drawn yet.
-    int? claimed;
+    // Sample every frame. The trail's last cell IS the dot's cell, so "a turn is
+    // playing somewhere the dot no longer is" is directly checkable.
+    int? turning;
     var spins = 0;
     for (var i = 0; i < 250 && spins < 2; i++) {
       await tester.pump(const Duration(milliseconds: 16));
       final g = grid();
-      if (g.spinCell != null && g.spinCell != claimed) {
-        spins++;
-        expect(g.spinProgress, lessThan(0.05),
-            reason: 'the arrow was already part-turned as the spin began');
+      if (g.spinCell != null) {
+        expect(g.trail.last, isNot(g.spinCell),
+            reason: 'the arrow must not turn while the dot is still on it');
+        if (g.spinCell != turning) spins++;
       }
-      claimed = g.spinCell;
+      turning = g.spinCell;
     }
     expect(spins, 2, reason: 'level 71 sends the dot through its rotor twice');
   });

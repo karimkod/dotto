@@ -94,11 +94,14 @@ class _GameScreenState extends State<GameScreen>
   late final AnimationController _moverCtrl; // patrol glide (every beat)
   late final AnimationController _spinCtrl; // a rotating arrow's quarter-turn
 
-  /// The rotating arrow currently mid-turn, if any. Claimed synchronously when
-  /// the dot passes through, so [_afterGlide] can see that the spin has taken
-  /// the beat timer over; cleared when the turn lands. [_rotations] keeps the
-  /// pre-turn heading until then — the painter turns the glyph off it.
+  /// The rotating arrow currently mid-turn, if any. [_rotations] keeps the
+  /// pre-turn heading until the turn lands — the painter swings the glyph off it.
   int? _spinCell;
+
+  /// A rotating arrow that has redirected the dot and now owes its quarter-turn:
+  /// (cell, the heading it sent the dot). The turn plays once the dot LEAVES the
+  /// cell, so the arrow swings shut behind it rather than under it.
+  (int, Direction)? _pendingSpin;
 
   /// Teleport animation state. [_teleporting] gates the whole overlay; while it
   /// runs, [_teleportGrowing] is false during the shrink-out at the entrance and
@@ -390,6 +393,7 @@ class _GameScreenState extends State<GameScreen>
     _spinCtrl.stop();
     _spinCtrl.value = 0;
     _spinCell = null;
+    _pendingSpin = null;
     final s = _level!.start;
     _status = GameStatus.planning;
     _dot = DotState(r: s.r, c: s.c, dir: s.dir);
@@ -871,9 +875,8 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted || _status != GameStatus.running) return;
     blast();
     // The blast can end the run (a teleport landing on the exit wins), so only
-    // resume beats if it did not — and not while a rotor spin owns the timer
-    // (the blast resolved onto a rotating arrow), or two timers would step.
-    if (!mounted || _status != GameStatus.running || _spinCell != null) return;
+    // resume beats if it did not.
+    if (!mounted || _status != GameStatus.running) return;
     _timer =
         Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
@@ -935,6 +938,15 @@ class _GameScreenState extends State<GameScreen>
     _glide(fromR, fromC, nr, nc);
     Sfx.tick();
 
+    // The dot has just started moving off its previous cell. If that cell was a
+    // rotating arrow, its quarter-turn plays NOW — behind the departing dot, and
+    // without holding the beat, so the run never waits on it.
+    final owed = _pendingSpin;
+    if (owed != null && owed.$1 == _idx(fromR, fromC)) {
+      _pendingSpin = null;
+      _spinRotorBehindDot(owed.$1, owed.$2);
+    }
+
     // Both have moved — a patrol catches the dot by sharing its FINAL cell or by
     // trading places with it. A shield blows the patrol away and the dot
     // survives; otherwise it's caught.
@@ -995,10 +1007,10 @@ class _GameScreenState extends State<GameScreen>
       Sfx.arrow();
     }
 
-    // A rotating arrow redirects the dot to its current heading, then turns a
-    // quarter-turn clockwise on screen. The turn — and the new heading it
-    // commits — is driven by [_runRotorSpin], which holds the beat timer for its
-    // duration and finishes the cell itself, so nothing steps mid-spin.
+    // A rotating arrow redirects the dot to its current heading and then owes a
+    // quarter-turn clockwise. The dot leaves immediately — the turn plays behind
+    // it, fired by [_beat] as the departing glide starts, so the beat is never
+    // held and the run reads as "redirected, gone, and the arrow swings shut."
     final rot = _rotations[newKey];
     if (rot != null) {
       setState(() {
@@ -1006,8 +1018,7 @@ class _GameScreenState extends State<GameScreen>
         _glow(newKey, const Color(0xFF1E88E5), 1.0); // arrow flash
       });
       Sfx.arrow();
-      _runRotorSpin(newKey, rot);
-      return;
+      _pendingSpin = (newKey, rot);
     }
 
     final piece = _pieceAt(newKey);
@@ -1052,52 +1063,33 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// Play a rotating arrow's quarter-turn: settle the glide ONTO the arrow, turn
-  /// it 90° clockwise, commit the new heading, then resume beats. Like a
-  /// teleport, the beat timer is held for the whole animation, so the dot waits
-  /// on the arrow and the turn is never half-drawn when the next step lands.
+  /// Swing a rotating arrow through its quarter-turn while the dot travels on.
+  /// Purely visual bookkeeping: it does NOT touch the beat timer, so the run
+  /// keeps stepping and the arrow turns behind the dot. [from] is the heading it
+  /// sent the dot; the new heading is committed as the turn lands.
   ///
-  /// [from] is the heading the arrow just sent the dot; it points [from]
-  /// .rotatedCW once this returns.
-  Future<void> _runRotorSpin(int cell, Direction from) async {
-    _timer?.cancel();
-    _timer = null;
-    // Claimed before the first await: _afterGlide resumes beats as soon as the
-    // blast it ran returns, and must not do so on top of this.
-    //
-    // The controller is wound back HERE, not at forward(from: 0) below, because
-    // the cell counts as spinning from this moment while the glide settles. Left
-    // at the 1.0 it ended the previous turn on, the painter would draw this
-    // arrow fully turned for the whole glide — the arrow appearing to rotate
-    // before the dot ever reached it, on every pass after the first.
-    _spinCtrl.value = 0;
-    setState(() => _spinCell = cell);
-    await _settleGlides(); // let the dot land on the arrow before it turns
-    if (!mounted || _status != GameStatus.running) {
-      _spinCell = null;
-      return;
+  /// Called from [_beat] the moment the dot starts gliding off the arrow, so the
+  /// turn can never be drawn while the dot is still standing on it.
+  Future<void> _spinRotorBehindDot(int cell, Direction from) async {
+    // One controller serves every rotor, so a turn still in flight elsewhere is
+    // landed first rather than dropped half-done. At a 400ms beat and a 260ms
+    // turn this cannot currently happen — it keeps a faster beat honest.
+    final busy = _spinCell;
+    if (busy != null && busy != cell) {
+      _rotations[busy] = _rotations[busy]!.rotatedCW;
     }
-
+    setState(() => _spinCell = cell);
     try {
       await _spinCtrl.forward(from: 0).orCancel;
     } catch (_) {
-      return; // disposed / reset mid-spin (_resetDot already cleared the state)
+      return; // disposed, or Retry reset the board mid-turn
     }
     if (!mounted) return;
     // The glyph has arrived on the next heading — make it official.
     setState(() {
       _rotations[cell] = from.rotatedCW;
-      _spinCell = null;
+      if (_spinCell == cell) _spinCell = null;
     });
-    if (_status != GameStatus.running) return;
-
-    // The arrow could sit on the exit cell; resolve that before beating on.
-    if (_level!.baseTypeAt(_dot.r, _dot.c) == CellType.exit) {
-      _win();
-      return;
-    }
-    _timer =
-        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
   }
 
   /// The pair colour of the portal at [cell], for the ring pulses. Falls back to
