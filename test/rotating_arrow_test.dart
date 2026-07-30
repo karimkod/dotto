@@ -187,81 +187,148 @@ void main() {
       }
     });
 
-    // The dial's arrow is geometry, not a text glyph, so that it pivots in place.
-    // A glyph is placed by its line box rather than its ink, and the offset
-    // between the two flips sign between up and down — so rotating one drags the
-    // arrow around a small arc and the turn looks like a jump.
+    // Every arrow on the board is geometry, not a text glyph. A glyph is placed
+    // by its line box rather than its ink, and the two centres do not coincide —
+    // which the rotating arrow exposed, since rotating one drags it around a
+    // small arc instead of spinning it in place.
     //
-    // Balanced means the arrow's drawn EXTENT is centred on the cell centre —
-    // the point the canvas rotates about. An extent that sits off the pivot
-    // swings around it through the turn, which is the jump this replaces. (Its
-    // centre of MASS is not the pivot and shouldn't be: a head outweighs a
-    // shaft, and spinning about mass would throw the tip wide.)
+    // Balanced means the arrow's drawn EXTENT is centred on the cell centre, the
+    // point the canvas rotates about. (Its centre of MASS is not, and shouldn't
+    // be: a head outweighs a shaft, and spinning about mass would throw the tip
+    // wide.)
     //
     // Rendered big on purpose. Measuring a pointed shape on a pixel grid costs
-    // about a pixel at the tip, where coverage tails off; at a 400px cell that
-    // is a quarter of a percent, well under any imbalance worth seeing.
-    test('the arrow is balanced on the pivot for every heading', () async {
-      const side = 2000.0;
-      final geo = GridGeometry(side, 5);
-      final centre = geo.center(2, 2);
-      // Inside the ring's inner edge: the arrow reaches 0.155 of a cell from the
-      // centre, the ring's ink starts at 0.218. Nothing else lives in here.
-      final span = geo.cell * 0.20;
+    // about a pixel at the tip, where coverage tails off; against a 400px cell
+    // that is a quarter of a percent, well under any imbalance worth seeing.
+    const side = 2000.0;
+    final geo = GridGeometry(side, 5);
+    // Windows stop inside the rotating arrow's ring — the arrow itself reaches
+    // 0.155 of a cell from the centre, the ring's ink starts at 0.218 — and well
+    // inside every cell's border. Only the arrow lives in there.
+    final span = geo.cell * 0.20;
 
-      Future<Offset> inkBoxCentre(Direction dir) async {
-        final recorder = PictureRecorder();
-        GameGridPainter(
-          level: learn,
-          placed: const {},
-          forced: const {},
-          rotations: {rotor: dir},
-          trail: const [],
-          revision: 0,
-          placeAnim: const {},
-          removing: const [],
-          cellGlow: const {},
-          cellGlowColor: const {},
-          cellPulse: const {},
-          explosions: const [],
-          destroyedCells: const {},
-          glowTick: 0,
-          showStartHint: false,
-          winProgress: 0,
-        ).paint(Canvas(recorder), const Size(side, side));
-        final img = await recorder
-            .endRecording()
-            .toImage(side.toInt(), side.toInt());
-        final data = (await img.toByteData())!;
-        var minX = side, maxX = 0.0, minY = side, maxY = 0.0, found = 0;
-        for (var y = (centre.dy - span).round(); y < centre.dy + span; y++) {
-          for (var x = (centre.dx - span).round(); x < centre.dx + span; x++) {
-            // Only FULL-opacity ink — the arrow. The pale fill and the white hub
-            // are far lighter, and so is the ring even where two of its
-            // half-alpha layers overlap (r≈106 against the arrow's 30).
-            if (data.getUint8((y * side.toInt() + x) * 4) >= 60) continue;
-            found++;
-            if (x < minX) minX = x.toDouble();
-            if (x > maxX) maxX = x.toDouble();
-            if (y < minY) minY = y.toDouble();
-            if (y > maxY) maxY = y.toDouble();
-          }
+    /// The bounding box of the ARROW ink in the cell at [r],[c].
+    Future<Rect> arrowBox(GameGridPainter p, int r, int c) async {
+      final centre = geo.center(r, c);
+      final recorder = PictureRecorder();
+      p.paint(Canvas(recorder), const Size(side, side));
+      final img =
+          await recorder.endRecording().toImage(side.toInt(), side.toInt());
+      final data = (await img.toByteData())!;
+      var minX = side, maxX = 0.0, minY = side, maxY = 0.0, found = 0;
+      for (var y = (centre.dy - span).round(); y < centre.dy + span; y++) {
+        for (var x = (centre.dx - span).round(); x < centre.dx + span; x++) {
+          // Only FULL-opacity ink — the arrow. Cell fills and the rotating
+          // arrow's white hub are far lighter, and so is its ring even where two
+          // half-alpha layers overlap at the arrowhead (r≈106 against the
+          // arrow's 30).
+          if (data.getUint8((y * side.toInt() + x) * 4) >= 60) continue;
+          found++;
+          if (x < minX) minX = x.toDouble();
+          if (x > maxX) maxX = x.toDouble();
+          if (y < minY) minY = y.toDouble();
+          if (y > maxY) maxY = y.toDouble();
         }
-        expect(found, greaterThan(1000), reason: 'found no arrow ink to measure');
-        // +1 because max is the last COVERED pixel, whose far edge is at max + 1.
-        return Offset((minX + maxX + 1) / 2, (minY + maxY + 1) / 2);
       }
+      expect(found, greaterThan(1000), reason: 'found no arrow ink to measure');
+      // +1 on each max: it is the last COVERED pixel, whose far edge is at +1.
+      return Rect.fromLTRB(minX, minY, maxX + 1, maxY + 1);
+    }
 
-      // 0.75% of a cell: far tighter than any imbalance that reads on screen,
-      // far looser than the ~1px the tip costs to measure.
-      final tolerance = geo.cell * 0.0075;
+    // 0.75% of a cell: far tighter than any imbalance that reads on screen, far
+    // looser than the ~1px the tip costs to measure.
+    final tolerance = geo.cell * 0.0075;
+
+    test('the arrow is balanced on the pivot for every heading', () async {
       for (final dir in Direction.values) {
-        final off = (await inkBoxCentre(dir)) - centre;
+        final box = await arrowBox(
+            GameGridPainter(
+              level: learn,
+              placed: const {},
+              forced: const {},
+              rotations: {rotor: dir},
+              trail: const [],
+              revision: 0,
+              placeAnim: const {},
+              removing: const [],
+              cellGlow: const {},
+              cellGlowColor: const {},
+              cellPulse: const {},
+              explosions: const [],
+              destroyedCells: const {},
+              glowTick: 0,
+              showStartHint: false,
+              winProgress: 0,
+            ),
+            2,
+            2);
+        final off = box.center - geo.center(2, 2);
         expect(off.distance, lessThan(tolerance),
             reason: 'pointing ${dir.name} puts the arrow '
                 '${off.distance.toStringAsFixed(1)}px off the pivot (tolerance '
                 '${tolerance.toStringAsFixed(1)}px) — it would swing around an '
                 'arc as it turns instead of spinning in place');
+      }
+    });
+
+    // Placed, fixed and rotating arrows are three borders around ONE arrow. They
+    // were three sizes of two different shapes: a 0.42-em text glyph on the
+    // placed and fixed cells, geometry on the rotating one.
+    test('placed, fixed and rotating arrows draw the same arrow', () async {
+      const trio = LevelData(
+        id: 9062,
+        size: 5,
+        title: 'three arrows',
+        tip: '',
+        start: StartSpec(0, 4, Direction.left),
+        exit: Pos(4, 0),
+        forcedArrows: [ForcedArrow(0, 0, Direction.up)],
+        rotatingArrows: [RotatingArrow(2, 2, Direction.up)],
+        toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
+      );
+      const up = PlacedElement(
+          type: PlacedType.arrow,
+          tool: ToolType.arrowUp,
+          direction: Direction.up);
+      final painter = GameGridPainter(
+        level: trio,
+        placed: const {4 * 5 + 4: up},
+        forced: buildForcedPieces(trio),
+        rotations: buildRotations(trio),
+        trail: const [],
+        revision: 0,
+        placeAnim: const {},
+        removing: const [],
+        cellGlow: const {},
+        cellGlowColor: const {},
+        cellPulse: const {},
+        explosions: const [],
+        destroyedCells: const {},
+        glowTick: 0,
+        showStartHint: false,
+        winProgress: 0,
+      );
+
+      final placed = await arrowBox(painter, 4, 4);
+      final fixed = await arrowBox(painter, 0, 0);
+      final rotating = await arrowBox(painter, 2, 2);
+      for (final (name, box, cell) in [
+        ('placed', placed, (4, 4)),
+        ('fixed', fixed, (0, 0)),
+        ('rotating', rotating, (2, 2)),
+      ]) {
+        final off = box.center - geo.center(cell.$1, cell.$2);
+        expect(off.distance, lessThan(tolerance),
+            reason: 'the $name arrow sits ${off.distance.toStringAsFixed(1)}px '
+                'off its cell centre');
+        // A pixel of slack: the cells sit at different subpixel offsets, so
+        // antialiasing rounds their edges differently.
+        expect((box.width - placed.width).abs(), lessThan(2),
+            reason: 'the $name arrow is ${box.width.toStringAsFixed(1)}px wide, '
+                'the placed one ${placed.width.toStringAsFixed(1)}px');
+        expect((box.height - placed.height).abs(), lessThan(2),
+            reason: 'the $name arrow is ${box.height.toStringAsFixed(1)}px tall, '
+                'the placed one ${placed.height.toStringAsFixed(1)}px');
       }
     });
   });

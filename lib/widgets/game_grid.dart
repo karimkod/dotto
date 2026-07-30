@@ -784,13 +784,17 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = borderWidth
         ..color = color,
     );
-    if (tool.placedType == PlacedType.shield) {
-      paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
-    } else if (tool.placedType == PlacedType.teleporter) {
-      _drawPortal(canvas, center, geo.cell * 0.24, color,
-          entrance: portalEntrance ?? true);
-    } else {
-      _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    switch (tool.placedType) {
+      case PlacedType.shield:
+        paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+      case PlacedType.teleporter:
+        _drawPortal(canvas, center, geo.cell * 0.24, color,
+            entrance: portalEntrance ?? true);
+      case PlacedType.arrow:
+        _drawArrowPath(
+            canvas, center, geo.cell, color, dir ?? tool.direction!);
+      case PlacedType.pause:
+        _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     }
     canvas.restore();
   }
@@ -846,17 +850,22 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5 // matches a settled placed piece
         ..color = color,
     );
-    if (piece.type == PlacedType.shield) {
-      paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
-    } else if (piece.type == PlacedType.teleporter) {
-      // A level-defined pair lists its ends in order, so the first is the way in.
-      final pair = level.teleporterPairAt(r, c);
-      final entrance =
-          pair < 0 || (level.teleporters[pair].a.r == r &&
-              level.teleporters[pair].a.c == c);
-      _drawPortal(canvas, center, geo.cell * 0.24, color, entrance: entrance);
-    } else {
-      _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+    switch (piece.type) {
+      case PlacedType.shield:
+        paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
+      case PlacedType.teleporter:
+        // A level-defined pair lists its ends in order, so the first is the way
+        // in.
+        final pair = level.teleporterPairAt(r, c);
+        final entrance = pair < 0 ||
+            (level.teleporters[pair].a.r == r &&
+                level.teleporters[pair].a.c == c);
+        _drawPortal(canvas, center, geo.cell * 0.24, color, entrance: entrance);
+      case PlacedType.arrow:
+        _drawArrowPath(canvas, center, geo.cell, color,
+            piece.direction ?? piece.tool.direction!);
+      case PlacedType.pause:
+        _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
     }
   }
 
@@ -867,8 +876,8 @@ class GameGridPainter extends CustomPainter {
   /// arrowhead framing them both. One element, concentric: the ring is the thing
   /// the arrow is mounted in, not a decoration parked beside it.
   ///
-  /// The heading is drawn by [_drawDialArrow] as geometry, NOT as the shared text
-  /// glyph the other arrows use — see there for why a glyph cannot pivot cleanly.
+  /// The heading itself is the same [_drawArrowPath] every other arrow uses, at
+  /// the same size — only the frame around it says "this one turns".
   ///
   /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). The whole
   /// dial turns together about its centre, the ring brightens through the turn
@@ -912,7 +921,7 @@ class GameGridPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, geo.cell * _kRingRadius,
         Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.62));
     _drawRotateRing(canvas, Offset.zero, geo.cell, color, emphasis);
-    _drawDialArrow(canvas, Offset.zero, geo.cell, color, dir);
+    _drawArrowPath(canvas, Offset.zero, geo.cell, color, dir);
     canvas.restore();
 
     canvas.restore();
@@ -923,16 +932,18 @@ class GameGridPainter extends CustomPainter {
   /// in from the cell border — otherwise it reads as a second border.
   static const double _kRingRadius = 0.28;
 
-  /// The dial's heading arrow, drawn as GEOMETRY — a shaft and a filled head,
-  /// reaching exactly the same distance either side of [center] so the shape is
-  /// balanced on the pivot.
+  /// EVERY arrow on the board: a shaft and a filled head, drawn as geometry and
+  /// reaching exactly the same distance either side of [center], so the shape is
+  /// balanced on the cell centre.
   ///
-  /// The other arrows on the board are text glyphs (↑→↓←) and stay that way. A
-  /// glyph is positioned by its line box, not by its ink, and the two centres do
-  /// not coincide: rotating one walks the arrow around a small arc instead of
-  /// spinning it in place, which reads as the arrow jumping mid-turn. Only this
-  /// piece rotates, so only this piece needs to be geometry.
-  void _drawDialArrow(
+  /// This replaced the text glyphs (↑→↓←) the arrows used to be. A glyph is
+  /// positioned by its line box, not by its ink, and the two centres do not
+  /// coincide — which the rotating arrow exposed, since rotating one walks it
+  /// around a small arc instead of spinning it in place. The fix is worth having
+  /// everywhere: one arrow shape, sized and centred the same whether the cell is
+  /// placed, fixed or rotating, so the three read as the same piece wearing
+  /// different borders.
+  void _drawArrowPath(
       Canvas canvas, Offset center, double cell, Color color, Direction dir) {
     final (dr, dc) = dir.delta;
     final v = Offset(dc.toDouble(), dr.toDouble()); // heading, in screen axes
@@ -1119,9 +1130,14 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5
         ..color = color.withValues(alpha: 0.85),
     );
+    // The ghost has to be the piece it is about to become, or the arrow changes
+    // shape the moment it lands.
     if (tool.placedType == PlacedType.shield) {
       paintShieldIcon(canvas, center, geo.cell * 0.28,
           color: color, opacity: 0.85);
+    } else if (tool.placedType == PlacedType.arrow) {
+      _drawArrowPath(canvas, center, geo.cell,
+          color.withValues(alpha: 0.85), tool.direction!);
     } else {
       _drawGlyph(canvas, center, glyph,
           color.withValues(alpha: 0.85), geo.cell * 0.42);
