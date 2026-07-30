@@ -1799,19 +1799,24 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 75 — Overwind: 72's loop with live ammunition — mines one cell beyond
-  // both bounce spots keep the return arrows honest. Solver-verified UNIQUE.
+  // 75 — Long Way Round: the short bounce reaches the exit ray unarmed — the
+  // mine there only falls to the wide western circuit over the pinned shield,
+  // home through the start's relaunch, and up into the dial's second pass.
+  // The up arrow works double duty on both climbs. Solver-verified UNIQUE.
   75: LevelData(
     id: 75,
     size: 6,
-    title: 'Overwind',
-    tip: 'Same trick, live ammunition — overshoot either bounce and the mines '
-        'collect.',
-    start: StartSpec(3, 0, Direction.right),
-    exit: Pos(5, 3),
-    destroyers: [Pos(1, 3), Pos(3, 5)],
+    title: 'Long Way Round',
+    tip: 'The quick bounce arrives unarmed. Take the long way — over the '
+        'shield, home past your launch pad, and up through the dial again.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(3, 5),
+    walls: [Pos(4, 5)],
+    destroyers: [Pos(3, 4)],
+    forcedShields: [Pos(2, 1)],
     rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
     ],
@@ -1952,18 +1957,20 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 82 — Odometer: the dial's up-ray is the clock face; where you park the
-  // portal pair on it decides when you land in the patrol's row.
+  // 82 — Odometer: the dial sits at the floor of the west tower and its
+  // up-ray is the clock face — park the portal pair deeper along it to leave
+  // later, and land the far column's climb on the pinned-pause gate between
+  // the patrol's sweeps.
   82: LevelData(
     id: 82,
     size: 7,
     title: 'Odometer',
     tip: 'The pair is the clock: park it deeper along the ray to arrive '
-        'later. Two portals, no second chances.',
-    start: StartSpec(6, 3, Direction.up),
-    exit: Pos(0, 2),
-    walls: [Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6)],
-    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+        'later. Two portals, one gate, no second chances.',
+    start: StartSpec(6, 6, Direction.left),
+    exit: Pos(0, 0),
+    forcedPauses: [Pos(1, 0)],
+    rotatingArrows: [RotatingArrow(6, 2, Direction.up)],
     movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
     toolkit: [ToolkitEntry(ToolType.teleporter, 2)],
   ),
@@ -2010,29 +2017,33 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 85 — Moulinet: one bounce dial, two patrol rows on the climb, one pause —
-  // three clocks that all have to agree.
+  // 85 — Moulinet: a two-storey climb with offset slits, the dial hanging
+  // mid-air between the floors. Ground patrol, bounce-row patrol, and the
+  // wait — three clocks that all have to agree. Too heavy for the suite's
+  // exhaustive solver — verified TIGHT by tool/verify_pairs.dart.
   85: LevelData(
     id: 85,
-    size: 7,
+    size: 8,
     title: 'Moulinet',
-    tip: 'One bounce, two patrol rows, one pause — three clocks, and they all '
-        'have to agree.',
-    start: StartSpec(6, 0, Direction.right),
+    tip: 'Two storeys, two patrols, one dial hanging between them. Wind it '
+        'once, and make every clock agree.',
+    start: StartSpec(7, 0, Direction.right),
     exit: Pos(0, 6),
     walls: [
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6),
-      Pos(1, 3), Pos(2, 6),
+      Pos(5, 0), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6),
+      Pos(5, 7),
+      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5),
+      Pos(2, 7),
     ],
-    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+    rotatingArrows: [RotatingArrow(4, 4, Direction.up)],
     movers: [
-      MovingDestroyer(2, 4, horizontal: true, dir: 1),
-      MovingDestroyer(0, 0, horizontal: true, dir: 1),
+      MovingDestroyer(6, 0, horizontal: true, dir: 1),
+      MovingDestroyer(3, 2, horizontal: true, dir: 1),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.pause, 1),
     ],
   ),
@@ -2105,29 +2116,29 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 89 — Flywheel: the Roundabout's double orbit with a patrol threading the
-  // ring's heart — enter on the right beat, and both laps clear it.
-  // Solver-verified UNIQUE.
+  // 89 — Flywheel: the world's great wheel — four dials at the far corners,
+  // rays three cells long, a patrol threading its heart. One lap clockwise,
+  // one lap back, then the south-east dial's third pass hurls the dot out
+  // east. The waits go INSIDE the wheel's own spokes.
   89: LevelData(
     id: 89,
     size: 7,
     title: 'Flywheel',
-    tip: 'The flywheel spins both ways with a patrol through its heart. Enter '
-        'on the right beat and catch the throw.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(6, 1),
-    forcedPauses: [Pos(5, 1)],
+    tip: 'A wheel as wide as the board, a patrol through its heart. Slow the '
+        'spin from inside the spokes, and step off where it throws you.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(5, 6),
+    walls: [Pos(6, 6)],
     rotatingArrows: [
-      RotatingArrow(2, 2, Direction.right),
-      RotatingArrow(2, 4, Direction.down),
-      RotatingArrow(4, 4, Direction.left),
-      RotatingArrow(4, 2, Direction.up),
+      RotatingArrow(1, 1, Direction.right),
+      RotatingArrow(1, 5, Direction.down),
+      RotatingArrow(5, 5, Direction.left),
+      RotatingArrow(5, 1, Direction.up),
     ],
-    movers: [MovingDestroyer(3, 0, horizontal: true, dir: 1)],
+    movers: [MovingDestroyer(3, 3, horizontal: true, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.pause, 2),
     ],
   ),
 

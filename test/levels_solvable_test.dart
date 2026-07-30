@@ -270,7 +270,11 @@ void main() {
     72: [(1, 2, Direction.down), (2, 4, Direction.left)],
     73: [(0, 3, Direction.down), (5, 3, Direction.up)],
     74: [(5, 2, Direction.right), (5, 4, Direction.up)],
-    75: [(2, 3, Direction.down), (3, 4, Direction.left)],
+    75: [
+      (2, 0, Direction.down),
+      (2, 3, Direction.left),
+      (5, 3, Direction.up),
+    ],
     76: [
       (1, 0, Direction.down),
       (1, 3, Direction.left),
@@ -292,11 +296,12 @@ void main() {
     82: [], // portals only (below)
     83: [(2, 2, Direction.down), (4, 3, Direction.up)],
     84: [(2, 3, Direction.down), (5, 3, Direction.up)],
+    // (85 below was rebuilt as the two-storey moulinet.)
     85: [
-      (0, 5, Direction.right),
-      (2, 3, Direction.down),
-      (4, 5, Direction.up),
-      (6, 3, Direction.up),
+      (7, 1, Direction.up),
+      (4, 1, Direction.right),
+      (3, 4, Direction.down),
+      (4, 6, Direction.up),
     ],
     86: [
       (2, 3, Direction.down),
@@ -306,7 +311,7 @@ void main() {
     ],
     87: [(1, 0, Direction.down)],
     88: [(5, 3, Direction.up)],
-    89: [(4, 1, Direction.down), (5, 2, Direction.up)],
+    89: [(6, 5, Direction.up)],
     90: [
       (0, 5, Direction.right),
       (4, 2, Direction.right),
@@ -351,8 +356,9 @@ void main() {
     // mined top row. Placed in pair order.
     70: [(4, 3), (2, 7), (0, 1), (0, 3)],
     // ----- World 6. -----
-    // 82 — the warp clock: park the pair on the dial's ray.
-    82: [(0, 3), (1, 2)],
+    // 82 — the warp clock: park the pair on the dial's ray, out to the far
+    // column's climb.
+    82: [(2, 2), (5, 0)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
   };
@@ -388,9 +394,10 @@ void main() {
     // ----- World 6. -----
     77: [(4, 1)],
     84: [(4, 3)],
-    85: [(1, 5)],
+    85: [(4, 3)],
     88: [(3, 5)],
-    89: [(2, 3)],
+    // 89: both waits inside the wheel's own spokes.
+    89: [(3, 5), (4, 5)],
     90: [(3, 2)],
     91: [(7, 3)],
   };
@@ -454,10 +461,10 @@ void main() {
   // Levels whose exhaustive enumeration is too slow for the suite (a full open
   // board with a teleporter toolkit, so no reachability pruning). Level 55 takes
   // ~14 minutes to enumerate; level 91's seven-piece kit is likewise beyond the
-  // budget, and is verified TIGHT out of band by tool/verify_pairs.dart. Their
-  // recorded solutions carry them via the intended-solution-wins test; the
-  // solvable/tight sweeps are skipped.
-  const solverTooSlow = {55, 91};
+  // budget, as are 85's and 91's kits — both verified TIGHT out of band by
+  // tool/verify_pairs.dart. Their recorded solutions carry them via the
+  // intended-solution-wins test; the solvable/tight sweeps are skipped.
+  const solverTooSlow = {55, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.
