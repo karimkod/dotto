@@ -80,6 +80,137 @@ void paintShieldIcon(Canvas canvas, Offset center, double radius,
   canvas.drawArc(arcRect, math.pi * 1.05, math.pi * 0.6, false, hl);
 }
 
+/// How much of a cell an arrow spans, tip to tail. The board draws arrows at
+/// this fraction of the cell; widget contexts size them against their own box.
+const double kArrowSpan = 0.31;
+
+/// How tall a pause piece's bars are, as a fraction of a cell.
+const double kPauseHeight = 0.30;
+
+/// EVERY arrow in the game: a shaft and a filled head, drawn as geometry and
+/// reaching exactly [length] / 2 either side of [center], so the shape is
+/// balanced on the point it is drawn about.
+///
+/// This replaced the text glyphs (↑→↓←) arrows used to be. A glyph is positioned
+/// by its line box, not by its ink, and the two centres do not coincide — which
+/// the rotating arrow exposed, since rotating one walks it around a small arc
+/// instead of spinning it in place. Shared by the board, the toolbar tile and the
+/// drag ghost, so an arrow is the same arrow wherever the player meets it.
+void paintArrowIcon(
+    Canvas canvas, Offset center, double length, Color color, Direction dir) {
+  final (dr, dc) = dir.delta;
+  final v = Offset(dc.toDouble(), dr.toDouble()); // heading, in screen axes
+  final perp = Offset(-v.dy, v.dx);
+  final half = length / 2; // tip and tail both land exactly this far out
+  final headLen = length * 0.452;
+  final headHalf = length * 0.339;
+  final width = length * 0.232;
+
+  final tip = center + v * half;
+  final base = tip - v * headLen;
+  // A round cap paints half a stroke width past the line's end, so the tail is
+  // pulled in by that much and the drawn shape stays exactly ±half about the
+  // centre.
+  canvas.drawLine(
+    center - v * (half - width / 2),
+    base + v * (headLen * 0.4), // overlap the head so there is no seam
+    Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round,
+  );
+  canvas.drawPath(
+    Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(base.dx + perp.dx * headHalf, base.dy + perp.dy * headHalf)
+      ..lineTo(base.dx - perp.dx * headHalf, base.dy - perp.dy * headHalf)
+      ..close(),
+    Paint()..color = color,
+  );
+}
+
+/// A standalone arrow for widget contexts (toolbar tile, drag ghost), sized to
+/// sit in a [size] box like the shield and portal glyphs beside it.
+class ArrowGlyph extends StatelessWidget {
+  const ArrowGlyph(
+      {super.key, required this.size, required this.dir, this.color = _C.arrow});
+
+  final double size;
+  final Direction dir;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _ArrowGlyphPainter(color, dir)),
+      );
+}
+
+class _ArrowGlyphPainter extends CustomPainter {
+  _ArrowGlyphPainter(this.color, this.dir);
+  final Color color;
+  final Direction dir;
+
+  @override
+  void paint(Canvas canvas, Size size) => paintArrowIcon(
+      canvas, size.center(Offset.zero), size.width * 0.84, color, dir);
+
+  @override
+  bool shouldRepaint(covariant _ArrowGlyphPainter old) =>
+      old.color != color || old.dir != dir;
+}
+
+/// The pause piece: two rounded bars, [height] tall. Drawn rather than typed for
+/// the same reason as the arrow — a glyph's ink sits where the font decides, so
+/// the board and the toolbar could never be made to agree.
+void paintPauseIcon(
+    Canvas canvas, Offset center, double height, Color color) {
+  final barW = height * 0.30;
+  final gap = height * 0.24;
+  final dx = (barW + gap) / 2;
+  final paint = Paint()..color = color;
+  for (final side in [-1.0, 1.0]) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+            center: center + Offset(dx * side, 0),
+            width: barW,
+            height: height),
+        Radius.circular(barW * 0.42),
+      ),
+      paint,
+    );
+  }
+}
+
+/// A standalone pause icon for widget contexts.
+class PauseGlyph extends StatelessWidget {
+  const PauseGlyph({super.key, required this.size, this.color = _C.pause});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _PauseGlyphPainter(color)),
+      );
+}
+
+class _PauseGlyphPainter extends CustomPainter {
+  _PauseGlyphPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) =>
+      paintPauseIcon(canvas, size.center(Offset.zero), size.width * 0.78, color);
+
+  @override
+  bool shouldRepaint(covariant _PauseGlyphPainter old) => old.color != color;
+}
+
 /// A standalone shield bubble for widget contexts (toolbar tile, drag ghost).
 class ShieldGlyph extends StatelessWidget {
   const ShieldGlyph({super.key, required this.size, this.color = _C.shield});
@@ -344,17 +475,16 @@ class DragGhost extends StatelessWidget {
               ),
             ],
           ),
-          child: tool.placedType == PlacedType.shield
-              ? ShieldGlyph(size: size * 0.7, color: color)
-              : Text(
-                  tool.glyph,
-                  style: TextStyle(
-                    fontSize: size * 0.42,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                  ),
-                ),
+          // The same icons the board draws, so the piece under the finger is
+          // already the piece it will become.
+          child: switch (tool.placedType) {
+            PlacedType.shield => ShieldGlyph(size: size * 0.7, color: color),
+            PlacedType.teleporter =>
+              PortalGlyph(size: size * 0.7, entrance: true, color: color),
+            PlacedType.arrow =>
+              ArrowGlyph(size: size * 0.7, dir: tool.direction!, color: color),
+            PlacedType.pause => PauseGlyph(size: size * 0.7, color: color),
+          },
         ),
       ),
     );
@@ -791,10 +921,10 @@ class GameGridPainter extends CustomPainter {
         _drawPortal(canvas, center, geo.cell * 0.24, color,
             entrance: portalEntrance ?? true);
       case PlacedType.arrow:
-        _drawArrowPath(
-            canvas, center, geo.cell, color, dir ?? tool.direction!);
+        paintArrowIcon(canvas, center, geo.cell * kArrowSpan, color,
+            dir ?? tool.direction!);
       case PlacedType.pause:
-        _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+        paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
     }
     canvas.restore();
   }
@@ -862,10 +992,10 @@ class GameGridPainter extends CustomPainter {
                 level.teleporters[pair].a.c == c);
         _drawPortal(canvas, center, geo.cell * 0.24, color, entrance: entrance);
       case PlacedType.arrow:
-        _drawArrowPath(canvas, center, geo.cell, color,
+        paintArrowIcon(canvas, center, geo.cell * kArrowSpan, color,
             piece.direction ?? piece.tool.direction!);
       case PlacedType.pause:
-        _drawGlyph(canvas, center, glyph, color, geo.cell * 0.42);
+        paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
     }
   }
 
@@ -876,7 +1006,7 @@ class GameGridPainter extends CustomPainter {
   /// arrowhead framing them both. One element, concentric: the ring is the thing
   /// the arrow is mounted in, not a decoration parked beside it.
   ///
-  /// The heading itself is the same [_drawArrowPath] every other arrow uses, at
+  /// The heading itself is the same [paintArrowIcon] every other arrow uses, at
   /// the same size — only the frame around it says "this one turns".
   ///
   /// [spin] is the quarter-turn in progress (0 at rest, 1 as it lands). The whole
@@ -921,7 +1051,7 @@ class GameGridPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, geo.cell * _kRingRadius,
         Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.62));
     _drawRotateRing(canvas, Offset.zero, geo.cell, color, emphasis);
-    _drawArrowPath(canvas, Offset.zero, geo.cell, color, dir);
+    paintArrowIcon(canvas, Offset.zero, geo.cell * kArrowSpan, color, dir);
     canvas.restore();
 
     canvas.restore();
@@ -931,50 +1061,6 @@ class GameGridPainter extends CustomPainter {
   /// arrow inside it keeps clear air on every side and the ring itself stays well
   /// in from the cell border — otherwise it reads as a second border.
   static const double _kRingRadius = 0.28;
-
-  /// EVERY arrow on the board: a shaft and a filled head, drawn as geometry and
-  /// reaching exactly the same distance either side of [center], so the shape is
-  /// balanced on the cell centre.
-  ///
-  /// This replaced the text glyphs (↑→↓←) the arrows used to be. A glyph is
-  /// positioned by its line box, not by its ink, and the two centres do not
-  /// coincide — which the rotating arrow exposed, since rotating one walks it
-  /// around a small arc instead of spinning it in place. The fix is worth having
-  /// everywhere: one arrow shape, sized and centred the same whether the cell is
-  /// placed, fixed or rotating, so the three read as the same piece wearing
-  /// different borders.
-  void _drawArrowPath(
-      Canvas canvas, Offset center, double cell, Color color, Direction dir) {
-    final (dr, dc) = dir.delta;
-    final v = Offset(dc.toDouble(), dr.toDouble()); // heading, in screen axes
-    final perp = Offset(-v.dy, v.dx);
-    final half = cell * 0.155; // tip and tail both land exactly this far out
-    final headLen = cell * 0.14;
-    final headHalf = cell * 0.105;
-    final width = cell * 0.072;
-
-    final tip = center + v * half;
-    final base = tip - v * headLen;
-    // A round cap paints half a stroke width past the line's end, so the tail is
-    // pulled in by that much and the drawn shape stays exactly ±half about the
-    // centre.
-    canvas.drawLine(
-      center - v * (half - width / 2),
-      base + v * (headLen * 0.4), // overlap the head so there is no seam
-      Paint()
-        ..color = color
-        ..strokeWidth = width
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(tip.dx, tip.dy)
-        ..lineTo(base.dx + perp.dx * headHalf, base.dy + perp.dy * headHalf)
-        ..lineTo(base.dx - perp.dx * headHalf, base.dy - perp.dy * headHalf)
-        ..close(),
-      Paint()..color = color,
-    );
-  }
 
   /// The dial's rim: a dashed ring with a clockwise arrowhead riding it, drawn
   /// around [center] in the caller's (already rotated) frame. [emphasis] (0→1)
@@ -1130,17 +1216,20 @@ class GameGridPainter extends CustomPainter {
         ..strokeWidth = 2.5
         ..color = color.withValues(alpha: 0.85),
     );
-    // The ghost has to be the piece it is about to become, or the arrow changes
+    // The ghost has to be the piece it is about to become, or the piece changes
     // shape the moment it lands.
-    if (tool.placedType == PlacedType.shield) {
-      paintShieldIcon(canvas, center, geo.cell * 0.28,
-          color: color, opacity: 0.85);
-    } else if (tool.placedType == PlacedType.arrow) {
-      _drawArrowPath(canvas, center, geo.cell,
-          color.withValues(alpha: 0.85), tool.direction!);
-    } else {
-      _drawGlyph(canvas, center, glyph,
-          color.withValues(alpha: 0.85), geo.cell * 0.42);
+    final ghost = color.withValues(alpha: 0.85);
+    switch (tool.placedType) {
+      case PlacedType.shield:
+        paintShieldIcon(canvas, center, geo.cell * 0.28,
+            color: color, opacity: 0.85);
+      case PlacedType.teleporter:
+        _drawPortal(canvas, center, geo.cell * 0.24, ghost, entrance: true);
+      case PlacedType.arrow:
+        paintArrowIcon(
+            canvas, center, geo.cell * kArrowSpan, ghost, tool.direction!);
+      case PlacedType.pause:
+        paintPauseIcon(canvas, center, geo.cell * kPauseHeight, ghost);
     }
     canvas.restore();
   }

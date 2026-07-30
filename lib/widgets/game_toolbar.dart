@@ -141,8 +141,6 @@ class _ToolTile extends StatelessWidget {
   /// Only meaningful for the teleporter tile: which end comes next.
   final bool portalEntrance;
 
-  bool get _isArrow => tool.direction != null;
-
   @override
   Widget build(BuildContext context) {
     final opacity = !enabled ? 0.4 : (dragging ? 0.3 : 1.0);
@@ -158,12 +156,22 @@ class _ToolTile extends StatelessWidget {
     );
   }
 
-  Widget _buildContent() {
-    final isShield = tool.placedType == PlacedType.shield;
-    final glyphColor = _isArrow
-        ? const Color(0xFF1E88E5)
-        : (isShield ? kShieldColor : AppColors.ink);
+  /// The tile's icon: the very same painting the board uses, just smaller, so a
+  /// tile is a preview of the piece rather than a symbol standing in for it.
+  Widget _icon() {
+    switch (tool.placedType) {
+      case PlacedType.shield:
+        return const ShieldGlyph(size: 26, color: kShieldColor);
+      case PlacedType.teleporter:
+        return PortalGlyph(size: 26, entrance: portalEntrance);
+      case PlacedType.arrow:
+        return ArrowGlyph(size: 26, dir: tool.direction!);
+      case PlacedType.pause:
+        return const PauseGlyph(size: 26);
+    }
+  }
 
+  Widget _buildContent() {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -183,20 +191,7 @@ class _ToolTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (isShield)
-                const ShieldGlyph(size: 26, color: kShieldColor)
-              else if (tool.placedType == PlacedType.teleporter)
-                PortalGlyph(size: 26, entrance: portalEntrance)
-              else
-                Text(
-                  tool.glyph,
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    color: glyphColor,
-                  ),
-                ),
+              _icon(),
               const SizedBox(height: 2),
               Text(
                 tool.label,
