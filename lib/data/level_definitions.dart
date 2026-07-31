@@ -1636,22 +1636,21 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // 69 — The Convoy: three patrols share the middle corridor and a fourth owns
-  // the exit row. The only crossing is the aligned shaft at column 3, metered
-  // by a pinned pause — and the convoy's stagger leaves exactly one gap, two
-  // beats later than you can reach it. Both kit pauses go on the doorstep.
+  // the exit row. The only crossing is the aligned shaft at column 3, and the
+  // convoy's stagger leaves exactly one gap — both kit pauses go on the
+  // doorstep, in exactly one arrangement. Solver-verified UNIQUE.
   69: LevelData(
     id: 69,
     size: 7,
     title: 'The Convoy',
     tip: 'A convoy owns the corridor and one more guards the exit row. Stack '
-        'your waits at the doorstep and take the only gap in the traffic.',
+        'your waits inside the shaft and take the only gap in the traffic.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 0),
     walls: [
       Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 4), Pos(2, 5), Pos(2, 6),
       Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 4), Pos(4, 5), Pos(4, 6),
     ],
-    forcedPauses: [Pos(4, 3)],
     movers: [
       MovingDestroyer(3, 1, horizontal: true, dir: 1),
       MovingDestroyer(3, 5, horizontal: true, dir: 1),

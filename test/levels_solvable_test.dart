@@ -388,9 +388,8 @@ void main() {
     // 67: one pause per crossing, each at its own doorstep.
     67: [(2, 3), (4, 2)],
     68: [(4, 2)],
-    // 69: both waits stacked at the shaft's doorstep to catch the convoy's
-    // only gap.
-    69: [(5, 3), (6, 2)],
+    // 69: both waits stacked inside the shaft to catch the convoy's only gap.
+    69: [(2, 3), (1, 3)],
     // ----- World 6. -----
     77: [(4, 1)],
     84: [(4, 3)],
