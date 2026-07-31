@@ -8,6 +8,7 @@ import 'package:dotto/models/level.dart';
 import 'package:dotto/models/level_data.dart';
 import 'package:dotto/screens/game_screen.dart';
 import 'package:dotto/screens/level_designer_screen.dart';
+import 'package:dotto/widgets/game_grid.dart';
 
 void main() {
   testWidgets('Level designer renders palette, toolkit and buttons',
@@ -99,5 +100,44 @@ void main() {
 
     // The title field is populated from the loaded level.
     expect(find.text('Edit Me'), findsOneWidget);
+  });
+
+  // _loadFromLevel copies each kind of level content into the editor's state.
+  // Rotating arrows were missed when they were added, so opening a World 6 level
+  // for editing silently dropped its rotors — and exporting from that session
+  // would have written the level back out without them.
+  testWidgets('editing a level keeps every pinned piece', (tester) async {
+    const lvl = LevelData(
+      id: 71,
+      size: 5,
+      title: 'Rotor',
+      tip: '',
+      start: StartSpec(2, 0, Direction.right),
+      exit: Pos(2, 4),
+      forcedArrows: [ForcedArrow(0, 0, Direction.down)],
+      rotatingArrows: [RotatingArrow(2, 2, Direction.up)],
+      forcedShields: [Pos(4, 0)],
+      forcedPauses: [Pos(4, 4)],
+      toolkit: [ToolkitEntry(ToolType.arrowDown, 1)],
+    );
+    await tester.pumpWidget(const MaterialApp(
+      home: LevelDesignerScreen(initialLevel: lvl, initialNumber: 71),
+    ));
+    await tester.pump();
+
+    final grid = tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('designerBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    expect(grid.rotations, {2 * 5 + 2: Direction.up},
+        reason: 'the rotating arrow must survive the trip into the designer');
+    // The pinned pieces the designer already handled, so a future addition
+    // cannot quietly drop one of these either.
+    expect(grid.forced.keys, containsAll(<int>[0, 4 * 5 + 0, 4 * 5 + 4]));
+    expect(grid.forced[0]!.direction, Direction.down);
   });
 }

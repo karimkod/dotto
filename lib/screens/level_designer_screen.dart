@@ -154,6 +154,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     for (final f in lvl.forcedArrows) {
       _forced[_key(f.r, f.c)] = f.dir;
     }
+    for (final a in lvl.rotatingArrows) {
+      _rotating[_key(a.r, a.c)] = a.dir;
+    }
     for (final p in lvl.forcedShields) {
       _shields.add(_key(p.r, p.c));
     }
