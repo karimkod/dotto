@@ -1823,8 +1823,8 @@ const Map<int, LevelData> levelDefinitions = {
   ),
 
   // 76 — Figure Eight: a self-crossing course through one dial. The west lobe
-  // earns the pinned shield the exit-stem mine demands; pinned pauses on the
-  // dial's doorsteps keep cheap bounces out; the drop only opens from above.
+  // earns the pinned shield the exit-stem mine demands — any shortcut that
+  // skips it reaches the mine unarmed — and the drop only opens from above.
   76: LevelData(
     id: 76,
     size: 7,
@@ -1836,7 +1836,6 @@ const Map<int, LevelData> levelDefinitions = {
     walls: [Pos(4, 2), Pos(4, 4)],
     destroyers: [Pos(4, 3)],
     forcedShields: [Pos(1, 1)],
-    forcedPauses: [Pos(2, 3), Pos(3, 4)],
     rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
     toolkit: [
       ToolkitEntry(ToolType.arrowDown, 1),
