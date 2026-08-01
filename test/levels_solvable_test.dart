@@ -268,7 +268,9 @@ void main() {
     // rotor for a second pass — by then it has turned up → right, into the exit.
     71: [(0, 2, Direction.down)],
     72: [(1, 2, Direction.down), (2, 4, Direction.left)],
-    73: [(0, 3, Direction.down), (5, 3, Direction.up)],
+    73: [], // a hold and a portal pair only (below)
+    // 74: the loop home after the gears have handed the dot back and forth —
+    // the shield that carries it through the mine is below.
     74: [(5, 2, Direction.right), (5, 4, Direction.up)],
     75: [
       (2, 0, Direction.down),
@@ -356,6 +358,9 @@ void main() {
     // mined top row. Placed in pair order.
     70: [(4, 3), (2, 7), (0, 1), (0, 3)],
     // ----- World 6. -----
+    // 73 — off the floor the dial drops the dot onto, back out high on the east
+    // wall so the last step falls into the exit.
+    73: [(5, 3), (2, 5)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -391,6 +396,8 @@ void main() {
     // 69: both waits stacked inside the shaft to catch the convoy's only gap.
     69: [(2, 3), (1, 3)],
     // ----- World 6. -----
+    // 73: the gate cell, held so the column-2 patrol has walked past.
+    73: [(3, 1)],
     77: [(4, 1)],
     84: [(4, 3)],
     85: [(4, 3)],
@@ -441,6 +448,8 @@ void main() {
     // 68: one aura for the fence mine, one for the patrol at its new far end.
     68: [(3, 2), (4, 4)],
     // ----- World 6. -----
+    // 74: armour picked up on the way to the mine the east gear sends it into.
+    74: [(2, 1)],
     77: [(4, 3)],
     83: [(3, 3)],
     87: [(3, 4)],

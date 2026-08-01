@@ -1759,42 +1759,54 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 73 — Four Winds: all four headings in one run — the second pass fires
-  // west into the start, whose relaunch is the free return leg.
+  // 73 — Four Winds: two vertical patrols bracket the dial, and the kit is a
+  // hold and one portal pair. The hold at the gate times the column-2 crossing;
+  // the dial then drops the dot south onto a portal that puts it back on the
+  // exit row. Solver-verified TIGHT — the hold is forced to (3,1), while the
+  // pair has room to move, so there are 12 winning placements.
   73: LevelData(
     id: 73,
     size: 6,
     title: 'Four Winds',
-    tip: 'Four passes, four winds. Bounce below, ride your own launch pad '
-        'back, bounce above, fly east.',
+    tip: 'Two columns are on patrol. Hold at the gate to time the crossing, let '
+        'the dial drop you south, and warp back onto the exit row.',
     start: StartSpec(3, 0, Direction.right),
     exit: Pos(3, 5),
     rotatingArrows: [RotatingArrow(3, 3, Direction.down)],
+    movers: [
+      MovingDestroyer(1, 2, horizontal: false, dir: 1),
+      MovingDestroyer(4, 4, horizontal: false, dir: -1),
+    ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
-  // 74 — Meshed Gears: two dials feeding each other; the pinned pause between
-  // them stops cheap ping-pong bounces.
+  // 74 — Meshed Gears: two dials facing each other across a mine. The shield
+  // carries the dot east through the mine; the east dial turns it back west, the
+  // west dial — turned by that first pass — drops it south, and the two arrows
+  // loop it round to climb into the east dial's second pass and out. Every dial
+  // face is used twice. Solver-verified TIGHT, 3 winning placements (the return
+  // loop can run along any of the three southern rows).
   74: LevelData(
     id: 74,
     size: 6,
     title: 'Meshed Gears',
-    tip: 'Two gears, one mesh. Spin them against each other until both point '
-        'your way.',
+    tip: 'Armour up before the mine. The two gears hand you back and forth — '
+        'and every pass turns them, until both point your way.',
     start: StartSpec(2, 0, Direction.right),
     exit: Pos(0, 4),
     walls: [Pos(1, 2), Pos(0, 3), Pos(0, 5)],
-    forcedPauses: [Pos(2, 3)],
+    destroyers: [Pos(2, 3)],
     rotatingArrows: [
-      RotatingArrow(2, 2, Direction.right),
       RotatingArrow(2, 4, Direction.left),
+      RotatingArrow(2, 2, Direction.right),
     ],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 1),
     ],
   ),
 
