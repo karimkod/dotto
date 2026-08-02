@@ -358,9 +358,10 @@ void main() {
     // mined top row. Placed in pair order.
     70: [(4, 3), (2, 7), (0, 1), (0, 3)],
     // ----- World 6. -----
-    // 73 — off the floor the dial drops the dot onto, back out high on the east
-    // wall so the last step falls into the exit.
-    73: [(5, 3), (2, 5)],
+    // 73 — off the floor the dial drops the dot onto, back in above the dial so
+    // it takes a second pass. The east wall is mined either side of the door, so
+    // the approach has to come through the dial rather than along the wall.
+    73: [(5, 3), (2, 3)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],

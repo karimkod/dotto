@@ -1759,19 +1759,23 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 73 — Four Winds: two vertical patrols bracket the dial, and the kit is a
-  // hold and one portal pair. The hold at the gate times the column-2 crossing;
-  // the dial then drops the dot south onto a portal that puts it back on the
-  // exit row. Solver-verified TIGHT — the hold is forced to (3,1), while the
-  // pair has room to move, so there are 12 winning placements.
+  // 73 — Four Winds: two vertical patrols bracket the dial, mines flank the
+  // door, and the kit is a hold and one portal pair. The hold at (3,1) times the
+  // column-2 crossing; the dial then drops the dot south onto a portal that puts
+  // it back on the only safe approach. The mines at (2,5) and (4,5) are what
+  // make the dial matter — they close the routes that used to reach the exit
+  // down the east wall. Solver-verified TIGHT, 6 winning placements (the hold is
+  // forced, the pair can slide up the middle column).
   73: LevelData(
     id: 73,
     size: 6,
     title: 'Four Winds',
-    tip: 'Two columns are on patrol. Hold at the gate to time the crossing, let '
-        'the dial drop you south, and warp back onto the exit row.',
+    tip: 'Two columns on patrol, and mines either side of the door. Hold at the '
+        'gate to time the crossing, then let the dial and a portal put you on '
+        'the one safe line in.',
     start: StartSpec(3, 0, Direction.right),
     exit: Pos(3, 5),
+    destroyers: [Pos(2, 5), Pos(4, 5)],
     rotatingArrows: [RotatingArrow(3, 3, Direction.down)],
     movers: [
       MovingDestroyer(1, 2, horizontal: false, dir: 1),
