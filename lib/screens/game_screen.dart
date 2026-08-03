@@ -258,8 +258,9 @@ class _GameScreenState extends State<GameScreen>
       for (final e in _level!.toolkit) {
         _toolKeys[e.type] = GlobalKey();
       }
-      // Fixed arrows, shields and pauses alike — _canPlace/_canDropAt already
-      // refuse any cell in _forced, so they all become undroppable for free.
+      // Fixed arrows, shields and pauses alike. Note _canPlace/_canDropAt do
+      // NOT gate on this map — they ask the level, which also knows about the
+      // rotating arrows that never reach _forced. See _occupied.
       _forced.addAll(buildForcedPieces(_level!));
       _rotations.addAll(buildRotations(_level!));
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
@@ -463,13 +464,23 @@ class _GameScreenState extends State<GameScreen>
   /// The piece occupying [key] — a player piece or a fixed (forced) arrow.
   PlacedElement? _pieceAt(int key) => _placed[key] ?? _forced[key];
 
+  /// True when [cell] already holds something the player cannot displace: their
+  /// own piece, or anything the LEVEL pins there.
+  ///
+  /// The pinned test goes through [LevelData.hasForcedPieceAt] rather than
+  /// _forced, because _forced comes from buildForcedPieces() and that does not
+  /// carry rotating arrows — their live headings live in _rotations instead. Ask
+  /// the level, and every kind of pinned piece is covered at once.
+  bool _occupied(int r, int c) =>
+      _placed.containsKey(_idx(r, c)) ||
+      _forced.containsKey(_idx(r, c)) ||
+      _level!.hasForcedPieceAt(r, c);
+
   bool _canPlace((int, int) cell, ToolType tool) {
     if (_status != GameStatus.planning) return false;
     final (r, c) = cell;
     if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
-    if (_placed.containsKey(_idx(r, c)) || _forced.containsKey(_idx(r, c))) {
-      return false;
-    }
+    if (_occupied(r, c)) return false;
     return (_kit[tool] ?? 0) > 0;
   }
 
@@ -483,9 +494,7 @@ class _GameScreenState extends State<GameScreen>
     if (_status != GameStatus.planning) return false;
     final (r, c) = cell;
     if (_level!.baseTypeAt(r, c) != CellType.empty) return false;
-    if (_placed.containsKey(_idx(r, c)) || _forced.containsKey(_idx(r, c))) {
-      return false;
-    }
+    if (_occupied(r, c)) return false;
     // Toolkit drag needs stock; a picked-up piece is already in hand.
     if (_dragTool != null) return (_kit[_dragTool] ?? 0) > 0;
     return _dragPiece != null;
@@ -683,7 +692,8 @@ class _GameScreenState extends State<GameScreen>
     //   * out of stock  → refuse (would drive the counter to -1);
     //   * cell taken     → refuse (a race already committed a piece here).
     if (decrementKit &&
-        ((_kit[el.tool] ?? 0) <= 0 || _placed.containsKey(key))) {
+        ((_kit[el.tool] ?? 0) <= 0 ||
+            _occupied(key ~/ _level!.size, key % _level!.size))) {
       _stopHand();
       return;
     }

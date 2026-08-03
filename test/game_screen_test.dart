@@ -313,6 +313,53 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget);
   });
 
+  // A rotating arrow is pinned to the board like a fixed arrow, so its cell must
+  // refuse placements. The regression: _canPlace/_canDropAt gated on the _forced
+  // map, which buildForcedPieces() fills — and that never carried rotating
+  // arrows, so the one cell in the level the player must not touch was the one
+  // cell they could drop a piece on, burying the dial under an arrow.
+  testWidgets('a rotating arrow cell refuses a placement', (tester) async {
+    const rotor = Level(
+      id: 71,
+      number: 71,
+      title: 'Rotor',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: rotor)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+
+    GameGridPainter grid() => tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('gameBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    // Drag onto the dial at (2,2) — refused, and the piece goes back to the kit.
+    await _dragArrow(
+        tester, tester.getCenter(find.text('DOWN')), cell(2, 2));
+    expect(grid().placed, isEmpty,
+        reason: 'a piece was placed on top of the rotating arrow');
+    expect(find.text('1'), findsOneWidget,
+        reason: 'the refused piece must still be in the toolkit');
+    // Play stays gated: the level still wants its one arrow placed somewhere.
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    expect(grid().trail, hasLength(lessThanOrEqualTo(1)),
+        reason: 'the run must not start with the toolkit unplaced');
+
+    // The same piece drops fine on a free cell.
+    await _dragArrow(
+        tester, tester.getCenter(find.text('DOWN')), cell(0, 2));
+    expect(grid().placed.keys, [0 * 5 + 2]);
+  });
+
   // A rotating arrow turns BEHIND the dot: it redirects the dot, the dot leaves
   // on the same beat, and only then does the arrow swing to its next heading.
   // So whenever a turn is on screen, the dot must already be off that cell —
