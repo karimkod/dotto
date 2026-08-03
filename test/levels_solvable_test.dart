@@ -277,12 +277,26 @@ void main() {
       (2, 3, Direction.left),
       (5, 3, Direction.up),
     ],
+    // 76 — the climb to the dial, then the fold that turns the portal hop into a
+    // second crossing. The right/down/left trio rides row 6, which this route
+    // only walks once; see the design note on the level.
     76: [
-      (1, 0, Direction.down),
-      (1, 3, Direction.left),
-      (3, 6, Direction.left),
+      (6, 1, Direction.right),
+      (6, 2, Direction.up),
+      (5, 6, Direction.up),
+      (6, 4, Direction.down),
+      (6, 5, Direction.left),
     ],
-    77: [], // shield + pause only (below)
+    // 77 — up to the dial, back east into its second face, and after the mine
+    // blast the loop over the top that re-enters row 1 heading west.
+    77: [
+      (6, 1, Direction.up),
+      (6, 3, Direction.up),
+      (4, 1, Direction.right),
+      (0, 3, Direction.right),
+      (0, 5, Direction.down),
+      (1, 5, Direction.left),
+    ],
     78: [
       (2, 3, Direction.down),
       (4, 5, Direction.up),
@@ -362,6 +376,9 @@ void main() {
     // it takes a second pass. The east wall is mined either side of the door, so
     // the approach has to come through the dial rather than along the wall.
     73: [(5, 3), (2, 3)],
+    // 76 — the fold in the figure eight: crossed east-bound off the first mine,
+    // then north-bound again on the way to the second aura.
+    76: [(3, 6), (5, 5)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -399,7 +416,6 @@ void main() {
     // ----- World 6. -----
     // 73: the gate cell, held so the column-2 patrol has walked past.
     73: [(3, 1)],
-    77: [(4, 1)],
     84: [(4, 3)],
     85: [(4, 3)],
     88: [(3, 5)],
@@ -451,7 +467,12 @@ void main() {
     // ----- World 6. -----
     // 74: armour picked up on the way to the mine the east gear sends it into.
     74: [(2, 1)],
-    77: [(4, 3)],
+    // 76: one aura per mine — the first opens the stem, the second spends
+    // itself on the door.
+    76: [(3, 3), (4, 5)],
+    // 77: collected on the dial's first bounce, spent on the mine that
+    // demolishes the wall into the exit pocket.
+    77: [(5, 3)],
     83: [(3, 3)],
     87: [(3, 4)],
   };
@@ -473,7 +494,17 @@ void main() {
   // budget, as are 85's and 91's kits — both verified TIGHT out of band by
   // tool/verify_pairs.dart. Their recorded solutions carry them via the
   // intended-solution-wins test; the solvable/tight sweeps are skipped.
-  const solverTooSlow = {55, 85, 91};
+  //
+  // 76 and 77 are the same story an order of magnitude worse, and for a reason
+  // worth naming: a rotating arrow forces the SIMULATE-based BruteSearch (only
+  // it models per-pass rotation), and BruteSearch cannot prune to the dot's
+  // path. On a 7x7 that is 5.6e12 placements for 76's nine-piece kit and 1.9e10
+  // for 77's seven — against a kMaxBrutePlacements budget of 8e6, so the
+  // in-app solver refuses them outright. Both ARE solvable: their recorded
+  // solutions were found by enumerating over a hand-restricted candidate list
+  // (~0.8M and ~3.4M placements) and are asserted below by the
+  // intended-solution-wins test, which is a single simulate and exact.
+  const solverTooSlow = {55, 76, 77, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.

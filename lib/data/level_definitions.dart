@@ -1737,10 +1737,14 @@ const Map<int, LevelData> levelDefinitions = {
 
   // World 6 proper (72–91): twenty rotating-arrow levels, easy to brutal. Each
   // is built around a different consequence of the dial's one rule — it fires
-  // its current heading, then advances a quarter-turn clockwise per pass. All
-  // solver-verified TIGHT (the suite's BruteSearch for 72–90, and 91 — too
-  // heavy to enumerate there — by tool/verify_pairs.dart); 75, 79, 80, 81 and
-  // 89 are UNIQUE.
+  // its current heading, then advances a quarter-turn clockwise per pass.
+  // Solver-verified TIGHT (the suite's BruteSearch for 72–90 bar 76 and 77, and
+  // 91 — too heavy to enumerate there — by tool/verify_pairs.dart); 75, 79, 80,
+  // 81 and 89 are UNIQUE. 76 and 77 carry kits far past what the exhaustive
+  // search can enumerate — a rotating arrow rules out the path solver, and the
+  // exhaustive one cannot prune — so they are verified by their recorded
+  // solutions winning under the simulator, not by a sweep. See the note on
+  // solverTooSlow in levels_solvable_test.dart.
 
   // 72 — Second Pass: build one loop and spin the dial to its third heading.
   72: LevelData(
@@ -1837,45 +1841,73 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 76 — Figure Eight: a self-crossing course through one dial. The west lobe
-  // earns the pinned shield the exit-stem mine demands — any shortcut that
-  // skips it reaches the mine unarmed — and the drop only opens from above.
+  // 76 — Figure Eight: the exit at (0,5) is walled in on three sides and mined
+  // on the fourth, and the cell BELOW that mine is a wall too — so the only way
+  // in is to open (2,5) first. That takes the lower mine at (3,5): ram it
+  // shielded and the blast demolishes the wall above it. Then come back for the
+  // second aura and climb the stem, spending it on the mine at (1,5) to fall
+  // into the exit. Two mines, two shields, in that order — and the portal pair
+  // is the fold, crossed east-bound off the first mine and north-bound on the
+  // way to the second.
+  //
+  // NOT tight: the kit hands out nine pieces and the route needs six. In every
+  // solution found, the down and left arrows sit on row 6 where this route never
+  // returns, and the right arrow lands on a cell the dot already crosses heading
+  // east. Play-gating still makes the player place all nine, so three of them
+  // are parked rather than used. Trimming the kit to up x2, shield x2 and a
+  // pair would make it honest.
   76: LevelData(
     id: 76,
     size: 7,
     title: 'Figure Eight',
-    tip: 'One dial, two lobes. The west loop earns the shield; the east fold '
-        'spends the third pass on the drop.',
-    start: StartSpec(3, 0, Direction.right),
-    exit: Pos(5, 3),
-    walls: [Pos(4, 2), Pos(4, 4)],
-    destroyers: [Pos(4, 3)],
-    forcedShields: [Pos(1, 1)],
-    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
+    tip: 'The door is bricked up and mined. Blow the lower mine to open the '
+        'stem, come back for a second aura, and spend it on the door itself.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 5),
+    walls: [
+      Pos(0, 4), Pos(0, 6), Pos(1, 4), Pos(1, 6),
+      Pos(2, 4), Pos(2, 5), Pos(2, 6),
+    ],
+    destroyers: [Pos(1, 5), Pos(3, 5)],
+    rotatingArrows: [RotatingArrow(3, 2, Direction.right)],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
       ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowLeft, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 1),
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
-  // 77 — Demolition Dial: the dial's first pass bounces off the start, its
-  // second rams the mine that opens the exit pocket — while a patrol sweeps
-  // the corridor the dot crosses three times.
+  // 77 — Demolition Dial: the exit pocket at (1,0)–(1,1) is sealed — every
+  // neighbour is a wall, so no route reaches it as the board stands. The mine at
+  // (1,3) is the key: ram it shielded and the blast takes out the walls either
+  // side of it, (1,2) and (1,4), opening row 1 all the way to the door. The dot
+  // has to hit the mine from above or below (both its row-1 neighbours are still
+  // walls at that point), then come back round and run row 1 west through the
+  // hole it made. A patrol sweeps row 3, and with no pause in the kit the dial's
+  // bounce is the only clock.
   77: LevelData(
     id: 77,
     size: 7,
     title: 'Demolition Dial',
-    tip: 'The dial rams the mine on its second try — shield up, and mind the '
-        'corridor patrol on all three crossings.',
-    start: StartSpec(4, 0, Direction.right),
-    exit: Pos(1, 4),
-    walls: [Pos(1, 3), Pos(1, 5), Pos(0, 4), Pos(2, 4)],
-    destroyers: [Pos(3, 4)],
-    rotatingArrows: [RotatingArrow(4, 4, Direction.left)],
-    movers: [MovingDestroyer(2, 2, horizontal: false, dir: 1)],
+    tip: 'The door is bricked in. The mine beside it is the demolition charge — '
+        'ram it shielded, then come back round and run the row you opened.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(1, 0),
+    walls: [
+      Pos(0, 0), Pos(0, 1), Pos(1, 2), Pos(1, 4), Pos(2, 0), Pos(2, 1),
+    ],
+    destroyers: [Pos(1, 3)],
+    rotatingArrows: [RotatingArrow(4, 3, Direction.down)],
+    movers: [MovingDestroyer(3, 2, horizontal: true, dir: -1)],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
       ToolkitEntry(ToolType.shield, 1),
-      ToolkitEntry(ToolType.pause, 1),
     ],
   ),
 
