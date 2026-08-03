@@ -277,15 +277,12 @@ void main() {
       (2, 3, Direction.left),
       (5, 3, Direction.up),
     ],
-    // 76 — the climb, the turn east at (3,0) that takes the pinned aura
-    // sideways into the dial, and after the dial fires the dot into the lower
-    // mine, the drop down the far column and the run west to the stem. Every
-    // piece is on the path.
+    // 76 — the turn back west that feeds the dial's second face, the floor run
+    // east off the drop it makes, and the climb up the stem the first blast
+    // opened. The lift onto row 3 is the portal pair below.
     76: [
-      (6, 1, Direction.up),
-      (3, 0, Direction.right),
-      (3, 6, Direction.down),
-      (6, 6, Direction.left),
+      (3, 6, Direction.left),
+      (6, 2, Direction.right),
       (6, 5, Direction.up),
     ],
     // 77 — up to the dial, back east into its second face, and after the mine
@@ -377,9 +374,10 @@ void main() {
     // it takes a second pass. The east wall is mined either side of the door, so
     // the approach has to come through the dial rather than along the wall.
     73: [(5, 3), (2, 3)],
-    // 76 — the sidestep: one column west, still heading north, so the climb
-    // passes clear of the mine sitting above the pinned shield.
-    76: [(4, 1), (4, 0)],
+    // 76 — the lift: off the floor at (6,1) and onto row 3 at (3,0), still
+    // heading east, so the pinned aura is crossed sideways and the mine above it
+    // never comes into play.
+    76: [(6, 1), (3, 0)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],

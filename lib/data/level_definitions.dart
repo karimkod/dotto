@@ -1854,19 +1854,24 @@ const Map<int, LevelData> levelDefinitions = {
   // picked up is spent one cell later on a blast that opens nothing, leaving the
   // stem mine unarmed. The pinned aura has to be crossed SIDEWAYS.
   //
-  // The figure the name promises: climb column 1, hop the portal pair one column
-  // west so the climb continues clear of (2,1), turn east at (3,0) and take the
-  // pinned aura along row 3 into the dial. Its first face throws the dot east
-  // into the lower mine — that blast opens the stem — then down the far column,
-  // west along the floor, and up the stem, collecting the second aura on the way
-  // to spend it on the mine in the doorway. Every one of the eight pieces sits
-  // on the path.
+  // The kit is six pieces with a single up arrow, and that arrow is needed for
+  // the final climb — so the portal pair is the only lift onto row 3. It lands
+  // the dot at (3,0) still heading east, which is exactly the sideways crossing
+  // the pinned aura needs, and keeps the run clear of (2,1) altogether.
+  //
+  // Then the figure: the dial's first face fires the dot east into the lower
+  // mine, whose blast opens the stem; the far arrow turns it back west along
+  // row 3 and into the dial's SECOND face, which drops it down the middle column
+  // to the floor; the floor run east collects the second aura and the last arrow
+  // climbs the stem, spending that aura on the mine in the doorway. The dial is
+  // used twice, the path crosses itself, and every one of the six pieces is
+  // load-bearing.
   76: LevelData(
     id: 76,
     size: 7,
     title: 'Figure Eight',
-    tip: 'Two auras, three mines — one has to be dodged, not rammed. Cross the '
-        'pinned shield sideways and save both blasts for the stem and the door.',
+    tip: 'Two auras, three mines — one has to be dodged, not rammed. Your only '
+        'lift is the portal; save the climb for the stem you blow open.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 5),
     walls: [
@@ -1877,8 +1882,7 @@ const Map<int, LevelData> levelDefinitions = {
     rotatingArrows: [RotatingArrow(3, 2, Direction.right)],
     forcedShields: [Pos(3, 1)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
       ToolkitEntry(ToolType.shield, 1),
