@@ -1848,25 +1848,32 @@ const Map<int, LevelData> levelDefinitions = {
   // in that order — the pinned shield at (3,1) is the first, the kit's the
   // second.
   //
-  // The figure the name promises: climb column 1 over the pinned aura, warp from
-  // (2,1) to the far corner, come back west along row 3 to blast the lower mine,
-  // and let the dial catch the return — its first face throws the dot east into
-  // the arrow that sent it west, its second drops it to the floor, where the run
-  // east collects the second aura and climbs the stem that first blast opened.
-  // The path crosses itself twice, and every one of the eight pieces sits on it.
+  // Three mines, two auras — so one mine has to be walked around rather than
+  // rammed. The mine at (2,1) sits directly above the pinned shield, which makes
+  // the obvious climb a trap: take (3,1) heading north and the aura you just
+  // picked up is spent one cell later on a blast that opens nothing, leaving the
+  // stem mine unarmed. The pinned aura has to be crossed SIDEWAYS.
+  //
+  // The figure the name promises: climb column 1, hop the portal pair one column
+  // west so the climb continues clear of (2,1), turn east at (3,0) and take the
+  // pinned aura along row 3 into the dial. Its first face throws the dot east
+  // into the lower mine — that blast opens the stem — then down the far column,
+  // west along the floor, and up the stem, collecting the second aura on the way
+  // to spend it on the mine in the doorway. Every one of the eight pieces sits
+  // on the path.
   76: LevelData(
     id: 76,
     size: 7,
     title: 'Figure Eight',
-    tip: 'The door is bricked up and mined. One aura is already on the board — '
-        'spend it opening the stem, and win the second on the way back.',
+    tip: 'Two auras, three mines — one has to be dodged, not rammed. Cross the '
+        'pinned shield sideways and save both blasts for the stem and the door.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 5),
     walls: [
       Pos(0, 4), Pos(0, 6), Pos(1, 4), Pos(1, 6),
       Pos(2, 4), Pos(2, 5), Pos(2, 6),
     ],
-    destroyers: [Pos(1, 5), Pos(3, 5)],
+    destroyers: [Pos(1, 5), Pos(2, 1), Pos(3, 5)],
     rotatingArrows: [RotatingArrow(3, 2, Direction.right)],
     forcedShields: [Pos(3, 1)],
     toolkit: [

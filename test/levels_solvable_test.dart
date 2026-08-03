@@ -277,15 +277,15 @@ void main() {
       (2, 3, Direction.left),
       (5, 3, Direction.up),
     ],
-    // 76 — the climb over the pinned aura, the turn west into the lower mine,
-    // and after the dial has thrown the dot east and then down, the floor run
-    // that collects the second aura and climbs the opened stem. Every piece is
-    // on the path.
+    // 76 — the climb, the turn east at (3,0) that takes the pinned aura
+    // sideways into the dial, and after the dial fires the dot into the lower
+    // mine, the drop down the far column and the run west to the stem. Every
+    // piece is on the path.
     76: [
       (6, 1, Direction.up),
-      (3, 6, Direction.left),
-      (4, 2, Direction.down),
-      (6, 2, Direction.right),
+      (3, 0, Direction.right),
+      (3, 6, Direction.down),
+      (6, 6, Direction.left),
       (6, 5, Direction.up),
     ],
     // 77 — up to the dial, back east into its second face, and after the mine
@@ -377,9 +377,9 @@ void main() {
     // it takes a second pass. The east wall is mined either side of the door, so
     // the approach has to come through the dial rather than along the wall.
     73: [(5, 3), (2, 3)],
-    // 76 — the hop that starts the figure: in off the pinned aura at the top of
-    // column 1, out at the far corner still heading north.
-    76: [(2, 1), (6, 6)],
+    // 76 — the sidestep: one column west, still heading north, so the climb
+    // passes clear of the mine sitting above the pinned shield.
+    76: [(4, 1), (4, 0)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -468,8 +468,9 @@ void main() {
     // ----- World 6. -----
     // 74: armour picked up on the way to the mine the east gear sends it into.
     74: [(2, 1)],
-    // 76: the second aura, won on the floor run. The first is pinned at (3,1).
-    76: [(6, 4)],
+    // 76: the second aura, collected on the climb up the stem. The first is
+    // pinned at (3,1).
+    76: [(5, 5)],
     // 77: collected on the dial's first bounce, spent on the mine that
     // demolishes the wall into the exit pocket.
     77: [(5, 3)],
