@@ -295,12 +295,18 @@ void main() {
       (0, 5, Direction.down),
       (1, 5, Direction.left),
     ],
-    78: [
-      (2, 3, Direction.down),
-      (4, 5, Direction.up),
-      (6, 3, Direction.up),
+    // 78 — the one arrow starts the climb into the dial; the portal pair (below)
+    // feeds it back for all four faces, and the fourth points at the gap.
+    78: [(6, 3, Direction.up)],
+    // 79 — the climb out of the floor, the turn east into the upper mine, the
+    // drop down the hole it opens, and the run east into the corridor the second
+    // blast makes.
+    79: [
+      (6, 1, Direction.up),
+      (1, 1, Direction.right),
+      (0, 4, Direction.down),
+      (5, 2, Direction.right),
     ],
-    79: [(2, 0, Direction.down), (2, 2, Direction.left)],
     80: [
       (2, 2, Direction.down),
       (2, 4, Direction.down),
@@ -378,6 +384,13 @@ void main() {
     // heading east, so the pinned aura is crossed sideways and the mine above it
     // never comes into play.
     76: [(6, 1), (3, 0)],
+    // 78 — the return line that feeds the dial: east into (5,6), back at (5,2)
+    // for the down face, and the other way round for the left face.
+    78: [(5, 2), (5, 6)],
+    // 79 — two pairs, in pairing order. The first carries the dot from the end
+    // of the top run back to the start of it; the second is crossed twice, once
+    // southbound off the second blast and once eastbound into the corridor.
+    79: [(0, 1), (1, 6), (3, 2), (5, 4)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -472,6 +485,9 @@ void main() {
     // 77: collected on the dial's first bounce, spent on the mine that
     // demolishes the wall into the exit pocket.
     77: [(5, 3)],
+    // 79: one aura per mine, each collected on the leg that runs into it — the
+    // climb for the upper mine, the top run for the lower one.
+    79: [(5, 1), (1, 5)],
     83: [(3, 3)],
     87: [(3, 4)],
   };
@@ -503,7 +519,11 @@ void main() {
   // solutions were found by enumerating over a hand-restricted candidate list
   // (~0.8M and ~3.4M placements) and are asserted below by the
   // intended-solution-wins test, which is a single simulate and exact.
-  const solverTooSlow = {55, 76, 77, 85, 91};
+  // 79 joins them, and is the worst of the lot: a ten-piece kit including two
+  // portal pairs on a 7x7 comes to 4.96e12 placements. Its recorded solution was
+  // found by restricted enumeration (37.8M placements over 14 candidate cells,
+  // 18 wins — all of them with every piece on the path).
+  const solverTooSlow = {55, 76, 77, 79, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.

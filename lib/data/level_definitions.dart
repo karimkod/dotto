@@ -1738,9 +1738,9 @@ const Map<int, LevelData> levelDefinitions = {
   // World 6 proper (72–91): twenty rotating-arrow levels, easy to brutal. Each
   // is built around a different consequence of the dial's one rule — it fires
   // its current heading, then advances a quarter-turn clockwise per pass.
-  // Solver-verified TIGHT (the suite's BruteSearch for 72–90 bar 76 and 77, and
-  // 91 — too heavy to enumerate there — by tool/verify_pairs.dart); 75, 79, 80,
-  // 81 and 89 are UNIQUE. 76 and 77 carry kits far past what the exhaustive
+  // Solver-verified TIGHT (the suite's BruteSearch for 72–90 bar 76, 77 and 79,
+  // and 91 — too heavy to enumerate there — by tool/verify_pairs.dart); 75, 80,
+  // 81 and 89 are UNIQUE. 76, 77 and 79 carry kits far past what the exhaustive
   // search can enumerate — a rotating arrow rules out the path solver, and the
   // exhaustive one cannot prune — so they are verified by their recorded
   // solutions winning under the simulator, not by a sweep. See the note on
@@ -1921,47 +1921,71 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 78 — Gear Train: no pause in the kit — the dial bounce IS the clock, and
-  // the bounce row decides how late you cross the patrol.
+  // 78 — Gear Train: row 1 is a wall with one gap, at (1,3), so every route to
+  // the exit climbs column 3 through it and takes the fixed arrow at (0,3) home
+  // along the top. The dial sits in that column at (5,3) and its fourth face is
+  // the only one pointing north — so the intended run feeds it all four in
+  // order, the portal pair returning the dot to it each time: east into the
+  // portal, back for the down face, up again for the left face, into the portal
+  // the other way, and on the fourth pass it finally points at the gap.
+  // Solver-verified TIGHT, and cheap enough that the shipped BruteSearch does it
+  // outright — 2.74e4 placements, 143 solutions.
   78: LevelData(
     id: 78,
     size: 7,
     title: 'Gear Train',
-    tip: 'No pause in the kit: the bounce IS the clock. The deeper the '
-        'bounce, the later the crossing.',
+    tip: 'One gap in the wall, and the dial guards the column below it. Feed '
+        'the dial until it points north — then it opens the way itself.',
     start: StartSpec(6, 0, Direction.right),
-    exit: Pos(0, 5),
+    exit: Pos(0, 0),
     walls: [
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 4), Pos(5, 5), Pos(5, 6),
+      Pos(1, 0), Pos(1, 1), Pos(1, 2), Pos(1, 4), Pos(1, 5), Pos(1, 6),
     ],
-    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
-    movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
+    forcedArrows: [ForcedArrow(0, 3, Direction.left)],
+    rotatingArrows: [RotatingArrow(5, 3, Direction.right)],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 
-  // 79 — Ratchet: the dial's advanced state makes the second start-crossing
-  // genuinely different — and the two patrol clocks only fit the long lap, so
-  // the relaunch is mandatory. Solver-verified UNIQUE.
+  // 79 — Ratchet: the exit at (3,6) is a sealed pocket — walls on all three
+  // sides — and so is the mine at (3,4) that would open it, boxed in by walls on
+  // all four. The way in is a chain: ram the UPPER mine at (1,4) shielded and
+  // its blast takes out (2,4), which is the only cell that touches the lower
+  // mine's box. Come back down through that hole with the second aura, ram
+  // (3,4), and its blast opens (3,3), (3,5) and (4,4) at once — turning row 3
+  // into a corridor running straight to the door. The second portal pair then
+  // does double duty: crossed southbound off the second blast, and again
+  // eastbound to enter that corridor.
+  //
+  // Tight — every one of the ten pieces lies on the winning path — but the DIAL
+  // is not load-bearing. In all 18 winning placements found, the dot reaches
+  // (3,1) already heading north and the dial's first face points north too, so
+  // it passes straight through and never redirects anything. It is scenery here,
+  // not a mechanism. Turning its initial heading, or moving it off the column-1
+  // climb, would make it earn its place.
   79: LevelData(
     id: 79,
-    size: 6,
+    size: 7,
     title: 'Ratchet',
-    tip: 'The bounces are watched. Only the long way — back across your own '
-        'launch pad — arrives when the lanes are clear.',
-    start: StartSpec(3, 0, Direction.right),
-    exit: Pos(3, 5),
-    destroyers: [Pos(0, 2)],
-    rotatingArrows: [RotatingArrow(3, 2, Direction.up)],
-    movers: [
-      MovingDestroyer(2, 3, horizontal: false, dir: 1),
-      MovingDestroyer(1, 4, horizontal: false, dir: -1),
+    tip: 'The door is bricked in, and so is the charge that opens it. Blow the '
+        'upper mine to reach the lower one — that blast opens the whole row.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(3, 6),
+    walls: [
+      Pos(2, 3), Pos(2, 4), Pos(2, 5), Pos(2, 6),
+      Pos(3, 3), Pos(3, 5),
+      Pos(4, 3), Pos(4, 4), Pos(4, 5), Pos(4, 6),
     ],
+    destroyers: [Pos(1, 4), Pos(3, 4)],
+    rotatingArrows: [RotatingArrow(3, 1, Direction.up)],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
 
