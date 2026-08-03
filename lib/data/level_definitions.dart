@@ -1844,24 +1844,22 @@ const Map<int, LevelData> levelDefinitions = {
   // 76 — Figure Eight: the exit at (0,5) is walled in on three sides and mined
   // on the fourth, and the cell BELOW that mine is a wall too — so the only way
   // in is to open (2,5) first. That takes the lower mine at (3,5): ram it
-  // shielded and the blast demolishes the wall above it. Then come back for the
-  // second aura and climb the stem, spending it on the mine at (1,5) to fall
-  // into the exit. Two mines, two shields, in that order — and the portal pair
-  // is the fold, crossed east-bound off the first mine and north-bound on the
-  // way to the second.
+  // shielded and the blast demolishes the wall above it. Two mines, two auras,
+  // in that order — the pinned shield at (3,1) is the first, the kit's the
+  // second.
   //
-  // NOT tight: the kit hands out nine pieces and the route needs six. In every
-  // solution found, the down and left arrows sit on row 6 where this route never
-  // returns, and the right arrow lands on a cell the dot already crosses heading
-  // east. Play-gating still makes the player place all nine, so three of them
-  // are parked rather than used. Trimming the kit to up x2, shield x2 and a
-  // pair would make it honest.
+  // The figure the name promises: climb column 1 over the pinned aura, warp from
+  // (2,1) to the far corner, come back west along row 3 to blast the lower mine,
+  // and let the dial catch the return — its first face throws the dot east into
+  // the arrow that sent it west, its second drops it to the floor, where the run
+  // east collects the second aura and climbs the stem that first blast opened.
+  // The path crosses itself twice, and every one of the eight pieces sits on it.
   76: LevelData(
     id: 76,
     size: 7,
     title: 'Figure Eight',
-    tip: 'The door is bricked up and mined. Blow the lower mine to open the '
-        'stem, come back for a second aura, and spend it on the door itself.',
+    tip: 'The door is bricked up and mined. One aura is already on the board — '
+        'spend it opening the stem, and win the second on the way back.',
     start: StartSpec(6, 0, Direction.right),
     exit: Pos(0, 5),
     walls: [
@@ -1870,12 +1868,13 @@ const Map<int, LevelData> levelDefinitions = {
     ],
     destroyers: [Pos(1, 5), Pos(3, 5)],
     rotatingArrows: [RotatingArrow(3, 2, Direction.right)],
+    forcedShields: [Pos(3, 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 2),
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.shield, 1),
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),

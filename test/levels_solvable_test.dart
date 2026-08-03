@@ -277,15 +277,16 @@ void main() {
       (2, 3, Direction.left),
       (5, 3, Direction.up),
     ],
-    // 76 — the climb to the dial, then the fold that turns the portal hop into a
-    // second crossing. The right/down/left trio rides row 6, which this route
-    // only walks once; see the design note on the level.
+    // 76 — the climb over the pinned aura, the turn west into the lower mine,
+    // and after the dial has thrown the dot east and then down, the floor run
+    // that collects the second aura and climbs the opened stem. Every piece is
+    // on the path.
     76: [
-      (6, 1, Direction.right),
-      (6, 2, Direction.up),
-      (5, 6, Direction.up),
-      (6, 4, Direction.down),
-      (6, 5, Direction.left),
+      (6, 1, Direction.up),
+      (3, 6, Direction.left),
+      (4, 2, Direction.down),
+      (6, 2, Direction.right),
+      (6, 5, Direction.up),
     ],
     // 77 — up to the dial, back east into its second face, and after the mine
     // blast the loop over the top that re-enters row 1 heading west.
@@ -376,9 +377,9 @@ void main() {
     // it takes a second pass. The east wall is mined either side of the door, so
     // the approach has to come through the dial rather than along the wall.
     73: [(5, 3), (2, 3)],
-    // 76 — the fold in the figure eight: crossed east-bound off the first mine,
-    // then north-bound again on the way to the second aura.
-    76: [(3, 6), (5, 5)],
+    // 76 — the hop that starts the figure: in off the pinned aura at the top of
+    // column 1, out at the far corner still heading north.
+    76: [(2, 1), (6, 6)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -467,9 +468,8 @@ void main() {
     // ----- World 6. -----
     // 74: armour picked up on the way to the mine the east gear sends it into.
     74: [(2, 1)],
-    // 76: one aura per mine — the first opens the stem, the second spends
-    // itself on the door.
-    76: [(3, 3), (4, 5)],
+    // 76: the second aura, won on the floor run. The first is pinned at (3,1).
+    76: [(6, 4)],
     // 77: collected on the dial's first bounce, spent on the mine that
     // demolishes the wall into the exit pocket.
     77: [(5, 3)],
