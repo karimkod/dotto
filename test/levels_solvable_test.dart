@@ -318,7 +318,16 @@ void main() {
     // 81 — the turn into the ring's floor and the climb that feeds it. The hold
     // that times the last lane is below.
     81: [(2, 2, Direction.down), (3, 3, Direction.up)],
-    82: [], // portals only (below)
+    // 82 — the climb out of the floor, the two turns that work the dial's faces,
+    // and the last column once the patrol kill has blown (1,7) open. The portal
+    // pair that reaches into the tower is below.
+    82: [
+      (7, 4, Direction.up),
+      (4, 2, Direction.right),
+      (3, 4, Direction.right),
+      (1, 2, Direction.left),
+      (3, 7, Direction.up),
+    ],
     83: [(2, 2, Direction.down), (4, 3, Direction.up)],
     84: [(2, 3, Direction.down), (5, 3, Direction.up)],
     // (85 below was rebuilt as the two-storey moulinet.)
@@ -400,9 +409,10 @@ void main() {
     // of tumblers; the second is the lift home, taken once the dials have been
     // clicked round to point at it.
     80: [(0, 3), (1, 1), (1, 3), (1, 6)],
-    // 82 — the warp clock: park the pair on the dial's ray, out to the far
-    // column's climb.
-    82: [(2, 2), (5, 0)],
+    // 82 — the pair that solves the sealed tower: one end inside it at (1,0), so
+    // the dot arrives on row 1 beside the aura without ever descending, and the
+    // same pair carries it back out to the east field.
+    82: [(1, 0), (4, 7)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
   };
@@ -535,7 +545,7 @@ void main() {
   // portal pairs on a 7x7 comes to 4.96e12 placements. Its recorded solution was
   // found by restricted enumeration (37.8M placements over 14 candidate cells,
   // 18 wins — all of them with every piece on the path).
-  const solverTooSlow = {55, 76, 77, 79, 80, 85, 91};
+  const solverTooSlow = {55, 76, 77, 79, 80, 82, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.

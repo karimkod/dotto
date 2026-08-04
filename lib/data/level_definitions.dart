@@ -2069,32 +2069,44 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 82 — Odometer: the dial sits at the floor of the west tower and its
-  // up-ray is the clock face — park the portal pair deeper along it to leave
-  // later, and land the far column's climb on the pinned-pause gate between
-  // the patrol's sweeps.
+  // 82 — Odometer: an 8x8 cut in two by a wall spine, with a pinned aura at
+  // (1,1) inside the west tower and a patrol sweeping row 2. The exit at (0,7)
+  // is boxed by (0,6) and (1,7) and the level has no mines, so the only way to
+  // open it is to spend the aura on the patrol — the blast takes out the walls
+  // beside wherever it dies, and killing it against the east edge demolishes
+  // (1,7) to make column 7 the way in.
   //
-  // NOTE: a proposed 8x8 redesign (pinned aura at (1,1), spine at row 3, patrol
-  // on row 2, exit boxed at (0,7)) was left unapplied — it has no solution. The
-  // kit held up/left/right and a portal pair but no DOWN arrow, and the board
-  // had no pinned arrow, so the dial's second face was the only source of
-  // southward travel in the level. Descending into the walled tower to collect
-  // the aura therefore cost the whole portal pair AND both up arrows, leaving
-  // nothing to climb column 7 with — and column 7 is the only way into the exit,
-  // since opening it needs the aura spent on the patrol at (2,7). See the commit
-  // message for the searches run.
+  // The tower looks sealed: the spine at row 3 and the walls at (1,3)/(2,3)
+  // leave it no ground-level mouth, and the kit holds no down arrow, so nothing
+  // can descend into it from row 0. The portal pair is the answer — one end
+  // dropped INSIDE it at (1,0) lands the dot straight on row 1 beside the aura
+  // with no descent at all, and the same pair carries it back out.
+  //
+  // Solver-verified via restricted search (a portal end in the tower, the other
+  // in the east field, arrows swept over 16 cells — 6.2M placements): 4 wins,
+  // every one using all seven pieces. They differ only in how far along row 4
+  // the return arrow sits and which cell catches it.
   82: LevelData(
     id: 82,
-    size: 7,
+    size: 8,
     title: 'Odometer',
-    tip: 'The pair is the clock: park it deeper along the ray to arrive '
-        'later. Two portals, one gate, no second chances.',
-    start: StartSpec(6, 6, Direction.left),
-    exit: Pos(0, 0),
-    forcedPauses: [Pos(1, 0)],
-    rotatingArrows: [RotatingArrow(6, 2, Direction.up)],
-    movers: [MovingDestroyer(1, 1, horizontal: true, dir: 1)],
-    toolkit: [ToolkitEntry(ToolType.teleporter, 2)],
+    tip: 'The tower has no door — but a portal does not need one. Fetch the '
+        'aura, then spend it on the patrol to blow the last wall open.',
+    start: StartSpec(7, 0, Direction.right),
+    exit: Pos(0, 7),
+    walls: [
+      Pos(0, 6), Pos(1, 3), Pos(1, 6), Pos(1, 7),
+      Pos(2, 3), Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 3),
+    ],
+    forcedShields: [Pos(1, 1)],
+    rotatingArrows: [RotatingArrow(4, 4, Direction.right)],
+    movers: [MovingDestroyer(2, 5, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowLeft, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
   ),
 
   // 83 — Spin Doctor: the delay dial re-aims the shielded dot at the pen once
