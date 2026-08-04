@@ -307,10 +307,12 @@ void main() {
       (0, 4, Direction.down),
       (5, 2, Direction.right),
     ],
+    // 80 — the drop into the square, then the two turns that keep feeding the
+    // tumblers. Everything else is portals (below).
     80: [
-      (2, 2, Direction.down),
-      (2, 4, Direction.down),
-      (6, 2, Direction.up),
+      (0, 1, Direction.down),
+      (2, 6, Direction.left),
+      (4, 4, Direction.left),
     ],
     81: [(4, 1, Direction.down), (5, 2, Direction.up)],
     82: [], // portals only (below)
@@ -391,6 +393,10 @@ void main() {
     // of the top run back to the start of it; the second is crossed twice, once
     // southbound off the second blast and once eastbound into the corridor.
     79: [(0, 1), (1, 6), (3, 2), (5, 4)],
+    // 80 — two pairs, in pairing order. The first drops the dot into the square
+    // of tumblers; the second is the lift home, taken once the dials have been
+    // clicked round to point at it.
+    80: [(0, 3), (1, 1), (1, 3), (1, 6)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],
@@ -523,7 +529,7 @@ void main() {
   // portal pairs on a 7x7 comes to 4.96e12 placements. Its recorded solution was
   // found by restricted enumeration (37.8M placements over 14 candidate cells,
   // 18 wins — all of them with every piece on the path).
-  const solverTooSlow = {55, 76, 77, 79, 85, 91};
+  const solverTooSlow = {55, 76, 77, 79, 80, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.

@@ -1738,10 +1738,10 @@ const Map<int, LevelData> levelDefinitions = {
   // World 6 proper (72–91): twenty rotating-arrow levels, easy to brutal. Each
   // is built around a different consequence of the dial's one rule — it fires
   // its current heading, then advances a quarter-turn clockwise per pass.
-  // Solver-verified TIGHT (the suite's BruteSearch for 72–90 bar 76, 77 and 79,
-  // and 91 — too heavy to enumerate there — by tool/verify_pairs.dart); 75, 80,
-  // 81 and 89 are UNIQUE. 76, 77 and 79 carry kits far past what the exhaustive
-  // search can enumerate — a rotating arrow rules out the path solver, and the
+  // Solver-verified TIGHT (the suite's BruteSearch for 72–90 bar 76, 77, 79 and
+  // 80, and 91 — too heavy to enumerate there — by tool/verify_pairs.dart); 75,
+  // 81 and 89 are UNIQUE. 76, 77, 79 and 80 carry kits far past what the
+  // exhaustive search can enumerate — a rotating arrow rules out the path solver, and the
   // exhaustive one cannot prune — so they are verified by their recorded
   // solutions winning under the simulator, not by a sweep. See the note on
   // solverTooSlow in levels_solvable_test.dart.
@@ -1989,26 +1989,39 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 80 — Tumblers: two dials in the corridor, each pre-spun with one exact
-  // click — mines a cell beyond both bounce spots keep you honest.
-  // Solver-verified UNIQUE.
+  // 80 — Tumblers: four dials in a square, every one of them pointing east, and
+  // an exit walled off at (0,5) and (1,5) so the only way in is from (1,6)
+  // heading north. Nothing in the kit points up — the single north-facing thing
+  // on the board is the pinned arrow at (5,3), and the only other way to face
+  // north is a dial that has been clicked round to its fourth face. So the run
+  // is a lock: drop into the square, feed each tumbler until it clicks past
+  // east, and use the pinned arrow at the bottom as the kicker that starts the
+  // second half. The last dial to come round to north is the one that lifts the
+  // dot into the portal home.
+  //
+  // Solver-verified TIGHT via restricted search (22 candidate cells, 17.9M
+  // placements): 1357 wins, 64 of them with every piece on the path, and those
+  // 64 all click through all four dials.
   80: LevelData(
     id: 80,
     size: 7,
     title: 'Tumblers',
-    tip: 'Two tumblers, one click each. Set both to the corridor, then make '
-        'the run.',
-    start: StartSpec(6, 0, Direction.right),
-    exit: Pos(3, 6),
-    walls: [Pos(5, 0), Pos(5, 1), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6)],
-    destroyers: [Pos(1, 2), Pos(1, 4)],
+    tip: 'Four tumblers, all facing east, and nothing in your kit points north. '
+        'Keep feeding them until one clicks round to the door.',
+    start: StartSpec(0, 0, Direction.right),
+    exit: Pos(0, 6),
+    walls: [Pos(0, 5), Pos(1, 5)],
+    forcedArrows: [ForcedArrow(5, 3, Direction.up)],
     rotatingArrows: [
-      RotatingArrow(3, 2, Direction.up),
-      RotatingArrow(3, 4, Direction.up),
+      RotatingArrow(2, 1, Direction.right),
+      RotatingArrow(2, 3, Direction.right),
+      RotatingArrow(4, 1, Direction.right),
+      RotatingArrow(4, 3, Direction.right),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowDown, 2),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowLeft, 2),
+      ToolkitEntry(ToolType.teleporter, 4),
     ],
   ),
 
