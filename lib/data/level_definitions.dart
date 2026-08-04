@@ -1999,9 +1999,18 @@ const Map<int, LevelData> levelDefinitions = {
   // second half. The last dial to come round to north is the one that lifts the
   // dot into the portal home.
   //
-  // Solver-verified TIGHT via restricted search (22 candidate cells, 17.9M
-  // placements): 1357 wins, 64 of them with every piece on the path, and those
-  // 64 all click through all four dials.
+  // The wall runs two cells deep at (0,4)/(1,4) and (0,5)/(1,5) so the top-right
+  // corner cannot be cut: reaching the door means coming up column 6 from below,
+  // and the only lift is a portal entered while already heading north.
+  //
+  // Solver-verified via restricted search (21 candidate cells, 12.2M
+  // placements): 229 wins, 33 of them with every piece on the path, and most of
+  // those click through all four dials. NOT fully tight — the leanest win still
+  // leaves 2 of the 7 pieces idle, and 196 of the 229 leave one or two parked.
+  // The four-dial lock is the intended route, not an enforced one. Walling
+  // column 4 cut the field hard (1357 wins before, and a 4-piece shortcut that
+  // is now gone) but did not close it completely; a single extra obstacle at
+  // (4,2) would, at the cost of reducing the level to two solutions.
   80: LevelData(
     id: 80,
     size: 7,
@@ -2010,7 +2019,7 @@ const Map<int, LevelData> levelDefinitions = {
         'Keep feeding them until one clicks round to the door.',
     start: StartSpec(0, 0, Direction.right),
     exit: Pos(0, 6),
-    walls: [Pos(0, 5), Pos(1, 5)],
+    walls: [Pos(0, 4), Pos(0, 5), Pos(1, 4), Pos(1, 5)],
     forcedArrows: [ForcedArrow(5, 3, Direction.up)],
     rotatingArrows: [
       RotatingArrow(2, 1, Direction.right),
