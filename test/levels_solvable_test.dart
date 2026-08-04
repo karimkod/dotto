@@ -307,13 +307,13 @@ void main() {
       (0, 4, Direction.down),
       (5, 2, Direction.right),
     ],
-    // 80 — the drop into the square, then the two turns west that feed the
-    // upper dials. One of only two winning placements, and every piece is on the
-    // path.
+    // 80 — the drop into the square, then the two turns west that keep feeding
+    // the tumblers. One of only five winning placements, all of which use every
+    // piece and click all four dials.
     80: [
       (0, 1, Direction.down),
-      (3, 3, Direction.left),
-      (3, 5, Direction.left),
+      (2, 6, Direction.left),
+      (4, 4, Direction.left),
     ],
     81: [(4, 1, Direction.down), (5, 2, Direction.up)],
     82: [], // portals only (below)
@@ -394,10 +394,10 @@ void main() {
     // of the top run back to the start of it; the second is crossed twice, once
     // southbound off the second blast and once eastbound into the corridor.
     79: [(0, 1), (1, 6), (3, 2), (5, 4)],
-    // 80 — two pairs, in pairing order. The second feeds the dot back into the
-    // upper dials; the first is the lift home, taken once a dial has come round
-    // to north.
-    80: [(0, 3), (1, 6), (2, 5), (3, 1)],
+    // 80 — two pairs, in pairing order. The first drops the dot into the square
+    // of tumblers; the second is the lift home, taken once the dials have been
+    // clicked round to point at it.
+    80: [(0, 3), (1, 1), (1, 3), (1, 6)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],

@@ -2001,29 +2001,32 @@ const Map<int, LevelData> levelDefinitions = {
   //
   // The wall runs two cells deep at (0,4)/(1,4) and (0,5)/(1,5) so the top-right
   // corner cannot be cut: reaching the door means coming up column 6 from below,
-  // and the only lift is a portal entered while already heading north. The plug
-  // at (4,2) closes the slack routes that crossed the lower square.
+  // and the only lift is a portal entered while already heading north. Two more
+  // blocks, at (0,2) and (3,4), close the routes that skipped half the machine —
+  // (0,2) stops the top run reaching column 3 before the dot has been down into
+  // the square, and (3,4) severs the lane that let the upper dials hand straight
+  // back to the exit column.
   //
-  // Solver-verified via restricted search (20 candidate cells, 8.1M placements):
-  // exactly 2 wins, and BOTH use all seven pieces. Fully tight — no winning
-  // placement parks anything. The two differ only in which cell holds one portal
-  // end, so this is a near-unique level.
+  // Solver-verified via restricted search: exactly 5 wins, and every one of them
+  // uses all seven pieces AND crosses all four dials. No slack placement and no
+  // two-dial shortcut survives — the lock has to be worked in full.
   //
-  // The cost of that tightness is reach: both routes cross two of the four dials
-  // — (2,1) and (2,3) — and leave (4,1) and (4,3) untouched, along with the
-  // pinned arrow at (5,3). Earlier boards traded the other way: without the
-  // (4,2) plug there were 229 wins, 33 of them tight, and those clicked all four
-  // dials. Tight-and-near-unique, or four-dial-and-loose; this is the former.
+  // Those two cells were found by sweeping all 703 pairs of floor cells against
+  // the 606 wins of the unplugged board: (0,2)+(3,4) is the ONLY pair that
+  // leaves nothing but tight four-dial solutions. Every single-wall option
+  // failed — the ones that forced tightness ((4,2), (4,4)) killed every
+  // four-dial route, and the ones that spared the four-dial routes pruned almost
+  // nothing.
   80: LevelData(
     id: 80,
     size: 7,
     title: 'Tumblers',
     tip: 'Four tumblers, all facing east, and nothing in your kit points north. '
-        'Keep feeding them until one clicks round to the door.',
+        'Every one of them has to click before the door will.',
     start: StartSpec(0, 0, Direction.right),
     exit: Pos(0, 6),
     walls: [
-      Pos(0, 4), Pos(0, 5), Pos(1, 4), Pos(1, 5), Pos(4, 2),
+      Pos(0, 2), Pos(0, 4), Pos(0, 5), Pos(1, 4), Pos(1, 5), Pos(3, 4),
     ],
     forcedArrows: [ForcedArrow(5, 3, Direction.up)],
     rotatingArrows: [
