@@ -307,13 +307,13 @@ void main() {
       (0, 4, Direction.down),
       (5, 2, Direction.right),
     ],
-    // 80 — the drop into the square and the turn that feeds the (4,3) dial off
-    // the pinned arrow below it. The second left arrow at (0,3) is idle: no
-    // winning placement uses all seven pieces (see the note on the level).
+    // 80 — the drop into the square, then the two turns west that feed the
+    // upper dials. One of only two winning placements, and every piece is on the
+    // path.
     80: [
-      (0, 2, Direction.down),
-      (0, 3, Direction.left),
-      (5, 4, Direction.left),
+      (0, 1, Direction.down),
+      (3, 3, Direction.left),
+      (3, 5, Direction.left),
     ],
     81: [(4, 1, Direction.down), (5, 2, Direction.up)],
     82: [], // portals only (below)
@@ -394,10 +394,10 @@ void main() {
     // of the top run back to the start of it; the second is crossed twice, once
     // southbound off the second blast and once eastbound into the corridor.
     79: [(0, 1), (1, 6), (3, 2), (5, 4)],
-    // 80 — two pairs, in pairing order. The second straddles the (4,3) dial and
-    // bounces the dot back into it face after face; the first is the lift home,
-    // taken once that dial has come round to north.
-    80: [(1, 6), (3, 3), (4, 2), (4, 4)],
+    // 80 — two pairs, in pairing order. The second feeds the dot back into the
+    // upper dials; the first is the lift home, taken once a dial has come round
+    // to north.
+    80: [(0, 3), (1, 6), (2, 5), (3, 1)],
     // 82 — the warp clock: park the pair on the dial's ray, out to the far
     // column's climb.
     82: [(2, 2), (5, 0)],

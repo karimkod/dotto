@@ -1999,22 +1999,21 @@ const Map<int, LevelData> levelDefinitions = {
   // second half. The last dial to come round to north is the one that lifts the
   // dot into the portal home.
   //
-  // The wall runs three cells deep down columns 4 and 5, rows 0-2, so the
-  // top-right corner cannot be cut: reaching the door means coming up column 6
-  // from below, and the only lift is a portal entered while already heading
-  // north.
+  // The wall runs two cells deep at (0,4)/(1,4) and (0,5)/(1,5) so the top-right
+  // corner cannot be cut: reaching the door means coming up column 6 from below,
+  // and the only lift is a portal entered while already heading north. The plug
+  // at (4,2) closes the slack routes that crossed the lower square.
   //
-  // Solver-verified via restricted search (21 candidate cells, 12.2M
-  // placements): 33 wins. NONE of them tight — every winning placement parks one
-  // of the two left arrows, so the leanest and the richest win alike use 6 of
-  // the 7 pieces. And all 33 exercise exactly ONE of the four dials: the surviving
-  // routes bounce the (4,3) dial through all four faces with a portal pair
-  // either side of it, and never touch (2,1), (2,3) or (4,1).
+  // Solver-verified via restricted search (20 candidate cells, 8.1M placements):
+  // exactly 2 wins, and BOTH use all seven pieces. Fully tight — no winning
+  // placement parks anything. The two differ only in which cell holds one portal
+  // end, so this is a near-unique level.
   //
-  // That is a step backwards from the two-deep version, which had 33 tight
-  // solutions and routes clicking all four dials — the third wall row removed
-  // exactly the paths that crossed the upper half of the square. Worth revisiting
-  // if the four-dial reading matters more than the smaller solution count.
+  // The cost of that tightness is reach: both routes cross two of the four dials
+  // — (2,1) and (2,3) — and leave (4,1) and (4,3) untouched, along with the
+  // pinned arrow at (5,3). Earlier boards traded the other way: without the
+  // (4,2) plug there were 229 wins, 33 of them tight, and those clicked all four
+  // dials. Tight-and-near-unique, or four-dial-and-loose; this is the former.
   80: LevelData(
     id: 80,
     size: 7,
@@ -2024,7 +2023,7 @@ const Map<int, LevelData> levelDefinitions = {
     start: StartSpec(0, 0, Direction.right),
     exit: Pos(0, 6),
     walls: [
-      Pos(0, 4), Pos(0, 5), Pos(1, 4), Pos(1, 5), Pos(2, 4), Pos(2, 5),
+      Pos(0, 4), Pos(0, 5), Pos(1, 4), Pos(1, 5), Pos(4, 2),
     ],
     forcedArrows: [ForcedArrow(5, 3, Direction.up)],
     rotatingArrows: [
