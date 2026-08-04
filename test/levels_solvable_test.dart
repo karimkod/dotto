@@ -885,9 +885,17 @@ void main() {
 
     test('the solver does not offer solutions that cross a patrol', () {
       // Every solution the search returns must survive the real simulator.
-      // Two-pair levels aren't solver-enumerable (see multiPairLevels), so skip.
+      //
+      // Both skip sets apply. multiPairLevels are not solver-enumerable at all;
+      // solverTooSlow are, but not in any useful time — and this sweep calls
+      // solveFor directly, so without that second guard a level in solverTooSlow
+      // gets fully enumerated here no matter what the per-level tests skip.
+      // Level 77 is the case in point: it carries a patrol AND a seven-piece
+      // kit, which is 1.94e10 placements, and it hung the whole suite here.
       for (final n in allLevels.where((n) =>
-          levelDataFor(n)!.movers.isNotEmpty && !multiPairLevels.contains(n))) {
+          levelDataFor(n)!.movers.isNotEmpty &&
+          !multiPairLevels.contains(n) &&
+          !solverTooSlow.contains(n))) {
         final level = levelDataFor(n)!;
         for (final s in solveFor(level)) {
           // cached
