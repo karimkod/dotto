@@ -315,7 +315,9 @@ void main() {
       (2, 6, Direction.left),
       (4, 4, Direction.left),
     ],
-    81: [(4, 1, Direction.down), (5, 2, Direction.up)],
+    // 81 — the turn into the ring's floor and the climb that feeds it. The hold
+    // that times the last lane is below.
+    81: [(2, 2, Direction.down), (3, 3, Direction.up)],
     82: [], // portals only (below)
     83: [(2, 2, Direction.down), (4, 3, Direction.up)],
     84: [(2, 3, Direction.down), (5, 3, Direction.up)],
@@ -435,6 +437,9 @@ void main() {
     // ----- World 6. -----
     // 73: the gate cell, held so the column-2 patrol has walked past.
     73: [(3, 1)],
+    // 81: held inside the ring so the last lap crosses the column-2 patrol on
+    // the safe beat.
+    81: [(2, 4)],
     84: [(4, 3)],
     85: [(4, 3)],
     88: [(3, 5)],

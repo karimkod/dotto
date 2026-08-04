@@ -2042,28 +2042,30 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 81 — Roundabout: four dials at the ring's corners. One lap clockwise, one
-  // lap counter-clockwise as they all advance, then the machine flings the
-  // dot out west. The pinned pause guards the exit's doorstep.
-  // Solver-verified UNIQUE.
+  // 81 — Roundabout: four dials set as a ring in the north-east, each pointing
+  // at the next one round, so a dot fed into the ring is carried corner to
+  // corner — and every lap advances all four, so the ring hands it back out on a
+  // different face each time. A patrol runs column 2, which is the lane the exit
+  // sits under, so the kit's pause is the clock for the last crossing.
   81: LevelData(
     id: 81,
     size: 7,
     title: 'Roundabout',
-    tip: 'Step in and watch: one lap clockwise, one lap back, then the '
-        'machine throws you out. Be standing in the right place to catch it.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(6, 1),
-    forcedPauses: [Pos(5, 1)],
+    tip: 'The ring passes you corner to corner, and every lap turns it. Ride it '
+        'until it spits you at the floor, and time the last lane.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(6, 2),
     rotatingArrows: [
-      RotatingArrow(2, 2, Direction.right),
-      RotatingArrow(2, 4, Direction.down),
-      RotatingArrow(4, 4, Direction.left),
-      RotatingArrow(4, 2, Direction.up),
+      RotatingArrow(0, 3, Direction.right),
+      RotatingArrow(0, 5, Direction.down),
+      RotatingArrow(2, 3, Direction.up),
+      RotatingArrow(2, 5, Direction.left),
     ],
+    movers: [MovingDestroyer(2, 2, horizontal: false, dir: 1)],
     toolkit: [
       ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
     ],
   ),
 
@@ -2071,6 +2073,16 @@ const Map<int, LevelData> levelDefinitions = {
   // up-ray is the clock face — park the portal pair deeper along it to leave
   // later, and land the far column's climb on the pinned-pause gate between
   // the patrol's sweeps.
+  //
+  // NOTE: a proposed 8x8 redesign (pinned aura at (1,1), spine at row 3, patrol
+  // on row 2, exit boxed at (0,7)) was left unapplied — it has no solution. The
+  // kit held up/left/right and a portal pair but no DOWN arrow, and the board
+  // had no pinned arrow, so the dial's second face was the only source of
+  // southward travel in the level. Descending into the walled tower to collect
+  // the aura therefore cost the whole portal pair AND both up arrows, leaving
+  // nothing to climb column 7 with — and column 7 is the only way into the exit,
+  // since opening it needs the aura spent on the patrol at (2,7). See the commit
+  // message for the searches run.
   82: LevelData(
     id: 82,
     size: 7,
