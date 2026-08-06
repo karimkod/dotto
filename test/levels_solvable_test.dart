@@ -369,6 +369,15 @@ void main() {
       (7, 4, Direction.up),
     ],
     92: [], // one-shot only (below)
+    // ----- World 7 (93–110): one-shot arrows. Most kits are one-shots,
+    // pauses, shields and portals — the permanent arrows sit here.
+    // 93: the steady up that starts the climb on both laps.
+    93: [(4, 2, Direction.up)],
+    94: [], 95: [], 96: [], 97: [], 98: [], 99: [], 100: [], 101: [],
+    102: [],
+    // 103: the steady up that bounces both of its arrivals.
+    103: [(6, 4, Direction.up)],
+    104: [], 105: [], 106: [], 107: [], 108: [], 109: [], 110: [],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -433,6 +442,15 @@ void main() {
     85: [(1, 2), (4, 0), (1, 5), (2, 1), (4, 2), (5, 4)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
+    // ----- World 7. -----
+    // 99 — the fall enters (5,2); the far end is pinned by the chimney walls.
+    99: [(5, 2), (4, 5)],
+    // 104 — entered north-bound at (0,4) off the climb, west-bound off the
+    // roof; (5,6) emits into the chimney and then beside the door.
+    104: [(0, 4), (5, 6)],
+    // 110 — the roof run enters (0,6) west-bound; (3,4) emits into the
+    // rotor's second face.
+    110: [(0, 6), (3, 4)],
   };
 
   // Intended one-shot arrow placements (World 7). Same shape as `intended`, but
@@ -443,6 +461,37 @@ void main() {
     // north once; on the way back down the cell is empty and the dot falls
     // through it into the exit.
     92: [(2, 2, Direction.up)],
+    // 93: the detour to the pinned shield, burned so lap two climbs through.
+    93: [(2, 2, Direction.left)],
+    // 94: the two batons — climb-and-fall, kick-east-and-fall.
+    94: [(2, 2, Direction.up), (4, 2, Direction.right)],
+    95: [(3, 3, Direction.up)],
+    96: [(3, 3, Direction.up)],
+    97: [(5, 2, Direction.up)],
+    98: [(4, 3, Direction.up)],
+    99: [(4, 2, Direction.up)],
+    // 100: the interceptor that bounces the dial's first ray short of the mine.
+    100: [(2, 3, Direction.down)],
+    // 101: the three fuses, burned left to right.
+    101: [
+      (3, 1, Direction.up),
+      (3, 3, Direction.up),
+      (3, 5, Direction.down),
+    ],
+    102: [(5, 2, Direction.up)],
+    103: [(0, 4, Direction.down)],
+    104: [(5, 2, Direction.up)],
+    105: [(2, 2, Direction.up), (4, 2, Direction.right)],
+    106: [(5, 3, Direction.up)],
+    107: [(5, 2, Direction.up), (5, 5, Direction.left)],
+    // 108: the three bridges, each one rung lower.
+    108: [
+      (1, 2, Direction.up),
+      (3, 4, Direction.up),
+      (5, 6, Direction.up),
+    ],
+    109: [(2, 5, Direction.down)],
+    110: [(7, 3, Direction.up)],
   };
 
   // Intended pause placements (World 4).
@@ -486,6 +535,25 @@ void main() {
     89: [(3, 5), (4, 5)],
     90: [(3, 2)],
     91: [(7, 3)],
+    // ----- World 7. -----
+    // 95: the doorstep hold that shifts both lane crossings to safe beats.
+    95: [(3, 2)],
+    // 97: held for the short lane's beat before the climb.
+    97: [(4, 2)],
+    // 98: the between-lanes cell, held on the climb AND the fall.
+    98: [(2, 3)],
+    // 100: above the dial — held on the ray up, the bounce down and the fall.
+    100: [(3, 3)],
+    // 102: held inside the lane, where the patrol walks into the kill.
+    102: [(2, 2)],
+    // 105: the doorstep hold that times all four convoy crossings.
+    105: [(2, 1)],
+    106: [(5, 2)],
+    107: [(7, 3)],
+    // 109: held above the dial before the lane ride.
+    109: [(3, 5)],
+    // 110: the doorstep, held on both floor passes.
+    110: [(7, 2)],
   };
 
   // Intended shield placements (World 3, plus World 4's chain-explosion levels).
@@ -544,6 +612,11 @@ void main() {
     // second collected on the way up to meet the climber at the wall.
     84: [(2, 3), (6, 2)],
     87: [(3, 4)],
+    // ----- World 7. -----
+    // 96: the one approach cell before the turn — armour for the ceiling mine.
+    96: [(3, 2)],
+    // 102: the aura the climb spends on the mine at (4,2).
+    102: [(5, 1)],
   };
 
   // Walk the definitions themselves, so a new level is never silently skipped.

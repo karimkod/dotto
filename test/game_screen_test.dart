@@ -295,11 +295,16 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 92 "Once Only": one single-use arrow at (2,2). It fires the dot
-    // north, the pinned arrow sends it back, and it falls through the cell it
-    // was turned in — so this also covers one-shot consumption end to end,
+    // Level 110 "Once and For All": the World 7 finale. Once-up at (7,3),
+    // the doorstep pause at (7,2), and the portal pair (0,6)->(3,4) — placed
+    // in that order so the placement-order pairing matches the recorded
+    // solution. Exercises one-shot consumption, pause holds, warp AND rotor
     // through the real widget.
-    await _dragArrow(tester, tester.getCenter(find.text('ONCE UP')), cell(2, 2));
+    await _dragArrow(
+        tester, tester.getCenter(find.text('ONCE UP')), cell(7, 3));
+    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 2));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 6));
+    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(3, 4));
 
     await runToWin(tester);
 
@@ -357,8 +362,8 @@ void main() {
         reason: 'the arrow must not vanish while the dot is still standing on it');
 
     await runToWin(tester);
-    // 92 is the last level, so the win card offers Back to Menu.
-    expect(find.text('Back to Menu'), findsOneWidget);
+    // 92 opens World 7 but no longer ends it, so the win card offers Continue.
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   // Consuming a one-shot is a fact about the RUN, not about the player's kit —

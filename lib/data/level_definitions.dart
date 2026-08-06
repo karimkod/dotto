@@ -2396,6 +2396,544 @@ const Map<int, LevelData> levelDefinitions = {
     forcedArrows: [ForcedArrow(0, 2, Direction.down)],
     toolkit: [ToolkitEntry(ToolType.oneShotUp, 1)],
   ),
+
+  // World 7 proper (93–110): eighteen one-shot levels, easy to brutal. The
+  // design rule every board here obeys: a one-shot slot must NEED the turn on
+  // its first pass (straight ahead is death) and NEED the empty cell on a
+  // later pass (a permanent arrow there loops forever) — otherwise the piece
+  // is an ordinary arrow in disguise. All eighteen are solver-verified TIGHT
+  // by the shipped BruteSearch (one-shots route away from the path solver)
+  // and re-verified by the one-shot-aware PairSearch in
+  // tool/verify_pairs.dart; 93–101, 103–105, 108 and 110 are UNIQUE.
+
+  // 93 — Burn the Detour: one arrow of each kind, and the lap decides which
+  // is which. The permanent up at (4,2) starts the climb on BOTH laps; the
+  // one-shot left detours lap one to the pinned shield, the pinned arrow
+  // drops the dot home, and the relaunched climb runs straight through the
+  // spent cell into the mine the aura now pays for. A permanent left would
+  // orbit forever; a one-shot up at (4,2) would leave lap two running off the
+  // east edge. The wall at (0,3) closes the back door into the exit row.
+  93: LevelData(
+    id: 93,
+    size: 5,
+    title: 'Burn the Detour',
+    tip: 'One arrow lasts, one burns. Spend the left fetching the shield — '
+        'next lap the climb falls straight through where it was, armour and '
+        'all.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 2),
+    walls: [Pos(0, 3)],
+    destroyers: [Pos(1, 2)],
+    forcedArrows: [ForcedArrow(2, 0, Direction.down)],
+    forcedShields: [Pos(2, 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.oneShotLeft, 1),
+    ],
+  ),
+
+  // 94 — Relay: two one-shots passed like a baton. Climb and fall through the
+  // first (92's figure), kick east off the second and fall back through it
+  // westward, collect the pinned shield on the way home, and let the start
+  // relaunch the third pass — east across both spent cells and through the
+  // mine blast to the door. The mines at (5,2) and (2,4) are the two "straight
+  // ahead is death" guards that make each burn mandatory.
+  94: LevelData(
+    id: 94,
+    size: 6,
+    title: 'Relay',
+    tip: 'Two arrows, each burned once: climb and fall, kick east and fall '
+        'again. Grab the armour on the way home — the third pass runs the row '
+        'clean through.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 5),
+    destroyers: [Pos(5, 2), Pos(2, 4)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(4, 4, Direction.left),
+      ForcedArrow(4, 0, Direction.up),
+    ],
+    forcedShields: [Pos(4, 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.oneShotRight, 1),
+    ],
+  ),
+
+  // 95 — Turnstile: the 92 bounce-figure through a patrol lane, crossed once
+  // going up and once falling back down. The patrol hits column 3 at ticks
+  // {1,7} of its 10-beat lap: the unheld run's crossings land on 3 and 7 —
+  // dead on the second — while the doorstep hold shifts both to safe beats.
+  // A hold inside the column is counted twice and dies at tick 11 ≡ 1.
+  // Solver-verified TIGHT and UNIQUE.
+  95: LevelData(
+    id: 95,
+    size: 6,
+    title: 'Turnstile',
+    tip: 'One turn of the stile, then it folds flat. Hold a beat on the '
+        'doorstep — the lane above is crossed going up AND coming down.',
+    start: StartSpec(3, 1, Direction.right),
+    exit: Pos(5, 3),
+    forcedArrows: [ForcedArrow(0, 3, Direction.down)],
+    movers: [MovingDestroyer(2, 4, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 96 — Backdraft: the climb rams the mine and the blast demolishes the wall
+  // ABOVE it — the climb clears its own ceiling. The bounce then falls back
+  // through the hole and the spent cell alike. The mine at (3,4) kills the
+  // straight run east, so the turn is mandatory; the shield's only slot is
+  // the one approach cell. Solver-verified TIGHT and UNIQUE.
+  96: LevelData(
+    id: 96,
+    size: 6,
+    title: 'Backdraft',
+    tip: 'Armour up, punch through the mine — the blast takes the ceiling '
+        'with it. The way home falls through the hole you made.',
+    start: StartSpec(3, 1, Direction.right),
+    exit: Pos(5, 3),
+    walls: [Pos(1, 3)],
+    destroyers: [Pos(2, 3), Pos(3, 4)],
+    forcedArrows: [ForcedArrow(0, 3, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.oneShotUp, 1),
+    ],
+  ),
+
+  // 97 — Roadworks: a short patrol lane walled at (3,4), and the mine above
+  // that wall is the demolition charge — ramming it shielded EXTENDS the lane
+  // mid-run, so the descent crosses a longer, slower patrol than the climb
+  // did. Both pinned shields are tolls on the tour; the relaunch spends the
+  // second on the floor mine. The pause's one winning slot is (4,2), holding
+  // the climb for the short lane's beat. Solver-verified TIGHT and UNIQUE.
+  97: LevelData(
+    id: 97,
+    size: 7,
+    title: 'Roadworks',
+    tip: 'The wall pens the patrol into half its road. Blast it open and the '
+        'lane doubles — time the climb for the short road, the descent for '
+        'the long one.',
+    start: StartSpec(5, 1, Direction.right),
+    exit: Pos(5, 5),
+    walls: [Pos(3, 4)],
+    destroyers: [Pos(2, 4), Pos(5, 3)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.right),
+      ForcedArrow(0, 4, Direction.down),
+      ForcedArrow(6, 4, Direction.left),
+      ForcedArrow(6, 1, Direction.up),
+    ],
+    forcedShields: [Pos(0, 3), Pos(6, 2)],
+    movers: [MovingDestroyer(3, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 98 — Metronome: the bounce column crosses TWO patrol lanes, and both
+  // patrols start on that very column. A pause between the lanes is held on
+  // the climb AND again on the fall — the (0,+2,+2,+4) shift across the four
+  // crossings that no other slot can produce. Solver-verified TIGHT and
+  // UNIQUE: the between-lanes cell is the only winning hold.
+  98: LevelData(
+    id: 98,
+    size: 7,
+    title: 'Metronome',
+    tip: 'Four crossings, two lanes, one hold — and the beat between the '
+        'lanes is counted twice, once going up and once coming down.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(6, 3),
+    forcedArrows: [ForcedArrow(0, 3, Direction.down)],
+    movers: [
+      MovingDestroyer(1, 3, horizontal: true, dir: 1),
+      MovingDestroyer(3, 3, horizontal: true, dir: -1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 99 — Through the Floor: the 92 bounce falls through the spent cell INTO a
+  // portal on the floor below it, and pops out at the top of the walled
+  // chimney beside the exit. The mine at (5,4) kills every warp shortcut
+  // along the floor, and the chimney walls pin the exit-side end to (4,5) —
+  // the pair's wiring is forced. Solver-verified TIGHT and UNIQUE.
+  99: LevelData(
+    id: 99,
+    size: 6,
+    title: 'Through the Floor',
+    tip: 'Fall through where the arrow was, straight into the warp below it — '
+        'and step out at the top of the chimney next door.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(5, 5),
+    walls: [Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5)],
+    destroyers: [Pos(5, 4)],
+    forcedArrows: [ForcedArrow(0, 2, Direction.down)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 100 — Wind-Up: the rotor fires up into the one-shot, which bounces the
+  // ray back short of the mine — the bare ray dies on it. The wound dial then
+  // throws the grand tour east, up the wall and back along the top, entering
+  // the row-0 lane at its bounce end: a trailing chase only the pause above
+  // the dial survives. That pause is held THREE times — ray up, bounce down,
+  // and the late fall — before the third face drops the dot out below.
+  // Solver-verified TIGHT and UNIQUE.
+  100: LevelData(
+    id: 100,
+    size: 7,
+    title: 'Wind-Up',
+    tip: 'Bounce the first ray short of the mine, and the dial winds itself. '
+        'The hold above it is counted three times — then the third face '
+        'points home.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(6, 3),
+    destroyers: [Pos(1, 3)],
+    forcedArrows: [
+      ForcedArrow(4, 6, Direction.up),
+      ForcedArrow(0, 6, Direction.left),
+      ForcedArrow(0, 3, Direction.down),
+    ],
+    forcedShields: [Pos(2, 6)],
+    rotatingArrows: [RotatingArrow(4, 3, Direction.up)],
+    movers: [MovingDestroyer(0, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 101 — Slow Fuse: three one-shots on the start row, burned strictly left
+  // to right over three relaunch laps. Loop one fetches the first aura; loop
+  // two spends it on the mine, rides the top, falls down the east wall over
+  // the second aura and KILLS the row-5 patrol at exactly (5,5) — the kill's
+  // chain blast is what opens the wall door at (4,5). The final burn drops
+  // through the door. No aura can fake a wall opening, so the loops cannot
+  // be skipped; the pinned pause at (5,5) keeps the kill cell placement-free
+  // and holds the ride two beats over the meet. Solver-verified TIGHT and
+  // UNIQUE.
+  101: LevelData(
+    id: 101,
+    size: 7,
+    title: 'Slow Fuse',
+    tip: 'Three fuses on one row, burned in order. The second lap must ram '
+        'the patrol right beside the door — only that blast opens it for the '
+        'third.',
+    start: StartSpec(3, 0, Direction.right),
+    exit: Pos(6, 5),
+    walls: [Pos(4, 5)],
+    destroyers: [Pos(2, 3)],
+    forcedArrows: [
+      ForcedArrow(1, 1, Direction.left),
+      ForcedArrow(1, 0, Direction.down),
+      ForcedArrow(0, 3, Direction.right),
+      ForcedArrow(0, 6, Direction.down),
+      ForcedArrow(5, 6, Direction.left),
+      ForcedArrow(5, 0, Direction.up),
+    ],
+    forcedShields: [Pos(2, 1), Pos(2, 6)],
+    forcedPauses: [Pos(5, 5)],
+    movers: [MovingDestroyer(5, 4, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 2),
+      ToolkitEntry(ToolType.oneShotDown, 1),
+    ],
+  ),
+
+  // 102 — Punch Card: the climb blasts the mine with the placed aura, picks
+  // up the pinned one, and must MEET the row-2 patrol in its own column —
+  // the kill is what makes the later fall safe on every beat. The fall then
+  // drops through the whole punched column: dead lane, taken shield, cleared
+  // mine, spent one-shot — and the floor run rides the row-6 patrol's lane
+  // to the door. Two winning timings of the same kill (hold above the lane,
+  // or hold inside it); solver-verified TIGHT.
+  102: LevelData(
+    id: 102,
+    size: 7,
+    title: 'Punch Card',
+    tip: 'Punch the column: mine, shield, sentry, arrow. Meet the patrol in '
+        'your own lane — the fall only reads clean through a dead one.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(6, 6),
+    destroyers: [Pos(4, 2)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(6, 2, Direction.right),
+    ],
+    forcedShields: [Pos(3, 2)],
+    movers: [
+      MovingDestroyer(2, 1, horizontal: true, dir: 1),
+      MovingDestroyer(6, 2, horizontal: true, dir: 1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.shield, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 103 — Three Clocks: one machine, three kinds of answer. The permanent up
+  // at (6,4) bounces both of its arrivals; the rotor at (1,4) gives a
+  // different ray each pass — right, down, left; the one-shot down at (0,4)
+  // answers once, and the final run west crosses its empty cell into the
+  // mine the pinned aura pays for. Swap the two kit arrows and the board
+  // refuses both ways. Solver-verified TIGHT and UNIQUE.
+  103: LevelData(
+    id: 103,
+    size: 7,
+    title: 'Three Clocks',
+    tip: 'A steady arrow answers every time, a dial answers differently, a '
+        'one-shot answers once. Place the two you hold where each is the '
+        'right kind of clock.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(0, 0),
+    destroyers: [Pos(0, 2)],
+    forcedArrows: [
+      ForcedArrow(1, 6, Direction.up),
+      ForcedArrow(0, 6, Direction.left),
+      ForcedArrow(1, 1, Direction.down),
+      ForcedArrow(5, 1, Direction.right),
+      ForcedArrow(5, 6, Direction.up),
+    ],
+    forcedShields: [Pos(3, 1)],
+    rotatingArrows: [RotatingArrow(1, 4, Direction.right)],
+    toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.oneShotDown, 1),
+    ],
+  ),
+
+  // 104 — Tinderbox: one portal pair, entered twice with different headings.
+  // The bounce falls through the spent cell onto the floor run, the pinned
+  // up rams the mine with the first aura, and the climb enters the portal
+  // NORTH-bound — out at the chimney base, up over the second mine (the
+  // second aura's toll, which pins the pair's far end to the top of the
+  // climb), and back along the roof — where the same portal is entered
+  // WEST-bound and drops the dot beside the door. Solver-verified TIGHT and
+  // UNIQUE.
+  104: LevelData(
+    id: 104,
+    size: 7,
+    title: 'Tinderbox',
+    tip: 'One warp, two ways through it: in from below climbing, in from the '
+        'roof walking west. The same door opens on two different rooms.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(5, 5),
+    walls: [Pos(6, 5), Pos(6, 0), Pos(4, 5)],
+    destroyers: [Pos(5, 4), Pos(3, 6)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(6, 2, Direction.right),
+      ForcedArrow(6, 4, Direction.up),
+      ForcedArrow(0, 6, Direction.left),
+    ],
+    forcedShields: [Pos(6, 3), Pos(1, 4)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
+
+  // 105 — Powder Trail: the Relay figure threaded through two patrol lanes.
+  // The climb-and-fall crosses row 1 twice, the fall crosses row 3, and the
+  // relaunch climb crosses it again in column 0 — four crossings against two
+  // clocks, all hanging off the doorstep hold at (2,1). Then the spent row
+  // hands the dot home through the mine. Solver-verified TIGHT and UNIQUE.
+  105: LevelData(
+    id: 105,
+    size: 7,
+    title: 'Powder Trail',
+    tip: 'The relay again — but now two patrols own the rows between the '
+        'burns. One hold at the door times all four crossings.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(2, 6),
+    destroyers: [Pos(2, 4)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(4, 5, Direction.left),
+      ForcedArrow(4, 0, Direction.up),
+    ],
+    forcedShields: [Pos(4, 1)],
+    movers: [
+      MovingDestroyer(1, 2, horizontal: true, dir: -1),
+      MovingDestroyer(3, 3, horizontal: true, dir: 1),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.oneShotRight, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 106 — Matchbook: the rotor at (5,4) winds itself — its first face throws
+  // the dot down into the pinned bounce, the second throws it west across
+  // the spent cell to the start, and the relaunch feeds it a third time. But
+  // the third face's ray up column 4 is mined, and the only aura hangs off
+  // the one-shot's climb over the top and down the east wall, through the
+  // row-2 patrol. Burn the climb, ride the fall, and the third face carries
+  // the armour out. Solver-verified TIGHT (two timings of the doorstep
+  // hold).
+  106: LevelData(
+    id: 106,
+    size: 7,
+    title: 'Matchbook',
+    tip: 'The dial winds itself off the wall below it — but its last ray is '
+        'mined. Strike the match: climb over the top, fetch the armour, and '
+        'let the third face throw you through.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(1, 4),
+    destroyers: [Pos(3, 4)],
+    forcedArrows: [
+      ForcedArrow(0, 3, Direction.right),
+      ForcedArrow(0, 6, Direction.down),
+      ForcedArrow(6, 6, Direction.left),
+      ForcedArrow(6, 4, Direction.up),
+    ],
+    forcedShields: [Pos(2, 6)],
+    rotatingArrows: [RotatingArrow(5, 4, Direction.down)],
+    movers: [MovingDestroyer(2, 3, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 107 — Firebreak: the Relay at full scale. Bounce up column 2 and fall
+  // back through it across the row-6 lane; ride the floor east and climb
+  // into the once-left, which sends the dot back WEST across the first spent
+  // cell to the start; the relaunch then runs east across both spent cells
+  // and blasts the mine with the pinned aura. The lane is crossed by the
+  // fall and the climb — one hold on the floor times both. Solver-verified
+  // TIGHT (two floor slots for the hold).
+  107: LevelData(
+    id: 107,
+    size: 8,
+    title: 'Firebreak',
+    tip: 'Two burns and a lane between them: fall through the first, turn '
+        'back at the second, and the last lap crosses both scars into the '
+        'blast.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(5, 7),
+    destroyers: [Pos(5, 6)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(7, 2, Direction.right),
+      ForcedArrow(7, 5, Direction.up),
+    ],
+    forcedShields: [Pos(6, 5)],
+    movers: [MovingDestroyer(6, 1, horizontal: true, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.oneShotLeft, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 108 — Burning Bridges: the pure exam — three bounces on a descending
+  // ladder, each pinned catcher one rung lower, each fall burning the bridge
+  // it just crossed. One mine guards the first row; every other straight
+  // line ends at an edge, so each turn is mandatory and each spent cell is
+  // fallen through. No shields, no patrols, no warps: just geometry and
+  // three arrows that stop existing. Solver-verified TIGHT and UNIQUE.
+  108: LevelData(
+    id: 108,
+    size: 8,
+    title: 'Burning Bridges',
+    tip: 'Three bridges, three burns, each one rung lower. Cross, fall '
+        'through the ashes, and cross again — there is no way back up.',
+    start: StartSpec(1, 0, Direction.right),
+    exit: Pos(7, 7),
+    destroyers: [Pos(1, 4)],
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.down),
+      ForcedArrow(3, 2, Direction.right),
+      ForcedArrow(2, 4, Direction.down),
+      ForcedArrow(5, 4, Direction.right),
+      ForcedArrow(4, 6, Direction.down),
+      ForcedArrow(7, 6, Direction.right),
+    ],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 3),
+    ],
+  ),
+
+  // 109 — Embers: the caught-ray exam. The rotor's first ray climbs into the
+  // once-down, which bounces it back short of the mine; the second face
+  // throws the dot east into the column-7 lane — a five-cell ride straight
+  // up a patrol's own road, which only the right hold survives. The top-row
+  // return falls back down column 5, blasts the mine with the aura from the
+  // ride, crosses the spent cell, and the third face drops the dot out at
+  // the bottom. Solver-verified TIGHT (two slots for the hold).
+  109: LevelData(
+    id: 109,
+    size: 8,
+    title: 'Embers',
+    tip: 'Bounce the first ray, ride the second straight up the sentry\'s own '
+        'column, and fall home down the third — through the ember you '
+        'already burned.',
+    start: StartSpec(5, 0, Direction.right),
+    exit: Pos(7, 5),
+    destroyers: [Pos(1, 5)],
+    forcedArrows: [
+      ForcedArrow(5, 7, Direction.up),
+      ForcedArrow(0, 7, Direction.left),
+      ForcedArrow(0, 5, Direction.down),
+    ],
+    forcedShields: [Pos(2, 7)],
+    rotatingArrows: [RotatingArrow(5, 5, Direction.up)],
+    movers: [MovingDestroyer(3, 7, horizontal: false, dir: 1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotDown, 1),
+      ToolkitEntry(ToolType.pause, 1),
+    ],
+  ),
+
+  // 110 — Once and For All: the World 7 finale, and the whole world in one
+  // run. The burn at (7,3) starts the climb across the lane into the rotor's
+  // first face; the pinned drop brings the dot home for the relaunch, whose
+  // doorstep pause is held on BOTH floor passes; the relaunch crosses the
+  // spent cell, blasts the first mine, and climbs the far tower over the
+  // second aura; the roof run enters the portal WEST-bound — its wiring
+  // forced by the column-5 mine seam and the exit's mined flanks — and the
+  // rotor's second face lifts the dot up the guarded column, through the
+  // last blast, into the door. Solver-verified TIGHT and UNIQUE.
+  110: LevelData(
+    id: 110,
+    size: 8,
+    title: 'Once and For All',
+    tip: 'Everything burns once: the arrow, the auras, the beats of the '
+        'doorstep hold. Wind the dial twice, thread the warp, and finish it '
+        '— once and for all.',
+    start: StartSpec(7, 1, Direction.right),
+    exit: Pos(0, 3),
+    walls: [Pos(0, 2)],
+    destroyers: [
+      Pos(7, 5), Pos(3, 5), Pos(0, 5), Pos(0, 4), Pos(1, 3),
+    ],
+    forcedArrows: [
+      ForcedArrow(3, 0, Direction.down),
+      ForcedArrow(7, 0, Direction.right),
+      ForcedArrow(7, 7, Direction.up),
+      ForcedArrow(0, 7, Direction.left),
+    ],
+    forcedShields: [Pos(5, 0), Pos(1, 7)],
+    rotatingArrows: [RotatingArrow(3, 3, Direction.left)],
+    movers: [MovingDestroyer(6, 6, horizontal: true, dir: -1)],
+    toolkit: [
+      ToolkitEntry(ToolType.oneShotUp, 1),
+      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 2),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

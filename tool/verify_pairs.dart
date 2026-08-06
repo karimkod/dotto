@@ -57,6 +57,7 @@ class _State {
     required this.portalOrder,
     required this.remaining,
     required this.rotations,
+    required this.spent,
   });
 
   int r, c, pause, tick;
@@ -64,6 +65,10 @@ class _State {
   bool shielded;
   Set<int> taken, removed, decided;
   List<int> moverPos, moverDir;
+
+  /// Cells whose one-shot arrow the dot has already used — empty from then on,
+  /// exactly as in the simulator's own `spent` set.
+  Set<int> spent;
 
   /// Live rotating-arrow headings (cell -> current direction) — advances one
   /// quarter-turn CW per pass, exactly as in the simulator.
@@ -97,6 +102,7 @@ class _State {
         portalOrder: [...portalOrder],
         remaining: {...remaining},
         rotations: {...rotations},
+        spent: {...spent},
       );
 }
 
@@ -294,6 +300,7 @@ class PairSearch {
       portalOrder: [],
       remaining: {for (final e in level.toolkit) e.type: e.count},
       rotations: buildRotations(level),
+      spent: {},
     );
     _advance(s0);
   }
@@ -352,8 +359,11 @@ class PairSearch {
         return;
       }
 
-      final placedHere = s.placed[key];
+      // A spent one-shot leaves its cell reading as empty for the rest of the
+      // run — the piece is still "placed" for counting, but no longer acts.
+      final placedHere = s.spent.contains(key) ? null : s.placed[key];
       if (placedHere != null) {
+        if (placedHere.isOneShot) s.spent.add(key);
         if (!_apply(s, placedHere.placedType, placedHere.direction, key)) {
           return;
         }
@@ -392,6 +402,9 @@ class PairSearch {
       next.decided.add(key);
       next.remaining[t] = next.remaining[t]! - 1;
       next.placed[key] = t;
+      // The dot is standing on the piece it just "placed", so a one-shot is
+      // consumed by this very first pass.
+      if (t.isOneShot) next.spent.add(key);
       if (!_apply(next, t.placedType, t.direction, key)) continue;
       if (level.baseTypeAt(next.r, next.c) == CellType.exit) {
         _recordWin(next);
