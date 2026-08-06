@@ -338,13 +338,7 @@ void main() {
       (6, 4, Direction.up),
       (7, 3, Direction.up),
     ],
-    // (85 below was rebuilt as the two-storey moulinet.)
-    85: [
-      (7, 1, Direction.up),
-      (4, 1, Direction.right),
-      (3, 4, Direction.down),
-      (4, 6, Direction.up),
-    ],
+    85: [], // portals only — the level has no arrows at all (below)
     86: [
       (2, 3, Direction.down),
       (2, 4, Direction.up),
@@ -424,6 +418,11 @@ void main() {
     // 84: the lift onto the floor below the start — the dot drops in at (4,7)
     // and comes out at (7,2) to begin the climb.
     84: [(4, 7), (7, 2)],
+    // 85 — three pairs, in pairing order. Pair 1 drops the dot off row 7 onto
+    // the column-1 climb; pair 2 takes it from row 7 onto row 6 heading west
+    // into the dial; pair 3 catches it at (6,0) after that dial's first face
+    // pushes it out, and lifts it to row 1 for the second dial.
+    85: [(7, 0), (5, 1), (7, 1), (6, 2), (6, 0), (1, 7)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
   };
@@ -464,7 +463,6 @@ void main() {
     // 84: three holds — two on row 1 waiting for the climber to reach (1,5),
     // one on row 5 that lands the dot on (4,5) as the row-4 patrol arrives.
     84: [(1, 4), (1, 5), (5, 4)],
-    85: [(4, 3)],
     88: [(3, 5)],
     // 89: both waits inside the wheel's own spokes.
     89: [(3, 5), (4, 5)],

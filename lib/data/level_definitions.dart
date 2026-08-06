@@ -2179,34 +2179,35 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 85 — Moulinet: a two-storey climb with offset slits, the dial hanging
-  // mid-air between the floors. Ground patrol, bounce-row patrol, and the
-  // wait — three clocks that all have to agree. Too heavy for the suite's
-  // exhaustive solver — verified TIGHT by tool/verify_pairs.dart.
+  // 85 — Moulinet: an empty board, two dials, and nothing but portals. No walls,
+  // no mines, no arrows — the only turns in the level are the two dials, and the
+  // only way to reach them is to wire the pairs so the dot arrives on their rows
+  // already pointing at them.
+  //
+  // The sequence the geometry forces: the dot runs west along row 7 with no way
+  // to turn, so a pair must drop it onto row 6 heading west into the (6,1) dial.
+  // That dial's FIRST face is west, which pushes it out to (6,0) — so a second
+  // pair catches it there and feeds it back for the second face, which is north.
+  // The column-1 climb then reaches the (1,1) dial, whose first face is east,
+  // and a third pair lifts that row-1 run onto row 0 heading east, into the door
+  // at (0,7).
+  //
+  // Six portals is three pairs and fifteen ways to wire them, so this is carried
+  // by its recorded solution rather than a sweep. All six ends are on the path.
   85: LevelData(
     id: 85,
     size: 8,
     title: 'Moulinet',
-    tip: 'Two storeys, two patrols, one dial hanging between them. Wind it '
-        'once, and make every clock agree.',
-    start: StartSpec(7, 0, Direction.right),
-    exit: Pos(0, 6),
-    walls: [
-      Pos(5, 0), Pos(5, 2), Pos(5, 3), Pos(5, 4), Pos(5, 5), Pos(5, 6),
-      Pos(5, 7),
-      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 4), Pos(2, 5),
-      Pos(2, 7),
-    ],
-    rotatingArrows: [RotatingArrow(4, 4, Direction.up)],
-    movers: [
-      MovingDestroyer(6, 0, horizontal: true, dir: 1),
-      MovingDestroyer(3, 2, horizontal: true, dir: 1),
+    tip: 'No walls, no arrows — two dials and six portals. Wire them so each '
+        'dial gets the pass it needs.',
+    start: StartSpec(7, 7, Direction.left),
+    exit: Pos(0, 7),
+    rotatingArrows: [
+      RotatingArrow(1, 1, Direction.right),
+      RotatingArrow(6, 1, Direction.left),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.teleporter, 6),
     ],
   ),
 
