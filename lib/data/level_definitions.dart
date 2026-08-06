@@ -2130,24 +2130,52 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 84 — Escapement: the patrol sweeps straight over the dial's own cell.
-  // Slip into the tooth twice between sweeps, then ride the lane home in the
-  // patrol's wake.
+  // 84 — Escapement: the exit at (1,7) is bricked in on all three sides and the
+  // board carries no mines, so the ONLY way to open it is a shielded collision
+  // with a patrol — the blast takes out the walls beside wherever the patrol
+  // dies. That makes the two patrols the demolition charges, and the order is
+  // forced:
+  //
+  //   1. Ram the row-4 patrol on (4,5) with the first aura. Its blast opens
+  //      (3,5) — the one wall boxing the column-5 patrol into rows 4-7.
+  //   2. That patrol can now climb. Meet it on (1,5) with the second aura; that
+  //      blast opens (1,6), the only cell touching the door.
+  //   3. A right arrow ON (1,5) does the rest: the simulator resolves the
+  //      collision BEFORE the cell's piece, so the dot kills the climber, the
+  //      wall goes, and only then does the arrow turn it east into the exit.
+  //
+  // The row-4 patrol starts at (4,0) so that it and the climber are never on
+  // (4,5) on the same tick — otherwise one blast destroys both and step 2 has
+  // nothing left to kill. The three pauses are the clock that lands the dot on
+  // each cell exactly when its patrol is there.
+  //
+  // Eleven pieces on an 8x8 is far past any exhaustive sweep (5.03e9 placements
+  // for a six-piece kit alone), so this one is carried by its recorded solution
+  // — which uses every piece on the path.
   84: LevelData(
     id: 84,
-    size: 7,
+    size: 8,
     title: 'Escapement',
-    tip: 'The patrol rides right over the dial. Slip in twice between '
-        'sweeps, then follow it home.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(3, 6),
-    walls: [Pos(4, 6)],
-    rotatingArrows: [RotatingArrow(3, 3, Direction.up)],
-    movers: [MovingDestroyer(3, 2, horizontal: true, dir: 1)],
+    tip: 'The door is bricked in and you have no charges — but the patrols are '
+        'charges. Blow one to free the other, then meet it at the wall.',
+    start: StartSpec(6, 0, Direction.right),
+    exit: Pos(1, 7),
+    walls: [
+      Pos(0, 6), Pos(0, 7), Pos(1, 6), Pos(2, 6), Pos(2, 7),
+      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 4), Pos(3, 5), Pos(3, 6),
+      Pos(3, 7),
+    ],
+    rotatingArrows: [RotatingArrow(6, 3, Direction.right)],
+    movers: [
+      MovingDestroyer(4, 0, horizontal: true, dir: 1),
+      MovingDestroyer(6, 5, horizontal: false, dir: -1),
+    ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowDown, 1),
-      ToolkitEntry(ToolType.pause, 1),
+      ToolkitEntry(ToolType.arrowUp, 2),
+      ToolkitEntry(ToolType.arrowRight, 2),
+      ToolkitEntry(ToolType.shield, 2),
+      ToolkitEntry(ToolType.pause, 3),
+      ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
 

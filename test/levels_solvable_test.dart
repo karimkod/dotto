@@ -329,7 +329,15 @@ void main() {
       (3, 7, Direction.up),
     ],
     83: [(2, 2, Direction.down), (4, 3, Direction.up)],
-    84: [(2, 3, Direction.down), (5, 3, Direction.up)],
+    // 84 — the climb to the dial, the turn east into the row-4 patrol, and the
+    // right arrow ON the second kill cell that turns the dot through the wall
+    // its own blast opens.
+    84: [
+      (1, 3, Direction.right),
+      (4, 4, Direction.right),
+      (6, 4, Direction.up),
+      (7, 3, Direction.up),
+    ],
     // (85 below was rebuilt as the two-storey moulinet.)
     85: [
       (7, 1, Direction.up),
@@ -413,6 +421,9 @@ void main() {
     // the dot arrives on row 1 beside the aura without ever descending, and the
     // same pair carries it back out to the east field.
     82: [(1, 0), (4, 7)],
+    // 84: the lift onto the floor below the start — the dot drops in at (4,7)
+    // and comes out at (7,2) to begin the climb.
+    84: [(4, 7), (7, 2)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
   };
@@ -450,7 +461,9 @@ void main() {
     // 81: held inside the ring so the last lap crosses the column-2 patrol on
     // the safe beat.
     81: [(2, 4)],
-    84: [(4, 3)],
+    // 84: three holds — two on row 1 waiting for the climber to reach (1,5),
+    // one on row 5 that lands the dot on (4,5) as the row-4 patrol arrives.
+    84: [(1, 4), (1, 5), (5, 4)],
     85: [(4, 3)],
     88: [(3, 5)],
     // 89: both waits inside the wheel's own spokes.
@@ -511,6 +524,9 @@ void main() {
     // climb for the upper mine, the top run for the lower one.
     79: [(5, 1), (1, 5)],
     83: [(3, 3)],
+    // 84: one aura per patrol — the first rammed into the row-4 sweep, the
+    // second collected on the way up to meet the climber at the wall.
+    84: [(2, 3), (6, 2)],
     87: [(3, 4)],
   };
 
@@ -545,7 +561,7 @@ void main() {
   // portal pairs on a 7x7 comes to 4.96e12 placements. Its recorded solution was
   // found by restricted enumeration (37.8M placements over 14 candidate cells,
   // 18 wins — all of them with every piece on the path).
-  const solverTooSlow = {55, 76, 77, 79, 80, 82, 85, 91};
+  const solverTooSlow = {55, 76, 77, 79, 80, 82, 84, 85, 91};
 
   // 61–70 are the Master Trials — a no-new-pieces interlude that reports as 6
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.
