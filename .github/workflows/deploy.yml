@@ -24,3 +24,11 @@ jobs:
           path: build/web
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # Milliseconds, not minutes — 20 min, up from the action's 10-min
+          # default. Six consecutive deploys failed with "Timeout reached" while
+          # the deployment sat in_progress: GitHub accepted it within seconds and
+          # then took longer than the default to finish. A step-level
+          # timeout-minutes would not help, because the action aborts itself
+          # first.
+          timeout: 1200000
