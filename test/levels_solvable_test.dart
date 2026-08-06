@@ -418,11 +418,9 @@ void main() {
     // 84: the lift onto the floor below the start — the dot drops in at (4,7)
     // and comes out at (7,2) to begin the climb.
     84: [(4, 7), (7, 2)],
-    // 85 — three pairs, in pairing order. Pair 1 drops the dot off row 7 onto
-    // the column-1 climb; pair 2 takes it from row 7 onto row 6 heading west
-    // into the dial; pair 3 catches it at (6,0) after that dial's first face
-    // pushes it out, and lifts it to row 1 for the second dial.
-    85: [(7, 0), (5, 1), (7, 1), (6, 2), (6, 0), (1, 7)],
+    // 85 — three pairs, in pairing order, on the 6x6 board. The shortest of the
+    // winning wirings: an 11-cell path with all six ends on it.
+    85: [(1, 2), (4, 0), (1, 5), (2, 1), (4, 2), (5, 4)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
   };

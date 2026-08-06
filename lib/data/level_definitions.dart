@@ -2196,15 +2196,15 @@ const Map<int, LevelData> levelDefinitions = {
   // by its recorded solution rather than a sweep. All six ends are on the path.
   85: LevelData(
     id: 85,
-    size: 8,
+    size: 6,
     title: 'Moulinet',
     tip: 'No walls, no arrows — two dials and six portals. Wire them so each '
         'dial gets the pass it needs.',
-    start: StartSpec(7, 7, Direction.left),
-    exit: Pos(0, 7),
+    start: StartSpec(5, 5, Direction.left),
+    exit: Pos(0, 5),
     rotatingArrows: [
       RotatingArrow(1, 1, Direction.right),
-      RotatingArrow(6, 1, Direction.left),
+      RotatingArrow(4, 1, Direction.left),
     ],
     toolkit: [
       ToolkitEntry(ToolType.teleporter, 6),
