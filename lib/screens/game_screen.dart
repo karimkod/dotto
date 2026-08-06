@@ -103,6 +103,11 @@ class _GameScreenState extends State<GameScreen>
   /// cell, so the arrow swings shut behind it rather than under it.
   (int, Direction)? _pendingSpin;
 
+  /// A one-shot arrow the dot has just turned on, which owes its disappearance.
+  /// Like the rotating arrow's quarter-turn, it plays once the dot has LEFT the
+  /// cell, so the board changes behind the dot rather than under it.
+  int? _pendingOneShot;
+
   /// Teleport animation state. [_teleporting] gates the whole overlay; while it
   /// runs, [_teleportGrowing] is false during the shrink-out at the entrance and
   /// true during the grow-in at the exit. The two ring cells and the pair colour
@@ -396,6 +401,7 @@ class _GameScreenState extends State<GameScreen>
     _spinCtrl.value = 0;
     _spinCell = null;
     _pendingSpin = null;
+    _pendingOneShot = null;
     final s = _level!.start;
     _status = GameStatus.planning;
     _dot = DotState(r: s.r, c: s.c, dir: s.dir);
@@ -961,6 +967,20 @@ class _GameScreenState extends State<GameScreen>
       _spinRotorBehindDot(owed.$1, owed.$2);
     }
 
+    // Same timing for a one-shot arrow: the dot has cleared the cell, so the
+    // arrow can now go. Marking it spent here (rather than on arrival) is what
+    // keeps it drawn under the dot through the turn.
+    final used = _pendingOneShot;
+    if (used != null && used == _idx(fromR, fromC)) {
+      _pendingOneShot = null;
+      final piece = _placed[used] ?? _forced[used];
+      if (piece != null && _spentOneShots.add(used)) {
+        setState(() {
+          _removing.add(FadingPiece(used, piece.tool, piece.direction));
+        });
+      }
+    }
+
     // Both have moved — a patrol catches the dot by sharing its FINAL cell or by
     // trading places with it. A shield blows the patrol away and the dot
     // survives; otherwise it's caught.
@@ -1042,12 +1062,12 @@ class _GameScreenState extends State<GameScreen>
           setState(() {
             _dot.dir = piece.direction!;
             _glow(newKey, const Color(0xFF1E88E5), 1.0); // arrow activation flash
-            // A one-shot turns the dot once and then leaves the board, shrinking
-            // out the same way a collected shield does. The placement stays in
-            // _placed so Retry puts it back.
-            if (piece.tool.isOneShot && _spentOneShots.add(newKey)) {
-              _removing.add(FadingPiece(newKey, piece.tool, piece.direction));
-            }
+            // A one-shot turns the dot once and then leaves the board. The
+            // disappearance is owed, not done: it plays from _beat once the dot
+            // has moved off, so the arrow is still under the dot as it turns and
+            // fades behind it. The placement stays in _placed so Retry puts it
+            // back.
+            if (piece.tool.isOneShot) _pendingOneShot = newKey;
           });
           Sfx.arrow();
         case PlacedType.pause:

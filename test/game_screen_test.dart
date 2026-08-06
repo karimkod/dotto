@@ -348,7 +348,13 @@ void main() {
       if (grid().placed.isEmpty) disappeared = true;
     }
     expect(disappeared, isTrue,
-        reason: 'the one-shot must leave the board as the dot uses it');
+        reason: 'the one-shot must leave the board once the dot has used it');
+
+    // ...and it must go BEHIND the dot, not under it: on the frame the arrow
+    // disappears, the dot has already moved off that cell. The trail's last
+    // entry is the dot's cell, so this is directly checkable.
+    expect(grid().trail.last, isNot(2 * 5 + 2),
+        reason: 'the arrow must not vanish while the dot is still standing on it');
 
     await runToWin(tester);
     // 92 is the last level, so the win card offers Back to Menu.
