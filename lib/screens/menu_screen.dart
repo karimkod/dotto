@@ -229,6 +229,13 @@ class _MenuScreenState extends State<MenuScreen> {
                             number: 6, subtitle: 'Rotating Arrows'),
                       ]);
                     }
+                    if (level.number == kWorld7Start) {
+                      return Column(children: [
+                        slot,
+                        const _WorldBanner(
+                            number: 7, subtitle: 'One-Shot Arrows'),
+                      ]);
+                    }
                     return slot;
                   }(),
               ],

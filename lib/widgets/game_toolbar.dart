@@ -165,7 +165,8 @@ class _ToolTile extends StatelessWidget {
       case PlacedType.teleporter:
         return PortalGlyph(size: 26, entrance: portalEntrance);
       case PlacedType.arrow:
-        return ArrowGlyph(size: 26, dir: tool.direction!);
+        return ArrowGlyph(
+            size: 26, dir: tool.direction!, oneShot: tool.isOneShot);
       case PlacedType.pause:
         return const PauseGlyph(size: 26);
     }

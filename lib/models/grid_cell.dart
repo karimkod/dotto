@@ -58,6 +58,20 @@ extension DirectionX on Direction {
         return ToolType.arrowRight;
     }
   }
+
+  /// The single-use arrow that points this way.
+  ToolType get oneShotTool {
+    switch (this) {
+      case Direction.up:
+        return ToolType.oneShotUp;
+      case Direction.down:
+        return ToolType.oneShotDown;
+      case Direction.left:
+        return ToolType.oneShotLeft;
+      case Direction.right:
+        return ToolType.oneShotRight;
+    }
+  }
 }
 
 /// Base, level-defined contents of a cell (everything the player can't move).
@@ -67,11 +81,20 @@ enum CellType { empty, start, exit, wall, destroyer, movingDestroyer, gap }
 enum PlacedType { arrow, pause, teleporter, shield }
 
 /// Selectable toolkit item kinds.
+///
+/// The `oneShot*` arrows point the same four ways as the ordinary ones and are
+/// [PlacedType.arrow] like them, so placement, painting and the solvers all
+/// treat them as arrows. The single difference is spelled out in the simulator:
+/// the dot consumes one as it passes, and the cell is empty from then on.
 enum ToolType {
   arrowUp,
   arrowDown,
   arrowLeft,
   arrowRight,
+  oneShotUp,
+  oneShotDown,
+  oneShotLeft,
+  oneShotRight,
   pause,
   teleporter,
   shield,
@@ -90,19 +113,46 @@ extension ToolTypeX on ToolType {
       case ToolType.arrowDown:
       case ToolType.arrowLeft:
       case ToolType.arrowRight:
+      case ToolType.oneShotUp:
+      case ToolType.oneShotDown:
+      case ToolType.oneShotLeft:
+      case ToolType.oneShotRight:
         return PlacedType.arrow;
+    }
+  }
+
+  /// True for an arrow the dot uses up on its way through. See [ToolType].
+  bool get isOneShot {
+    switch (this) {
+      case ToolType.oneShotUp:
+      case ToolType.oneShotDown:
+      case ToolType.oneShotLeft:
+      case ToolType.oneShotRight:
+        return true;
+      case ToolType.arrowUp:
+      case ToolType.arrowDown:
+      case ToolType.arrowLeft:
+      case ToolType.arrowRight:
+      case ToolType.pause:
+      case ToolType.teleporter:
+      case ToolType.shield:
+        return false;
     }
   }
 
   Direction? get direction {
     switch (this) {
       case ToolType.arrowUp:
+      case ToolType.oneShotUp:
         return Direction.up;
       case ToolType.arrowDown:
+      case ToolType.oneShotDown:
         return Direction.down;
       case ToolType.arrowLeft:
+      case ToolType.oneShotLeft:
         return Direction.left;
       case ToolType.arrowRight:
+      case ToolType.oneShotRight:
         return Direction.right;
       case ToolType.pause:
       case ToolType.teleporter:
@@ -114,12 +164,16 @@ extension ToolTypeX on ToolType {
   String get glyph {
     switch (this) {
       case ToolType.arrowUp:
+      case ToolType.oneShotUp:
         return '↑';
       case ToolType.arrowDown:
+      case ToolType.oneShotDown:
         return '↓';
       case ToolType.arrowLeft:
+      case ToolType.oneShotLeft:
         return '←';
       case ToolType.arrowRight:
+      case ToolType.oneShotRight:
         return '→';
       case ToolType.pause:
         return '❚❚';
@@ -140,6 +194,14 @@ extension ToolTypeX on ToolType {
         return 'LEFT';
       case ToolType.arrowRight:
         return 'RIGHT';
+      case ToolType.oneShotUp:
+        return 'ONCE UP';
+      case ToolType.oneShotDown:
+        return 'ONCE DN';
+      case ToolType.oneShotLeft:
+        return 'ONCE LT';
+      case ToolType.oneShotRight:
+        return 'ONCE RT';
       case ToolType.pause:
         return 'PAUSE';
       case ToolType.teleporter:

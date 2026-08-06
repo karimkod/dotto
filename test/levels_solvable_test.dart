@@ -23,8 +23,17 @@ Map<int, PlacedElement> place(
   List<(int, int)> shields = const [],
   List<(int, int)> pauses = const [],
   List<(int, int)> teleports = const [],
+  List<(int, int, Direction)> oneShots = const [],
 ]) {
   return {
+    // One-shot arrows are PlacedType.arrow like the rest — the difference is the
+    // tool, which is what the simulator checks when it consumes one.
+    for (final (r, c, dir) in oneShots)
+      r * level.size + c: PlacedElement(
+        type: PlacedType.arrow,
+        tool: dir.oneShotTool,
+        direction: dir,
+      ),
     // Portal indices follow list order, so consecutive cells form a pair, index
     // i pairing with i^1. This lets a teleports list express ANY pairing —
     // including the "crossing" wirings that board-order pairing cannot (level
@@ -359,6 +368,7 @@ void main() {
       (4, 7, Direction.down),
       (7, 4, Direction.up),
     ],
+    92: [], // one-shot only (below)
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -423,6 +433,16 @@ void main() {
     85: [(1, 2), (4, 0), (1, 5), (2, 1), (4, 2), (5, 4)],
     // 91 — out of the pocket onto the tower's ground floor.
     91: [(0, 1), (7, 0)],
+  };
+
+  // Intended one-shot arrow placements (World 7). Same shape as `intended`, but
+  // these are the single-use arrows — the dot turns on one and it leaves the
+  // board, so the cell reads empty on any later pass.
+  final oneShots = <int, List<(int, int, Direction)>>{
+    // 92: the only cell the pinned arrow at (0,2) can catch. It fires the dot
+    // north once; on the way back down the cell is empty and the dot falls
+    // through it into the exit.
+    92: [(2, 2, Direction.up)],
   };
 
   // Intended pause placements (World 4).
@@ -563,7 +583,11 @@ void main() {
   // for naming; World 6 proper (rotating arrows) opens at 71 and shares it.
   int worldOf(int n) => n <= 15
       ? 1
-      : (n <= 20 ? 2 : (n <= 30 ? 3 : (n <= 50 ? 4 : (n <= 60 ? 5 : 6))));
+      : (n <= 20
+          ? 2
+          : (n <= 30
+              ? 3
+              : (n <= 50 ? 4 : (n <= 60 ? 5 : (n <= 91 ? 6 : 7)))));
 
 
 
@@ -610,7 +634,8 @@ void main() {
           simulate(
               level,
               place(level, intended[n]!, shields[n] ?? const [],
-                  pauses[n] ?? const [], teleports[n] ?? const [])),
+                  pauses[n] ?? const [], teleports[n] ?? const [],
+                  oneShots[n] ?? const [])),
           SimOutcome.win,
           reason: 'the recorded solution for level $n must win');
     });
@@ -648,7 +673,8 @@ void main() {
       final visited = tracePath(
           level,
           place(level, intended[n]!, shields[n] ?? const [],
-              pauses[n] ?? const [], teleports[n] ?? const []));
+              pauses[n] ?? const [], teleports[n] ?? const [],
+              oneShots[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
         expect(visited!.contains(a.r * level.size + a.c), isTrue,
@@ -843,7 +869,8 @@ void main() {
       final visited = tracePath(
           level,
           place(level, intended[n]!, shields[n] ?? const [],
-              pauses[n] ?? const [], teleports[n] ?? const []));
+              pauses[n] ?? const [], teleports[n] ?? const [],
+              oneShots[n] ?? const []));
       expect(visited, isNotNull, reason: 'level $n intended solution must win');
       // Reachability only has to cover the path on levels where it is actually
       // used to prune. With a teleporter in the TOOLKIT, candidateCells opts out

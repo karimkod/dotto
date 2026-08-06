@@ -295,22 +295,110 @@ void main() {
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 91 "Clock Tower": the recorded finale solution (verified TIGHT by
-    // tool/verify_pairs.dart). Portals dropped in pair order; also covers the
-    // live rotation state end to end, through the real widget.
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(0, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(7, 0));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(1, 4));
-    await _dragArrow(tester, tester.getCenter(find.text('DOWN')), cell(4, 7));
-    await _dragArrow(tester, tester.getCenter(find.text('RIGHT')), cell(4, 1));
-    await _dragArrow(tester, tester.getCenter(find.text('UP')), cell(7, 4));
-    await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 3));
+    // Level 92 "Once Only": one single-use arrow at (2,2). It fires the dot
+    // north, the pinned arrow sends it back, and it falls through the cell it
+    // was turned in — so this also covers one-shot consumption end to end,
+    // through the real widget.
+    await _dragArrow(tester, tester.getCenter(find.text('ONCE UP')), cell(2, 2));
 
     await runToWin(tester);
 
     // Last level → no Continue; the button is Back to Menu.
     expect(find.text('Continue'), findsNothing);
     expect(find.text('Back to Menu'), findsOneWidget);
+  });
+
+  // A one-shot leaves the board as the dot turns on it — but only for the run.
+  // Retry has to put it back, or the player loses a piece they still own.
+  testWidgets('a one-shot vanishes from the board when the dot uses it',
+      (tester) async {
+    const once = Level(
+      id: 92,
+      number: 92,
+      title: 'Once Only',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: once)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+
+    GameGridPainter grid() => tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('gameBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    await _dragArrow(
+        tester, tester.getCenter(find.text('ONCE UP')), cell(2, 2));
+    expect(grid().placed.keys, [2 * 5 + 2]);
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    // Sample every frame: once the dot has turned, the painter must stop being
+    // given the arrow, even though the player still owns it.
+    var disappeared = false;
+    for (var i = 0; i < 120 && !disappeared; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      if (grid().placed.isEmpty) disappeared = true;
+    }
+    expect(disappeared, isTrue,
+        reason: 'the one-shot must leave the board as the dot uses it');
+
+    await runToWin(tester);
+    // 92 is the last level, so the win card offers Back to Menu.
+    expect(find.text('Back to Menu'), findsOneWidget);
+  });
+
+  // Consuming a one-shot is a fact about the RUN, not about the player's kit —
+  // a failed attempt has to hand the piece back exactly as Retry does for
+  // everything else.
+  testWidgets('Retry puts a spent one-shot back on the board', (tester) async {
+    const once = Level(
+      id: 92,
+      number: 92,
+      title: 'Once Only',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: once)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+
+    GameGridPainter grid() => tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('gameBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    // (2,1) turns the dot up a column the pinned arrow does not cover, so it
+    // runs off the top — a loss, after the one-shot has already been spent.
+    await _dragArrow(
+        tester, tester.getCenter(find.text('ONCE UP')), cell(2, 1));
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    for (var i = 0; i < 120; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      if (find.text('Retry').evaluate().isNotEmpty) break;
+    }
+    expect(find.text('Retry'), findsOneWidget, reason: 'the run should fail');
+
+    await tester.tap(find.text('Retry'));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 40));
+    }
+    expect(grid().placed.keys, [2 * 5 + 1],
+        reason: 'the spent one-shot must come back for the next attempt');
   });
 
   // A rotating arrow is pinned to the board like a fixed arrow, so its cell must

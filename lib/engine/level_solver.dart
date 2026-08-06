@@ -608,7 +608,10 @@ bool needsExhaustiveSolver(LevelData level) =>
     level.toolkit.any((e) => e.type == ToolType.teleporter) ||
     // Rotating arrows carry per-pass state; only the simulate-based [BruteSearch]
     // models it faithfully, so route these away from [PathSearch] too.
-    level.rotatingArrows.isNotEmpty;
+    level.rotatingArrows.isNotEmpty ||
+    // Same story for one-shot arrows: the board mutates mid-run as they are
+    // used up, so the pruning search's locality assumption no longer holds.
+    level.toolkit.any((e) => e.type.isOneShot);
 
 /// How many teleporters the toolkit hands the player (2 per pair).
 int toolkitTeleporters(LevelData level) => level.toolkit
@@ -761,9 +764,16 @@ int toolkitTotal(LevelData level) =>
 /// Tools the fast path solver cannot reason about. Pause changes only the dot's
 /// TIMING and the teleporter moves it off its path — neither is expressible in a
 /// solver whose state is (cell, heading, shield, cleared-walls) with no clock.
+/// A one-shot arrow is a third case: the board itself changes as the dot uses
+/// one up, so the same cell answers differently on a later pass — runtime state
+/// the static search has nowhere to put.
 const Set<ToolType> pathSolverBlindTools = {
   ToolType.pause,
   ToolType.teleporter,
+  ToolType.oneShotUp,
+  ToolType.oneShotDown,
+  ToolType.oneShotLeft,
+  ToolType.oneShotRight,
 };
 
 /// True when [level] needs the timing-aware brute-force solver ([solveAll]).

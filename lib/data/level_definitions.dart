@@ -2368,6 +2368,34 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
+
+  // ============== WORLD 7 (92–) — ONE-SHOT ARROWS ============================
+  // An arrow the dot uses up: it turns once, then leaves the board. The same
+  // cell answers differently on the way back, which is the whole idea.
+
+  // 92 — Once Only: the World 7 opener, built so the lesson cannot be missed.
+  // The dot runs east into a dead end — nothing but the edge past (2,2) — so the
+  // one-shot is the only way to survive. It fires north, the pinned arrow at
+  // (0,2) turns the dot straight back down the column it came up, and on that
+  // second pass the cell is EMPTY: the dot falls through where it was turned
+  // moments ago and drops into the exit below.
+  //
+  // An ordinary up arrow in the same cell would catch the dot again and loop it
+  // forever. Being used up is what makes the route work, not a detail of it.
+  //
+  // Unique: the pinned arrow only catches column 2, so (2,2) is the one cell the
+  // one-shot can sit on.
+  92: LevelData(
+    id: 92,
+    size: 5,
+    title: 'Once Only',
+    tip: 'This arrow works once, then it is gone. Turn up, come back down — '
+        'and fall straight through where it used to be.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(4, 2),
+    forcedArrows: [ForcedArrow(0, 2, Direction.down)],
+    toolkit: [ToolkitEntry(ToolType.oneShotUp, 1)],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

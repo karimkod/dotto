@@ -125,6 +125,7 @@ class _GameScreenState extends State<GameScreen>
   final List<Explosion> _explosions = []; // destroyer blasts in progress
   final Set<int> _destroyedCells = {}; // destroyers cleared by a shielded dot
   final Set<int> _consumedShields = {}; // shield cells picked up this run
+  final Set<int> _spentOneShots = {}; // one-shot arrows used up this run
 
   /// True once the dot has the protective shield aura (consumed by a destroyer).
   bool _dotShielded = false;
@@ -408,6 +409,7 @@ class _GameScreenState extends State<GameScreen>
     _explosions.clear();
     _destroyedCells.clear();
     _consumedShields.clear();
+    _spentOneShots.clear();
     // Rotating arrows spin back to their level-defined starting headings.
     _rotations
       ..clear()
@@ -462,7 +464,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// The piece occupying [key] — a player piece or a fixed (forced) arrow.
-  PlacedElement? _pieceAt(int key) => _placed[key] ?? _forced[key];
+  PlacedElement? _pieceAt(int key) => _spentOneShots.contains(key)
+      ? null
+      : (_placed[key] ?? _forced[key]);
 
   /// True when [cell] already holds something the player cannot displace: their
   /// own piece, or anything the LEVEL pins there.
@@ -1038,6 +1042,12 @@ class _GameScreenState extends State<GameScreen>
           setState(() {
             _dot.dir = piece.direction!;
             _glow(newKey, const Color(0xFF1E88E5), 1.0); // arrow activation flash
+            // A one-shot turns the dot once and then leaves the board, shrinking
+            // out the same way a collected shield does. The placement stays in
+            // _placed so Retry puts it back.
+            if (piece.tool.isOneShot && _spentOneShots.add(newKey)) {
+              _removing.add(FadingPiece(newKey, piece.tool, piece.direction));
+            }
           });
           Sfx.arrow();
         case PlacedType.pause:
@@ -1601,11 +1611,13 @@ class _GameScreenState extends State<GameScreen>
                         // in _placed / _forced so Retry restores it. A collected
                         // shield can be a placed OR a fixed one, so both maps are
                         // filtered by _consumedShields.
-                        placed: _consumedShields.isEmpty
+                        placed: _consumedShields.isEmpty &&
+                                _spentOneShots.isEmpty
                             ? _placed
                             : {
                                 for (final e in _placed.entries)
-                                  if (!_consumedShields.contains(e.key))
+                                  if (!_consumedShields.contains(e.key) &&
+                                      !_spentOneShots.contains(e.key))
                                     e.key: e.value,
                               },
                         trail: _trail,

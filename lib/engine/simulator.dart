@@ -296,7 +296,11 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
   // Rotating arrows keep their own live heading, advancing per pass.
   final rotations = buildRotations(level);
 
-  PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
+  // One-shot arrows the dot has already used. They turn it once and are gone
+  // for the rest of the run, so the cell reads as empty on any later pass.
+  final spent = <int>{};
+  PlacedElement? pieceAt(int key) =>
+      spent.contains(key) ? null : (placed[key] ?? forced[key]);
 
   var r = level.start.r;
   var c = level.start.c;
@@ -416,6 +420,8 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
       switch (piece.type) {
         case PlacedType.arrow:
           dir = piece.direction!;
+          // A one-shot turns the dot exactly once, then leaves the board.
+          if (piece.tool.isOneShot) spent.add(key);
         case PlacedType.pause:
           pause = 2;
         case PlacedType.shield:
@@ -469,7 +475,10 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
   final forced = buildForcedPieces(level);
   final links = buildTeleportLinks(level, {...forced, ...placed});
   final rotations = buildRotations(level);
-  PlacedElement? pieceAt(int key) => placed[key] ?? forced[key];
+  // See simulateDetailed: a one-shot arrow is consumed as the dot turns on it.
+  final spent = <int>{};
+  PlacedElement? pieceAt(int key) =>
+      spent.contains(key) ? null : (placed[key] ?? forced[key]);
 
   var r = level.start.r;
   var c = level.start.c;
@@ -557,6 +566,7 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     final piece = pieceAt(r * n + c);
     if (piece != null && piece.type == PlacedType.arrow) {
       dir = piece.direction!;
+      if (piece.tool.isOneShot) spent.add(r * n + c);
     } else if (piece != null && piece.type == PlacedType.pause) {
       pause = 2;
     } else if (piece != null && piece.type == PlacedType.shield) {

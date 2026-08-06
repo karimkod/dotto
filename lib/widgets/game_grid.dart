@@ -129,36 +129,77 @@ void paintArrowIcon(
   );
 }
 
+/// The "one use only" mark: a small filled pip in the cell's top-right corner
+/// carrying a 1. Deliberately a badge rather than a restyled arrow — a one-shot
+/// has to read as the SAME arrow as its ordinary twin (it turns the dot exactly
+/// the same way), with one extra fact attached.
+void paintOneShotBadge(Canvas canvas, RRect cell, double size, Color color) {
+  final r = size * 0.115;
+  final centre = Offset(cell.right - r - size * 0.06, cell.top + r + size * 0.06);
+  canvas.drawCircle(centre, r, Paint()..color = color);
+  final tp = TextPainter(
+    text: TextSpan(
+      text: '1',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: r * 1.6,
+        height: 1,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  tp.paint(canvas, centre - Offset(tp.width / 2, tp.height / 2));
+}
+
 /// A standalone arrow for widget contexts (toolbar tile, drag ghost), sized to
-/// sit in a [size] box like the shield and portal glyphs beside it.
+/// sit in a [size] box like the shield and portal glyphs beside it. [oneShot]
+/// adds the single-use pip so a tile reads the same as the piece it places.
 class ArrowGlyph extends StatelessWidget {
-  const ArrowGlyph(
-      {super.key, required this.size, required this.dir, this.color = _C.arrow});
+  const ArrowGlyph({
+    super.key,
+    required this.size,
+    required this.dir,
+    this.color = _C.arrow,
+    this.oneShot = false,
+  });
 
   final double size;
   final Direction dir;
   final Color color;
+  final bool oneShot;
 
   @override
   Widget build(BuildContext context) => SizedBox(
         width: size,
         height: size,
-        child: CustomPaint(painter: _ArrowGlyphPainter(color, dir)),
+        child: CustomPaint(painter: _ArrowGlyphPainter(color, dir, oneShot)),
       );
 }
 
 class _ArrowGlyphPainter extends CustomPainter {
-  _ArrowGlyphPainter(this.color, this.dir);
+  _ArrowGlyphPainter(this.color, this.dir, this.oneShot);
   final Color color;
   final Direction dir;
+  final bool oneShot;
 
   @override
-  void paint(Canvas canvas, Size size) => paintArrowIcon(
-      canvas, size.center(Offset.zero), size.width * 0.84, color, dir);
+  void paint(Canvas canvas, Size size) {
+    paintArrowIcon(
+        canvas, size.center(Offset.zero), size.width * 0.84, color, dir);
+    if (oneShot) {
+      paintOneShotBadge(
+        canvas,
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.zero),
+        size.width * 1.25,
+        color,
+      );
+    }
+  }
 
   @override
   bool shouldRepaint(covariant _ArrowGlyphPainter old) =>
-      old.color != color || old.dir != dir;
+      old.color != color || old.dir != dir || old.oneShot != oneShot;
 }
 
 /// The pause piece: two rounded bars, [height] tall. Drawn rather than typed for
@@ -482,7 +523,11 @@ class DragGhost extends StatelessWidget {
             PlacedType.teleporter =>
               PortalGlyph(size: size * 0.7, entrance: true, color: color),
             PlacedType.arrow =>
-              ArrowGlyph(size: size * 0.7, dir: tool.direction!, color: color),
+              ArrowGlyph(
+                  size: size * 0.7,
+                  dir: tool.direction!,
+                  color: color,
+                  oneShot: tool.isOneShot),
             PlacedType.pause => PauseGlyph(size: size * 0.7, color: color),
           },
         ),
@@ -923,6 +968,7 @@ class GameGridPainter extends CustomPainter {
       case PlacedType.arrow:
         paintArrowIcon(canvas, center, geo.cell * kArrowSpan, color,
             dir ?? tool.direction!);
+        if (tool.isOneShot) paintOneShotBadge(canvas, rrect, geo.cell, color);
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
     }
@@ -994,6 +1040,9 @@ class GameGridPainter extends CustomPainter {
       case PlacedType.arrow:
         paintArrowIcon(canvas, center, geo.cell * kArrowSpan, color,
             piece.direction ?? piece.tool.direction!);
+        if (piece.tool.isOneShot) {
+          paintOneShotBadge(canvas, rrect, geo.cell, color);
+        }
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
     }
@@ -1228,6 +1277,7 @@ class GameGridPainter extends CustomPainter {
       case PlacedType.arrow:
         paintArrowIcon(
             canvas, center, geo.cell * kArrowSpan, ghost, tool.direction!);
+        if (tool.isOneShot) paintOneShotBadge(canvas, rrect, geo.cell, ghost);
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, ghost);
     }
