@@ -369,15 +369,36 @@ void main() {
       (7, 4, Direction.up),
     ],
     92: [], // one-shot only (below)
-    // ----- World 7 (93–110): one-shot arrows. Most kits are one-shots,
-    // pauses, shields and portals — the permanent arrows sit here.
+    // ----- World 7 (93–110): one-shot arrows. The depth-pass levels hand
+    // the routing arrows to the player, so several entries here are full
+    // tours rather than single turns.
     // 93: the steady up that starts the climb on both laps.
     93: [(4, 2, Direction.up)],
-    94: [], 95: [], 96: [], 97: [], 98: [], 99: [], 100: [], 101: [],
-    102: [],
+    94: [], 95: [], 96: [],
+    // 97: the player-built roof line over the extended lane.
+    97: [(0, 2, Direction.right), (0, 5, Direction.down)],
+    98: [], 99: [],
+    // 100: the player-built tour — over the wall, west along the roof.
+    100: [(0, 3, Direction.down), (0, 6, Direction.left)],
+    101: [], 102: [],
     // 103: the steady up that bounces both of its arrivals.
     103: [(6, 4, Direction.up)],
-    104: [], 105: [], 106: [], 107: [], 108: [], 109: [], 110: [],
+    // 104: the floor turn and the mine climb feeding the portal.
+    104: [(6, 2, Direction.right), (6, 4, Direction.up)],
+    // 105: the bounce catcher, the floor hook and the relaunch climb.
+    105: [
+      (1, 1, Direction.down),
+      (6, 1, Direction.left),
+      (6, 0, Direction.up),
+    ],
+    // 106: the player-built roof route into the winding dial's machine.
+    106: [(0, 2, Direction.right), (0, 4, Direction.down)],
+    // 107: the bounce catcher and the relaunch climb.
+    107: [(2, 5, Direction.down), (7, 0, Direction.up)],
+    108: [],
+    // 109: the top-row west turn that starts the fall home.
+    109: [(0, 7, Direction.left)],
+    110: [],
   };
 
   // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -470,7 +491,8 @@ void main() {
     97: [(5, 2, Direction.up)],
     98: [(4, 3, Direction.up)],
     99: [(4, 2, Direction.up)],
-    // 100: the interceptor that bounces the dial's first ray short of the mine.
+    // 100: the interceptor that bounces the dial's first ray short of the
+    // mine — the kit's permanent down is the roof-turn, this is the burn.
     100: [(2, 3, Direction.down)],
     // 101: the three fuses, burned left to right.
     101: [
@@ -481,9 +503,11 @@ void main() {
     102: [(5, 2, Direction.up)],
     103: [(0, 4, Direction.down)],
     104: [(5, 2, Direction.up)],
-    105: [(2, 2, Direction.up), (4, 2, Direction.right)],
-    106: [(5, 3, Direction.up)],
-    107: [(5, 2, Direction.up), (5, 5, Direction.left)],
+    // 105: the burn that starts the double-bounce.
+    105: [(2, 1, Direction.up)],
+    106: [(5, 2, Direction.up)],
+    // 107: the mid-board burn and the floor burn of the firebreak.
+    107: [(5, 5, Direction.up), (7, 5, Direction.left)],
     // 108: the three bridges, each one rung lower.
     108: [
       (1, 2, Direction.up),
@@ -540,16 +564,13 @@ void main() {
     95: [(3, 2)],
     // 97: held for the short lane's beat before the climb.
     97: [(4, 2)],
-    // 98: the between-lanes cell, held on the climb AND the fall.
-    98: [(2, 3)],
-    // 100: above the dial — held on the ray up, the bounce down and the fall.
-    100: [(3, 3)],
+    // 98: BOTH holds stacked inside the column, one between each lane pair.
+    98: [(2, 3), (3, 3)],
+    // 100: held on the col-6 climb to time the roof-lane ride.
+    100: [(1, 6)],
     // 102: held inside the lane, where the patrol walks into the kill.
     102: [(2, 2)],
-    // 105: the doorstep hold that times all four convoy crossings.
-    105: [(2, 1)],
-    106: [(5, 2)],
-    107: [(7, 3)],
+    106: [(3, 2)],
     // 109: held above the dial before the lane ride.
     109: [(3, 5)],
     // 110: the doorstep, held on both floor passes.
