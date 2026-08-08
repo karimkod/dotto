@@ -12,11 +12,15 @@ void main() {
 
     // Wordmark.
     expect(find.text('Dotto'), findsOneWidget);
-    // Current level (level 2 is the first unlocked) play button.
-    expect(find.text('Level 2'), findsOneWidget);
-    // Difficulty badge for level 2 (Easy).
+    // A fresh player has no progress, so the climb starts at level 1 — the only
+    // unlocked level, and what the play button points at.
+    expect(find.text('Level 1'), findsOneWidget);
+    // Difficulty badge for level 1 (Easy).
     expect(find.text('Easy'), findsOneWidget);
     // Dev-only "new level" button (tests run in debug mode).
     expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+    // Everything past the frontier is drawn locked, not merely unplayable — the
+    // padlock is what tells the player the climb is gated at all.
+    expect(find.byIcon(Icons.lock_outline_rounded), findsWidgets);
   });
 }

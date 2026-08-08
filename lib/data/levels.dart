@@ -33,8 +33,7 @@ const int kWorld7Start = 92;
 /// Progression is gated: level 1 is the completed baseline, and completing a
 /// level unlocks the next one (persisted via [ProgressStore]).
 List<Level> buildInitialLevels() {
-  // Level 1 is always considered complete (the "press Play" intro).
-  final completed = {1, ...ProgressStore.completed()};
+  final completed = ProgressStore.completed();
 
   Difficulty difficultyFor(int number) {
     // World 1.
@@ -70,10 +69,19 @@ List<Level> buildInitialLevels() {
     return Difficulty.hard; // 104–110 the burning exams
   }
 
+  /// The climb: level 1 is open from the start, and finishing a level opens the
+  /// next one. Anything further ahead stays locked.
+  ///
+  /// Gaps in [completed] are treated forgivingly — a level is open if the one
+  /// before it is done, whether or not everything earlier is — so progress
+  /// written out of order (by the designer, or by an older build) can never
+  /// strand a player behind a level they cannot reach.
   LevelStatus statusFor(int number) {
     if (completed.contains(number)) return LevelStatus.completed;
-    // Testing: every level is unlocked (no progression gating for now).
-    return LevelStatus.unlocked;
+    if (number == 1 || completed.contains(number - 1)) {
+      return LevelStatus.unlocked;
+    }
+    return LevelStatus.locked;
   }
 
   return List<Level>.generate(kLevelCount, (i) {
