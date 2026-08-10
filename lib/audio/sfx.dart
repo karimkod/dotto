@@ -1,9 +1,16 @@
-// Sound effects facade. Resolves to the Web Audio implementation on web and a
-// no-op stub elsewhere (so VM tests don't touch dart:js_interop).
+// Sound effects facade. Resolves to Web Audio on web, to pre-rendered WAV
+// assets played through audioplayers on mobile/desktop, and to a no-op stub
+// where neither library exists.
+//
+// The conditions are ordered, first match wins: web has dart.library.js_interop,
+// mobile and the VM have dart.library.io.
 
-import 'sfx_stub.dart' if (dart.library.js_interop) 'sfx_web.dart' as impl;
+import 'sfx_stub.dart'
+    if (dart.library.js_interop) 'sfx_web.dart'
+    if (dart.library.io) 'sfx_io.dart' as impl;
 
-/// Synthesized, file-free game sound effects.
+/// The game's sound effects. Synthesized live on web; the same design rendered
+/// to assets/sfx/*.wav everywhere else — see sfx_spec.dart.
 class Sfx {
   Sfx._();
 

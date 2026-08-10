@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^8.1.0
   web: ^1.1.1
+  shared_preferences: ^2.5.5
+  audioplayers: ^6.7.1
 
 dev_dependencies:
   flutter_test:
@@ -60,10 +62,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # Sound effects, pre-rendered by `flutter test tool/make_sfx_test.dart` from
+  # the layer definitions in lib/audio/sfx_spec.dart. The web build ignores
+  # these and synthesizes the same effects live through Web Audio — but Flutter
+  # has no per-platform asset lists, so the web bundle still carries the ~268 KB
+  # it will never load. Worth revisiting if web download size starts to matter.
+  assets:
+    - assets/sfx/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

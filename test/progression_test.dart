@@ -1,8 +1,9 @@
 // Level unlock progression: level 1 is open from the start, finishing a level
 // opens the next, and everything beyond the frontier stays locked.
 //
-// These run against the in-memory ProgressStore stub (VM), which is the same
-// facade the web build backs with localStorage — so what is asserted here is the
+// On the VM these run against the shared_preferences store with no plugin host
+// behind it, so writes land in its in-memory cache and go no further — the same
+// facade the web build backs with localStorage. What is asserted here is the
 // gating logic, not the storage.
 
 import 'package:flutter_test/flutter_test.dart';

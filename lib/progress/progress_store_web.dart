@@ -6,6 +6,9 @@ import 'package:web/web.dart' as web;
 
 const _key = 'dotto_progress';
 
+/// localStorage reads synchronously, so there is nothing to preload.
+Future<void> init() async {}
+
 Set<int> completed() {
   try {
     final raw = web.window.localStorage.getItem(_key);

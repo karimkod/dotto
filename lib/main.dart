@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'progress/progress_store.dart';
 import 'screens/menu_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  // Progress is read synchronously while the level list builds, so it has to be
+  // in memory before the first frame — otherwise a returning player sees a
+  // fully locked map for an instant.
+  WidgetsFlutterBinding.ensureInitialized();
+  await ProgressStore.init();
   runApp(const DottoApp());
 }
 
