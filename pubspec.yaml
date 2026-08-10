@@ -1,5 +1,5 @@
 name: dotto
-description: "Dotto — a minimalist dot-connecting puzzle game."
+description: "Dotto — a minimalist dot-routing puzzle. Place your pieces, press play, and watch the dot find its way home."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -47,6 +47,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -89,3 +90,20 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App launcher icons, generated from assets/icon by `dart run
+# flutter_launcher_icons`. The source PNGs are themselves generated — see
+# tool/make_icon_test.dart — so the icon is drawn with the game's own arrow
+# geometry and palette rather than redrawn by hand.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/dotto_icon.png"
+  # Android adaptive icon: the ink backdrop plus a transparent foreground, so the
+  # launcher can mask it to whatever shape the device uses. Ink rather than the
+  # game's cream — the glow only reads as light against a dark field, and it must
+  # match the full-bleed icon's background or the two look like different apps.
+  adaptive_icon_background: "#2D2D2D"
+  adaptive_icon_foreground: "assets/icon/dotto_icon_foreground.png"
+  # The App Store rejects icons with an alpha channel.
+  remove_alpha_ios: true
