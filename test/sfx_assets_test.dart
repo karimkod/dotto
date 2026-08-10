@@ -34,6 +34,22 @@ void main() {
         reason: 'the spec defines an effect nothing plays');
   });
 
+  test('replaying stops before it resumes', () {
+    // The native half of this cannot be reached from a Dart test: Android's
+    // SoundPool reports no completion, so audioplayers leaves `playing` set and
+    // silently ignores every resume after the first. Stopping first is what
+    // clears it. Nothing about that is visible from here — the symptom is
+    // silence, with no error to assert on — so the call sequence is pinned
+    // instead, to keep a plausible-looking `seek(Duration.zero)` from quietly
+    // muting the game again.
+    final src = File('lib/audio/sfx_io.dart').readAsStringSync();
+    expect(src, contains('player.stop()'),
+        reason: 'a resume without a preceding stop is a no-op after the '
+            'first shot');
+    expect(src, isNot(contains('seek(')),
+        reason: 'seek does not reset the flag that guards play()');
+  });
+
   test('pubspec bundles the sfx directory', () {
     expect(File('pubspec.yaml').readAsStringSync(), contains('assets/sfx/'),
         reason: 'unbundled assets load as nothing at runtime');

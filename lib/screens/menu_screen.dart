@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_routes.dart';
 import '../data/levels.dart';
 import '../models/level.dart';
 import '../theme/app_theme.dart';
@@ -23,7 +24,7 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen> with RouteAware {
   late List<Level> _levels;
   final ScrollController _scrollController = ScrollController();
   final int _hintCount = 3;
@@ -36,7 +37,28 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    // Widget tests pump this screen without the observer installed, so only
+    // subscribe when there is a page route to subscribe to.
+    if (route is PageRoute) routeObserver.subscribe(this, route);
+  }
+
+  /// Called when whatever was covering the menu is gone — which, however deep
+  /// into the game the player went, is the one moment progress can have changed.
+  @override
+  void didPopNext() => _refresh();
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() => _levels = buildInitialLevels());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _scrollController.dispose();
     super.dispose();
   }
@@ -74,14 +96,11 @@ class _MenuScreenState extends State<MenuScreen> {
 
   void _openLevel(Level level) {
     if (level.isLocked) return;
+    // No .then here: winning a level advances with pushReplacement, which
+    // completes this future while the player is still playing. didPopNext is
+    // what tells the menu it is genuinely back on top.
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => GameScreen(level: level)))
-        .then((_) {
-      // Reflect any newly-unlocked levels on return.
-      if (!mounted) return;
-      setState(() => _levels = buildInitialLevels());
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
-    });
+        .push(MaterialPageRoute(builder: (_) => GameScreen(level: level)));
   }
 
   @override

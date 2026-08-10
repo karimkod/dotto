@@ -49,9 +49,18 @@ Future<void> _create(String name) async {
   }
 }
 
+/// Retriggers an already-loaded player.
+///
+/// The stop is not tidiness, it is the whole trick. Android's SoundPool has no
+/// completion callback, so audioplayers never learns the shot ended and leaves
+/// its `playing` flag set; `play()` is guarded by `if (!playing)`, so every
+/// later resume on its own is a no-op and the effect is heard exactly once per
+/// process. Stopping clears that flag (and drops the finished stream id), which
+/// lets the resume start a fresh one. It is what audioplayers' own AudioPool
+/// does between shots, for the same reason.
 Future<void> _replay(AudioPlayer player) async {
   try {
-    await player.seek(Duration.zero);
+    await player.stop();
     await player.resume();
   } catch (_) {}
 }

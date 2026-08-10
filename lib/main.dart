@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_routes.dart';
 import 'progress/progress_store.dart';
 import 'screens/menu_screen.dart';
 import 'theme/app_theme.dart';
@@ -22,6 +23,8 @@ class DottoApp extends StatelessWidget {
       title: 'Dotto',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      // Lets the menu notice it has been uncovered and re-read progress.
+      navigatorObservers: [routeObserver],
       home: const MenuScreen(),
     );
   }
