@@ -24,6 +24,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- The app ships no encryption of its own; the only TLS use is the standard
+	     HTTPS that google_fonts makes, which is exempt. Declaring this here stops
+	     App Store Connect prompting for export compliance on every TestFlight build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

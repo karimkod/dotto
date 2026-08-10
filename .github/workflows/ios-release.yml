@@ -99,6 +99,12 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "Version Name: $VERSION_NAME, Build Number: $BUILD_NUMBER"
 
+      # The local build this workflow was verified against ran with SPM off, so
+      # the CocoaPods path is the one known to archive cleanly here. Pinning it
+      # keeps CI on that path regardless of the Flutter version's default.
+      - name: Disable Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Flutter dependencies
         run: flutter pub get
 
