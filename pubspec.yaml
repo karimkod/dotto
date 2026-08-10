@@ -99,11 +99,11 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/dotto_icon.png"
-  # Android adaptive icon: the ink backdrop plus a transparent foreground, so the
-  # launcher can mask it to whatever shape the device uses. Ink rather than the
-  # game's cream — the glow only reads as light against a dark field, and it must
-  # match the full-bleed icon's background or the two look like different apps.
-  adaptive_icon_background: "#2D2D2D"
+  # Android adaptive icon: the cream backdrop plus a transparent foreground, so
+  # the launcher can mask it to whatever shape the device uses. Must stay equal
+  # to the full-bleed icon's background, or the masked and unmasked icons look
+  # like two different apps.
+  adaptive_icon_background: "#FAF8F5"
   adaptive_icon_foreground: "assets/icon/dotto_icon_foreground.png"
   # The App Store rejects icons with an alpha channel.
   remove_alpha_ios: true

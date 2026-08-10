@@ -4,16 +4,20 @@
 // Writes assets/icon/dotto_icon.png (full-bleed, iOS + Play listing) and
 // dotto_icon_foreground.png (transparent, Android adaptive foreground).
 //
-// The background is the game's own ink (#2D2D2D) rather than its cream: a warm
-// glow reads as light on a dark field and disappears on a light one, and the dot
-// is the whole subject here.
+// The background is the game's cream (#FAF8F5), so the icon sits in the same
+// world as the board. A glow has less contrast to work with on a light field
+// than on a dark one, so it is carried by warmth rather than brightness — the
+// halo deepens toward coral instead of fading to white — and the ball takes the
+// game's ink outline, which is what gives it definition against the cream.
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 
-const _ink = Color(0xFF2D2D2D); // the game's outline colour, used as the field
+const _cream = Color(0xFFFAF8F5); // AppColors.background — the field
+const _ink = Color(0xFF2D2D2D); // AppColors.ink — the outline
 const _dot = Color(0xFFFFB347); // AppColors.accent — the dot
+const _coral = Color(0xFFFF6B6B); // AppColors.coral — the outer glow's warmth
 const _hot = Color(0xFFFFD9A0); // lit top-left of the sphere
 const _deep = Color(0xFFF59331); // shaded lower edge
 
@@ -24,48 +28,49 @@ const _deep = Color(0xFFF59331); // shaded lower edge
 void paintMark(Canvas canvas, double size, {required bool background}) {
   final c = Offset(size / 2, size / 2);
   if (background) {
-    canvas.drawRect(Rect.fromLTWH(0, 0, size, size), Paint()..color = _ink);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size, size), Paint()..color = _cream);
   }
 
   final r = size * 0.20; // the ball
   final glow = size * 0.42; // how far the light reaches
 
-  // The radiance: one wide soft field, then a tighter brighter one, so the
-  // falloff has some shape instead of reading as a flat disc.
+  // The radiance. Against cream a pale halo would vanish, so this one gains
+  // saturation as it leaves the ball — orange into coral — and fades out on
+  // colour rather than on brightness.
   canvas.drawCircle(
     c,
     glow,
     Paint()
       ..shader = Gradient.radial(c, glow, [
-        _dot.withValues(alpha: 0.42),
-        _dot.withValues(alpha: 0.16),
-        _dot.withValues(alpha: 0.0),
+        _dot.withValues(alpha: 0.50),
+        _coral.withValues(alpha: 0.22),
+        _coral.withValues(alpha: 0.0),
       ], [
         0.0,
-        0.45,
+        0.5,
         1.0,
       ]),
   );
   canvas.drawCircle(
     c,
-    r * 1.9,
+    r * 1.75,
     Paint()
-      ..shader = Gradient.radial(c, r * 1.9, [
-        _dot.withValues(alpha: 0.55),
+      ..shader = Gradient.radial(c, r * 1.75, [
+        _dot.withValues(alpha: 0.45),
         _dot.withValues(alpha: 0.0),
       ], [
-        0.3,
+        0.35,
         1.0,
       ]),
   );
 
-  // A soft seat beneath the ball so it sits in the light rather than floating
-  // flat on it.
+  // A soft seat beneath the ball. Warm grey — the game's own shadow colour —
+  // rather than black, which would go muddy against cream.
   canvas.drawCircle(
-    c + Offset(0, r * 0.55),
-    r * 0.95,
+    c + Offset(0, r * 0.62),
+    r * 0.92,
     Paint()
-      ..color = const Color(0xFF1A1614).withValues(alpha: 0.35)
+      ..color = const Color(0xFF786E5F).withValues(alpha: 0.28)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, size * 0.035),
   );
 
@@ -80,6 +85,18 @@ void paintMark(Canvas canvas, double size, {required bool background}) {
         [_hot, _dot, _deep],
         [0.0, 0.55, 1.0],
       ),
+  );
+
+  // The thick hand-drawn outline every piece on the board wears. On the dark
+  // field this was unnecessary; on cream it is what separates ball from
+  // backdrop, and it puts the icon in the same visual language as the game.
+  canvas.drawCircle(
+    c,
+    r,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size * 0.022
+      ..color = _ink,
   );
 
   // A specular kiss — faded, not a pasted-on disc. A hard-edged white circle
