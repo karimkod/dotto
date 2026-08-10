@@ -88,21 +88,127 @@ Rextory signs with would invalidate its App Store provisioning profile and break
 that pipeline until the profile is regenerated. An extra App Store Connect API
 key is likewise additive and disturbs nothing already in use.
 
+## Where each value comes from
+
+Everything below lives under the same Apple account Rextory ships from
+(team `P6733MSWNR`). Sign in with that Apple ID.
+
+### `APP_STORE_CONNECT_ISSUER_ID` and `APP_STORE_CONNECT_KEY_ID` and `APP_STORE_CONNECT_API_KEY`
+
+All three come from one page:
+**<https://appstoreconnect.apple.com/access/integrations/api>**
+(App Store Connect → Users and Access → Integrations → App Store Connect API,
+"Team Keys" tab). Creating a key needs the Admin or Account Holder role.
+
+| Secret | Where on that page |
+|---|---|
+| `APP_STORE_CONNECT_ISSUER_ID` | The **Issuer ID** shown above the key table, a UUID like `69a6de70-1f2c-47e3-...`. One per team, shared by every key, with a copy button next to it. |
+| `APP_STORE_CONNECT_KEY_ID` | The 10-character **KEY ID** column in the key's row, e.g. `2X9R4HXF34`. |
+| `APP_STORE_CONNECT_API_KEY` | The **`.p8` file itself**, downloaded via the row's Download link. The whole file contents, including the `-----BEGIN PRIVATE KEY-----` lines, go in the secret. |
+
+The `.p8` downloads **once and only once**. If Rextory's original is lost, the
+Issuer ID and Key ID on that page are still visible but useless on their own, so
+generate a new key with the "+" button. Give it the **App Manager** role, which
+is the least privilege that can still upload builds. A new key does not disturb
+the existing one, so Rextory keeps working.
+
+### `IOS_DIST_CERT_BASE64` and `IOS_DIST_CERT_PASSWORD`
+
+A `.p12` is the certificate **plus its private key**. This is the part that
+cannot be recovered from Apple: downloading the certificate from the portal
+gives a `.cer`, which is only the public half. The private key exists solely in
+the keychain of whichever Mac created it.
+
+**First, look for the original.** On any other Mac you have used for Rextory:
+
+```bash
+# an exported .p12 sitting in a folder
+find ~ -iname "*.p12" -not -path "*/Library/Caches/*" 2>/dev/null
+
+# or the cert still installed in that Mac's keychain
+security find-identity -v -p codesigning | grep "Apple Distribution"
+```
+
+If the second command lists an `Apple Distribution: ... (P6733MSWNR)` identity,
+export it: **Keychain Access → login → My Certificates**, find that row, expand
+it to confirm a private key is nested under it, right-click → **Export**, choose
+**Personal Information Exchange (.p12)**. The password it asks you to invent
+during that export **is** `IOS_DIST_CERT_PASSWORD`. It is not a pre-existing
+value to look up anywhere.
+
+**If it is nowhere, make a new one** (additive, see the warning above):
+
+1. Keychain Access → menu **Certificate Assistant → Request a Certificate From a
+   Certificate Authority**. Enter your email, leave CA Email blank, select
+   **Saved to disk**. This produces a `.certSigningRequest` file.
+2. <https://developer.apple.com/account/resources/certificates/add> → **Apple
+   Distribution** → upload the CSR → download the resulting `.cer`.
+3. Double-click the `.cer` to install it into the login keychain, then export it
+   as `.p12` exactly as above.
+
+Then:
+
+```bash
+base64 -i dist.p12 | gh secret set IOS_DIST_CERT_BASE64 --repo karimkod/dotto
+gh secret set IOS_DIST_CERT_PASSWORD --repo karimkod/dotto   # paste, then Ctrl-D
+gh secret set APP_STORE_CONNECT_API_KEY --repo karimkod/dotto < AuthKey_XXXXXXXXXX.p8
+gh secret set APP_STORE_CONNECT_KEY_ID --repo karimkod/dotto
+gh secret set APP_STORE_CONNECT_ISSUER_ID --repo karimkod/dotto
+```
+
+### Privacy policy URL
+
+**You almost certainly already have this.** Google Play refuses a listing
+without one, and Dotto is already live there. Find the URL you gave them at
+**Play Console → Dotto → Policy and programs → App content → Privacy policy**,
+and reuse it verbatim. The same page's **Data safety** answers map directly onto
+Apple's privacy questions.
+
+### Apple Team ID
+
+Already set as a secret. For reference it is on
+<https://developer.apple.com/account> under Membership details, shown as
+**Team ID**: `P6733MSWNR`.
+
 ## Apple portal steps
 
 These need an interactive Apple ID login with 2FA, so they have to be done by
 hand, because none of the credentials exist on this machine.
 
-1. **Register the App ID** `com.karimkod.dotto` under team P6733MSWNR
-   (Certificates, Identifiers & Profiles → Identifiers).
-2. **Create an App Store provisioning profile** for it. Name it
-   **`com.karimkod.dotto AppStore`**, because the workflow's `ExportOptions.plist`
-   looks it up by that exact string, following the same convention as
-   Rextory's `com.rextory.mobile AppStore`. Nothing needs downloading; CI
-   fetches it via the API.
-3. **Create the App Store Connect app record** with bundle ID `com.karimkod.dotto`,
-   name **Dotto**, primary language English. Upload fails without this record
-   even when signing is correct.
+**1. Register the App ID.** <https://developer.apple.com/account/resources/identifiers/add/bundleId>
+
+- Type: **App IDs** → **App**
+- Description: `Dotto` (portal label only, no punctuation allowed)
+- Bundle ID: select **Explicit** and enter `com.karimkod.dotto` exactly
+- Capabilities: leave everything unchecked. The app uses no entitlements, and
+  `ios/Runner` has no `.entitlements` file.
+
+**2. Create the App Store provisioning profile.** <https://developer.apple.com/account/resources/profiles/add>
+
+- Under **Distribution**, choose **App Store Connect**
+- App ID: `com.karimkod.dotto` from step 1
+- Certificate: the Apple Distribution certificate whose `.p12` you are putting
+  in the secrets. If you made a new certificate, pick the new one.
+- Provisioning Profile Name: **`com.karimkod.dotto AppStore`**, exactly, spaces
+  included. The workflow's `ExportOptions.plist` looks the profile up by that
+  literal string, mirroring Rextory's `com.rextory.mobile AppStore`. A mismatch
+  here fails the export step after a successful archive, which is a confusing
+  failure to debug, so it is worth double-checking.
+- No need to download it. CI fetches it through the API at build time.
+
+**3. Create the App Store Connect app record.** <https://appstoreconnect.apple.com/apps> → the **+** button → **New App**
+
+- Platform: **iOS**
+- Name: `Dotto` (this is the public App Store name and must be globally unique;
+  if it is taken you will be told here, and the workflow does not care what you
+  pick)
+- Primary Language: English
+- Bundle ID: pick `com.karimkod.dotto` from the dropdown. It only appears once
+  step 1 is done, sometimes after a minute's delay.
+- SKU: any private unique string, for example `dotto-ios`. Never shown publicly.
+- User Access: Full Access
+
+Upload fails without this record even when signing is completely correct.
 
 ## Listing
 
