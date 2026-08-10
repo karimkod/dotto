@@ -1,0 +1,166 @@
+name: Android Release to Play Store
+
+# Required repository secrets
+# ---------------------------
+#   KEYSTORE_BASE64            base64 of the upload keystore.
+#                              Produce with:
+#                                base64 -w0 jebud-upload-key.keystore
+#                              (on Windows PowerShell:
+#                                [Convert]::ToBase64String([IO.File]::ReadAllBytes('jebud-upload-key.keystore')))
+#   KEY_ALIAS                  the key alias inside that keystore — REXTORY.
+#                              The file is named for Jebud but its alias is
+#                              REXTORY; it is shared across Rextory, Jebud and
+#                              Dotto, so the alias is NOT "dotto".
+#   KEY_PASSWORD               password for that key
+#   STORE_PASSWORD             password for the keystore itself
+#   PLAY_SERVICE_ACCOUNT_JSON  the Google Play service-account key, as raw JSON
+#                              (not base64 — it is passed straight to the
+#                              upload action as plain text)
+#
+# Note: Google Play will not accept an upload for an app that has never been
+# created in the Play Console. The very first release has to be made by hand;
+# this workflow takes over from the second onwards.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Release track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+permissions:
+  contents: write
+
+env:
+  # Pinned to the Flutter that actually builds this project locally — the signed
+  # AAB and the whole test suite are verified against it.
+  FLUTTER_VERSION: '3.41.9'
+  JAVA_VERSION: '17'
+
+jobs:
+  release:
+    name: Build & Release Android to Play Store
+    runs-on: ubuntu-latest
+    # Build, upload and GitHub release all run here, so the AAB never has to be
+    # handed between jobs as an artifact. A named bound surfaces a runner
+    # SIGTERM as a clear timeout rather than an opaque "operation was canceled".
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-key.keystore
+
+      - name: Create key.properties
+        run: |
+          # storeFile is resolved by Gradle relative to android/app, so a bare
+          # filename is correct here. Locally the same file holds an absolute
+          # path — and it must use forward slashes either way, because a
+          # backslash is an escape character in a .properties file.
+          {
+            echo "storePassword=${{ secrets.STORE_PASSWORD }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "storeFile=upload-key.keystore"
+          } > android/key.properties
+
+      - name: Get version from tag or pubspec
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # Version comes from the tag, minus the leading 'v'.
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "Using version from tag: $VERSION"
+            if [[ $VERSION == *"+"* ]]; then
+              VERSION_NAME=${VERSION%+*}
+              BUILD_NUMBER=${VERSION#*+}
+            else
+              VERSION_NAME=$VERSION
+              BUILD_NUMBER=${{ github.run_number }}
+            fi
+          else
+            # Manual runs fall back to pubspec.yaml.
+            VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+            VERSION_NAME=${VERSION%+*}
+            BUILD_NUMBER=${{ github.run_number }}
+            echo "Using version from pubspec.yaml: $VERSION"
+          fi
+
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Version Name: $VERSION_NAME, Build Number: $BUILD_NUMBER"
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        # The suite is the thing that proves every level is still solvable, so a
+        # broken level can never reach the Play Console.
+        run: flutter test
+
+      - name: Build AAB
+        run: |
+          flutter build appbundle --release \
+            --build-name=${{ steps.version.outputs.VERSION_NAME }} \
+            --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+
+      - name: Upload to Google Play Console
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          # Passed as plain text, so there is no JSON file left on the runner to
+          # clean up afterwards.
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.karimkod.dotto
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: draft
+          inAppUpdatePriority: 2
+          whatsNewDirectory: release-notes/
+
+      - name: Create GitHub Release
+        # Tag pushes only, and only once the Play upload above has succeeded —
+        # a failed step short-circuits the rest of the job by default.
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/bundle/release/app-release.aab
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up signing material
+        # `always()` so the keystore and passwords are removed even when an
+        # earlier step failed.
+        if: always()
+        run: |
+          rm -f android/app/upload-key.keystore
+          rm -f android/key.properties

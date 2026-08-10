@@ -1,0 +1,188 @@
+name: iOS Release to App Store
+
+# Required repository secrets
+# ---------------------------
+#   IOS_DIST_CERT_BASE64          base64 of the Apple Distribution .p12
+#   IOS_DIST_CERT_PASSWORD        password for that .p12
+#   APP_STORE_CONNECT_ISSUER_ID   App Store Connect API issuer id
+#   APP_STORE_CONNECT_KEY_ID      App Store Connect API key id
+#   APP_STORE_CONNECT_API_KEY     the .p8 private key contents
+#   APPLE_TEAM_ID                 the 10-character team id. Rextory's is
+#                                 P6733MSWNR; if Dotto ships from the same Apple
+#                                 developer account it is the same value, but it
+#                                 is a secret here rather than hardcoded because
+#                                 that has NOT been confirmed for this app.
+#
+# UNVERIFIED. Dotto's iOS target has never been compiled — the development
+# machine is Windows, so there is no Xcode to build it with. This workflow is
+# adapted from the Rextory one and is a starting point, not a proven pipeline.
+# Two things in particular need checking on the first run:
+#
+#   * The provisioning profile must exist in the Apple developer portal for
+#     com.karimkod.dotto, and its NAME must match the value in ExportOptions
+#     below. "com.karimkod.dotto AppStore" follows the convention the download
+#     action produces, but the real profile name wins.
+#   * IPHONEOS_DEPLOYMENT_TARGET is 14.0 in the Xcode project. Apple raises the
+#     minimum SDK periodically; if an upload is rejected for SDK age, that and
+#     the Xcode version below are the two knobs.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Override build number (CFBundleVersion). Defaults to the GitHub run number.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  # Matches the Android workflow and the locally verified toolchain.
+  FLUTTER_VERSION: '3.41.9'
+
+jobs:
+  build-and-upload:
+    name: Build & Upload iOS to App Store Connect
+    # Apple requires a recent Xcode for App Store uploads; macos-26 defaults to
+    # Xcode 26, where macos-15 only ships Xcode 16.
+    runs-on: macos-26
+    # Pods plus xcodebuild archive run long; a named bound surfaces a runner
+    # SIGTERM as a clear timeout rather than an opaque cancel.
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Get version from tag or pubspec
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "Using version from tag: $VERSION"
+            if [[ $VERSION == *"+"* ]]; then
+              VERSION_NAME=${VERSION%+*}
+              BUILD_NUMBER=${VERSION#*+}
+            else
+              VERSION_NAME=$VERSION
+              BUILD_NUMBER=${{ github.run_number }}
+            fi
+          else
+            VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+            VERSION_NAME=${VERSION%+*}
+            BUILD_NUMBER=${{ github.run_number }}
+            echo "Using version from pubspec.yaml: $VERSION"
+          fi
+
+          # A manual override wins, so a re-run can bump the build number —
+          # App Store Connect rejects a build number it has already seen.
+          if [[ -n "${{ github.event.inputs.build_number }}" ]]; then
+            BUILD_NUMBER=${{ github.event.inputs.build_number }}
+          fi
+
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Version Name: $VERSION_NAME, Build Number: $BUILD_NUMBER"
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Import Apple Distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: Download App Store provisioning profile
+        uses: apple-actions/download-provisioning-profiles@v3
+        with:
+          bundle-id: com.karimkod.dotto
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+
+      - name: Write ExportOptions.plist
+        run: |
+          cat > ios/ci-export-options.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.karimkod.dotto</key>
+              <string>com.karimkod.dotto AppStore</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Build signed IPA
+        run: |
+          flutter build ipa --release \
+            --build-name=${{ steps.version.outputs.VERSION_NAME }} \
+            --build-number=${{ steps.version.outputs.BUILD_NUMBER }} \
+            --export-options-plist=ios/ci-export-options.plist
+
+      - name: Locate IPA
+        id: ipa
+        run: |
+          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -1)
+          echo "Found IPA: $IPA_PATH"
+          echo "path=$IPA_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload to App Store Connect (TestFlight)
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ steps.ipa.outputs.path }}
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-and-upload
+    if: ${{ always() && needs.build-and-upload.result == 'success' && startsWith(github.ref, 'refs/tags/') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The IPA is already on TestFlight, so the GitHub Release carries the
+      # generated notes only rather than a redundant copy.
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}

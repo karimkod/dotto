@@ -1,0 +1,7 @@
+Dotto — a minimalist dot-routing puzzle.
+
+The dot moves on its own, one cell at a time, in a straight line. Place a limited
+kit of arrows, shields and portals to steer it home, then press play and watch
+your plan run.
+
+110 hand-built levels across 7 worlds. No timers, no lives, no account.
