@@ -380,7 +380,7 @@ re-running after a failed upload.
 TestFlight works, but nothing is submitted to the App Store yet. Outstanding:
 
 1. **Internal testing group.** TestFlight shows "create a group and invite
-   testers" — needed before anyone but you can install the build.
+   testers", which is needed before anyone but you can install the build.
 2. **The listing.** Screenshots, description, keywords, support URL, age-rating
    questionnaire, and the privacy policy URL from the Play Console. See above.
 3. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
