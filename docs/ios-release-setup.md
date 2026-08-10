@@ -212,13 +212,29 @@ Upload fails without this record even when signing is completely correct.
 
 ## Listing
 
-| Field | Value |
-|---|---|
-| Name | Dotto |
-| Category | Games → Puzzle |
-| Age rating | 4+ (no objectionable content, no ads, no UGC, no account) |
-| Privacy policy URL | **pending**, required before submission |
-| Price | Free |
+**None of this blocks TestFlight.** Once the app record exists and the build
+uploads, it is testable immediately. The listing below is only needed for public
+App Store submission, so it can wait until after the pipeline is proven.
+
+Everything lives under <https://appstoreconnect.apple.com/apps> → **Dotto**.
+The left sidebar splits into app-level pages (apply to every version) and the
+version page (`1.0.2 Prepare for Submission`).
+
+| Field | Value | Where |
+|---|---|---|
+| Name | `Dotto` | App-level → **App Information** → Localizable Information |
+| Subtitle | `Route the dot, watch it run` | same panel, 30 char limit |
+| Category | Games, subcategory **Puzzle** | App-level → **App Information** → General Information. Pick Games as the category, then Puzzle as the primary subcategory. |
+| Age rating | **4+** | App-level → **App Information** → Age Rating → Edit. It is a questionnaire, not a dropdown. Answering "None" to every item yields 4+. |
+| Privacy policy URL | reuse the Play Store one | App-level → **App Privacy** page |
+| Price | Free | App-level → **Pricing and Availability** |
+| Description, keywords, promotional text | see copy below | Version page |
+| Screenshots | `store/screenshots/ios/` | Version page → App Previews and Screenshots, with a tab per device size |
+| Support URL | **required**, easy to miss | Version page. The repo URL <https://github.com/karimkod/dotto> works if there is no dedicated site. |
+| Copyright, review contact | your name, your email | Version page → App Review Information |
+
+Support URL is mandatory and was not on the original checklist, so it is the
+field most likely to block submission at the last moment.
 
 Privacy nutrition label: the app collects nothing. Progress is stored locally via
 `shared_preferences`; there is no account, no analytics, no ads. Answer "Data Not
