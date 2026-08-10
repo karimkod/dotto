@@ -18,17 +18,20 @@ dev machine was Windows, so `.github/workflows/ios-release.yml` carried an
 Toolchain used: Flutter 3.44.4, Xcode 26.6. Note CI pins Flutter **3.41.9**
 (matching `android-release.yml`), which is not the version verified locally.
 
-CI agrees on where the blockage is. The three runs triggered so far (tags
-`v1.0.1+2`, `v1.0.1+3`, `v1.0.2+4`) all failed at the same step:
+**The pipeline works end to end.** Run
+[31440137575](https://github.com/karimkod/dotto/actions/runs/31440137575) went
+green in 4m57s and put **version 1.0.3, build 6** on TestFlight, where it shows
+as "Ready to Submit". Delivery UUID `48ffb726-78c4-4a11-b548-bea899f77b74`.
 
-```
-Import Apple Distribution certificate
-##[error]At least one of p12-filepath or p12-file-base64 must be provided
-```
+It also arrived without an export-compliance prompt, which is the
+`ITSAppUsesNonExemptEncryption` key doing its job.
 
-That is the empty `IOS_DIST_CERT_BASE64` secret. Everything before it (checkout,
-Xcode select, Flutter 3.41.9 setup, version parsing, `pub get`) succeeds, so the
-secrets below are the only thing standing between here and a TestFlight build.
+For the record, the four earlier failures and their causes:
+
+| Run | Failed at | Cause |
+|---|---|---|
+| `v1.0.1+2`, `v1.0.1+3`, `v1.0.2+4`, `v1.0.3+5` | Import Apple Distribution certificate | `IOS_DIST_CERT_BASE64` was empty |
+| first `workflow_dispatch` | Build signed IPA | Automatic signing, see below |
 
 ## Project changes made
 
@@ -357,18 +360,29 @@ is why this uses a compile-time define.
 
 ## Releasing
 
-Once the secrets and the three portal steps are done, `pubspec.yaml` is at
-`1.0.2+4` and the `v1.0.2+4` tag already exists, so the quickest path is a
-manual run from the Actions tab (**iOS Release to App Store** → Run workflow)
-rather than a new tag.
-
-For subsequent releases:
+Tag a release:
 
 ```bash
-git tag v1.0.3+5 && git push origin v1.0.3+5
+git tag v1.0.4+7 && git push origin v1.0.4+7
 ```
 
-The tag drives both values: `v1.0.3+5` gives version name `1.0.3` and build
-number `5`. Without a `+`, the build number falls back to the GitHub run number.
-App Store Connect rejects a build number it has already accepted, so use the
-`build_number` input when re-running after a failed upload.
+The tag drives both values: `v1.0.4+7` gives version name `1.0.4` and build
+number `7`. Without a `+`, the build number falls back to the GitHub run number,
+which is what build 6 used. A manual run from the Actions tab (**iOS Release to
+App Store** → Run workflow) works too and takes the version from `pubspec.yaml`.
+
+App Store Connect **rejects a build number it has already accepted**, so build
+numbers must only ever go up. Build 6 is taken. Use the `build_number` input when
+re-running after a failed upload.
+
+## What is left
+
+TestFlight works, but nothing is submitted to the App Store yet. Outstanding:
+
+1. **Internal testing group.** TestFlight shows "create a group and invite
+   testers" — needed before anyone but you can install the build.
+2. **The listing.** Screenshots, description, keywords, support URL, age-rating
+   questionnaire, and the privacy policy URL from the Play Console. See above.
+3. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
+   "Dotto" was taken. If you want the bare name, Apple's dispute route is linked
+   from the error, and it needs a trademark claim.
