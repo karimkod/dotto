@@ -3,11 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
 import '../ads/ad_pacing.dart';
+import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
@@ -885,7 +885,7 @@ class _GameScreenState extends State<GameScreen>
         // Dropped off the grid → remove, returning it to the toolkit.
         setState(() => _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1);
         Sfx.remove();
-        HapticFeedback.lightImpact();
+        Haptics.light();
       } else {
         // Dropped on an occupied/invalid cell → return to its origin.
         setState(() => _placed[_dragOriginKey!] = piece);
@@ -992,7 +992,7 @@ class _GameScreenState extends State<GameScreen>
       _rippleNeighbors(key); // neighbors react
     });
     Sfx.place();
-    HapticFeedback.mediumImpact();
+    Haptics.medium();
   }
 
   void _placeTool((int, int) cell, ToolType tool) {
@@ -1011,7 +1011,7 @@ class _GameScreenState extends State<GameScreen>
       if (piece.type == PlacedType.teleporter) _reindexPortals();
     });
     Sfx.remove();
-    HapticFeedback.lightImpact();
+    Haptics.light();
   }
 
   /// Teleporters already on the board, which is also the index the next one
@@ -1636,7 +1636,7 @@ class _GameScreenState extends State<GameScreen>
       if (fatal) _dotGone = true;
     });
     Sfx.boom();
-    HapticFeedback.heavyImpact();
+    Haptics.heavy();
   }
 
   /// A shielded hit: blow up the destroyer AND chain-explode every wall beside

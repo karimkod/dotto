@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../audio/sfx.dart';
+import '../settings/haptics.dart';
 
 /// Wraps any child to make taps feel satisfying:
 /// - press-down: shrink to 0.92x + slight darken (fast, ~60ms)
@@ -67,7 +67,7 @@ class _BouncyButtonState extends State<BouncyButton>
   void _onUp() {
     setState(() => _pressed = false);
     Sfx.tap();
-    HapticFeedback.lightImpact();
+    Haptics.light();
     widget.onTap!();
   }
 

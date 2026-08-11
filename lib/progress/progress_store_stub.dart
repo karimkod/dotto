@@ -15,3 +15,5 @@ int _hints = 0;
 int hintsUsed() => _hints;
 
 void bumpHintsUsed() => _hints++;
+
+void clear() => _completed.clear();

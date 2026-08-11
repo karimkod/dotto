@@ -7,6 +7,7 @@ import 'analytics/analytics_service.dart';
 import 'app_routes.dart';
 import 'progress/progress_store.dart';
 import 'screens/menu_screen.dart';
+import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -15,6 +16,7 @@ Future<void> main() async {
   // fully locked map for an instant.
   WidgetsFlutterBinding.ensureInitialized();
   await ProgressStore.init();
+  await SettingsStore.init();
   // Ads start in the background: consent and the first ad fetch involve the
   // network, and none of it should stand between launch and the first frame.
   // AdManager fails soft, so a slow or failed start just means no ads.

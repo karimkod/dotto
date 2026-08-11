@@ -42,3 +42,9 @@ void bumpHintsUsed() {
     web.window.localStorage.setItem(_hintsKey, '${hintsUsed() + 1}');
   } catch (_) {}
 }
+
+void clear() {
+  try {
+    web.window.localStorage.removeItem(_key);
+  } catch (_) {}
+}

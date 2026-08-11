@@ -62,3 +62,10 @@ void bumpHintsUsed() {
   if (prefs == null) return;
   unawaited(prefs.setInt(_hintsKey, _hints).catchError((_) => false));
 }
+
+void clear() {
+  _cache.clear();
+  final prefs = _prefs;
+  if (prefs == null) return;
+  unawaited(prefs.remove(_key).catchError((_) => false));
+}

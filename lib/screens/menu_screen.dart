@@ -13,6 +13,7 @@ import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
 import 'game_screen.dart';
 import 'level_designer_screen.dart';
+import 'settings_screen.dart';
 
 /// Vertical slot height per level node on the path.
 const double _slotHeight = 116;
@@ -101,6 +102,14 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     );
   }
 
+  void _openSettings() {
+    // Nothing to await: settings can reset progress, and the menu re-reads it
+    // through didPopNext when this route is popped — the same path a finished
+    // level takes back.
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
   void _openLevel(Level level) {
     if (level.isLocked) return;
     // No .then here: winning a level advances with pushReplacement, which
@@ -124,7 +133,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  const TopBar(),
+                  TopBar(onSettings: _openSettings),
                   const SizedBox(height: 18),
                   // Wordmark, with a dev-only "+" (new level) balanced on the
                   // right so the title stays centered.

@@ -26,4 +26,8 @@ class ProgressStore {
   static int hintsUsed() => impl.hintsUsed();
 
   static void bumpHintsUsed() => impl.bumpHintsUsed();
+
+  /// Erase every completed level, putting the player back to level 1. The
+  /// lifetime hint count is left alone — it is a usage statistic, not progress.
+  static void clear() => impl.clear();
 }
