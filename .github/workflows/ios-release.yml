@@ -13,18 +13,22 @@ name: iOS Release to App Store
 #                                 is a secret here rather than hardcoded because
 #                                 that has NOT been confirmed for this app.
 #
-# UNVERIFIED. Dotto's iOS target has never been compiled — the development
-# machine is Windows, so there is no Xcode to build it with. This workflow is
-# adapted from the Rextory one and is a starting point, not a proven pipeline.
-# Two things in particular need checking on the first run:
+# VERIFIED. This pipeline has archived, signed and delivered to TestFlight
+# (1.0.3, builds 6 and 7). It is adapted from the Rextory workflow and now
+# matches it where it counts: manual signing declared in the Xcode project, the
+# App Store profile fetched through the API rather than committed, and CocoaPods
+# forced over Swift Package Manager.
 #
-#   * The provisioning profile must exist in the Apple developer portal for
-#     com.karimkod.dotto, and its NAME must match the value in ExportOptions
-#     below. "com.karimkod.dotto AppStore" follows the convention the download
-#     action produces, but the real profile name wins.
-#   * IPHONEOS_DEPLOYMENT_TARGET is 14.0 in the Xcode project. Apple raises the
-#     minimum SDK periodically; if an upload is rejected for SDK age, that and
-#     the Xcode version below are the two knobs.
+# Two things worth knowing when it next breaks:
+#
+#   * The profile name in ExportOptions below, "com.karimkod.dotto AppStore",
+#     must match the profile in the developer portal exactly. It does today. A
+#     mismatch fails the export step *after* a successful archive, which is a
+#     confusing place to land.
+#   * IPHONEOS_DEPLOYMENT_TARGET is 15.0, raised from 14.0 after Apple returned
+#     ITMS-90068 against build 7: from Spring 2027 an upload must declare 15.0
+#     or later. That and the Xcode version below are the two knobs for when
+#     Apple next moves the floor.
 
 on:
   push:

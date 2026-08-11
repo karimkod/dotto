@@ -42,7 +42,7 @@ whether the plan works — a small, repeatable hit of "I solved it."
 | **Genre** | Logic / routing puzzle |
 | **Players** | Single-player |
 | **Content** | 750 levels across 50 worlds (15 levels each) |
-| **Platforms** | Flutter — web first; Android (minSdk 21) & iOS (14) ready |
+| **Platforms** | Flutter — web first; Android (minSdk 21) & iOS (15) ready |
 | **Orientation** | Portrait, phone-sized (max content width ~460px) |
 | **Session** | Seconds-to-minutes per level; pick-up-and-play |
 | **Monetization (proposed)** | Free with optional hint packs / cosmetic themes; no forced ads |
