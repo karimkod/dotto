@@ -24,6 +24,7 @@ SharedPreferences? _prefs;
 Future<void> init() async {
   try {
     final prefs = _prefs = await SharedPreferences.getInstance();
+    _hints = prefs.getInt(_hintsKey) ?? 0;
     final raw = prefs.getString(_key);
     if (raw == null || raw.isEmpty) return;
     final map = jsonDecode(raw) as Map<String, dynamic>;
@@ -45,4 +46,19 @@ void markCompleted(int level) {
   // Fire and forget: progress is already true in memory, so a failed write
   // costs this session's tail rather than the level the player just won.
   unawaited(prefs.setString(_key, payload).catchError((_) => false));
+}
+
+const _hintsKey = 'dotto_hints_used';
+
+/// Cached like the completed set, and for the same reason: the read is
+/// synchronous while shared_preferences is not.
+int _hints = 0;
+
+int hintsUsed() => _hints;
+
+void bumpHintsUsed() {
+  _hints++;
+  final prefs = _prefs;
+  if (prefs == null) return;
+  unawaited(prefs.setInt(_hintsKey, _hints).catchError((_) => false));
 }

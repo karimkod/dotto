@@ -27,6 +27,23 @@ const int kWorld6Start = 71;
 /// The level number at which World 7 (One-Shot Arrows) begins.
 const int kWorld7Start = 92;
 
+/// Which world a level belongs to, 1–7.
+///
+/// The Master Trials (61–70) are an interlude rather than a world of their own,
+/// and count as World 5 — the world whose pieces they revisit. The equivalent
+/// helper in the test suite splits them out separately, so the two do not agree
+/// on 61–70 by design: one is labelling analytics, the other is grouping test
+/// output.
+int worldOf(int level) {
+  if (level >= kWorld7Start) return 7;
+  if (level >= kWorld6Start) return 6;
+  if (level >= kWorld5Start) return 5;
+  if (level >= kWorld4Start) return 4;
+  if (level >= kWorld3Start) return 3;
+  if (level >= kWorld2Start) return 2;
+  return 1;
+}
+
 /// Hardcoded menu level list — World 1 (1–15), World 2 (16–20), World 3 (21–30),
 /// World 4 (31–50).
 ///

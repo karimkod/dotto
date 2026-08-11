@@ -20,4 +20,10 @@ class ProgressStore {
 
   /// Record a level as completed (which unlocks the next one).
   static void markCompleted(int level) => impl.markCompleted(level);
+
+  /// Lifetime count of hints taken, across every level and session. Reported as
+  /// an analytics user property; nothing in the game reads it.
+  static int hintsUsed() => impl.hintsUsed();
+
+  static void bumpHintsUsed() => impl.bumpHintsUsed();
 }

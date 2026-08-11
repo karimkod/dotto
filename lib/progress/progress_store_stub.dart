@@ -9,3 +9,9 @@ Future<void> init() async {}
 Set<int> completed() => {..._completed};
 
 void markCompleted(int level) => _completed.add(level);
+
+int _hints = 0;
+
+int hintsUsed() => _hints;
+
+void bumpHintsUsed() => _hints++;

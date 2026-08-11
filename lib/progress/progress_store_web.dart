@@ -26,3 +26,19 @@ void markCompleted(int level) {
   web.window.localStorage
       .setItem(_key, jsonEncode({'completed': set.toList()..sort()}));
 }
+
+const _hintsKey = 'dotto_hints_used';
+
+int hintsUsed() {
+  try {
+    return int.tryParse(web.window.localStorage.getItem(_hintsKey) ?? '') ?? 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+void bumpHintsUsed() {
+  try {
+    web.window.localStorage.setItem(_hintsKey, '${hintsUsed() + 1}');
+  } catch (_) {}
+}

@@ -7,9 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
+import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
 import '../data/level_hints.dart';
+import '../data/levels.dart';
 import '../engine/simulator.dart'
     show
         adjacentWallKeys,
@@ -287,6 +289,10 @@ class _GameScreenState extends State<GameScreen>
       _rotations.addAll(buildRotations(_level!));
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
+      if (widget.levelOverride == null) {
+        _levelStartedAt = DateTime.now();
+        Analytics.levelStart(_level!.id, worldOf(_level!.id));
+      }
       // One free hint per level, and the idle clock starts now: a player who
       // opens a level and never touches it is exactly who the nudge is for.
       _freeHints = 1;
@@ -302,6 +308,44 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted || _placed.isNotEmpty || _status != GameStatus.planning) return;
     setState(() => _showHand = true);
     _handCtrl.forward(from: 0);
+  }
+
+  // ----- analytics -----
+
+  /// When this visit to the level began, for the completion time. Reset by
+  /// Retry as well as by loading a level, so the number means "how long the
+  /// winning attempt took" rather than how long the app has been open.
+  DateTime _levelStartedAt = DateTime.now();
+  int _attempts = 0;
+  int _hintsThisLevel = 0;
+
+  void _reportWin() {
+    final id = _level!.id;
+    final world = worldOf(id);
+    Analytics.levelComplete(
+      id,
+      world,
+      timeSeconds: DateTime.now().difference(_levelStartedAt).inSeconds,
+      hintsUsed: _hintsThisLevel,
+    );
+
+    final completed = ProgressStore.completed();
+    Analytics.setProgress(
+      levelsCompleted: completed.length,
+      currentWorld: world,
+    );
+    // The first level of a world is what opens it, so finishing the one before
+    // it is the moment the next world becomes reachable.
+    if (id < kLevelCount && worldOf(id + 1) != world) {
+      Analytics.worldUnlocked(worldOf(id + 1));
+    }
+    if (completed.length >= kLevelCount) Analytics.gameCompleted();
+  }
+
+  void _reportFail() {
+    if (widget.levelOverride != null) return;
+    _attempts++;
+    Analytics.levelFail(_level!.id, worldOf(_level!.id), _attempts);
   }
 
   // ----- hints -----
@@ -351,12 +395,25 @@ class _GameScreenState extends State<GameScreen>
   Future<void> _onHintPressed() async {
     if (!_hintAvailable) return;
     _noteActivity();
+    final id = _level!.id;
+    final world = worldOf(id);
     if (_freeHints > 0) {
       setState(() => _freeHints--);
+      _noteHintTaken(id, world, 'free');
       await _revealHint();
       return;
     }
-    if (await _offerAd() && mounted) await _revealHint();
+    if (await _offerAd() && mounted) {
+      _noteHintTaken(id, world, 'ad');
+      await _revealHint();
+    }
+  }
+
+  void _noteHintTaken(int levelId, int worldId, String type) {
+    _hintsThisLevel++;
+    ProgressStore.bumpHintsUsed();
+    Analytics.hintUsed(levelId, worldId, type);
+    Analytics.setHintsUsedTotal(ProgressStore.hintsUsed());
   }
 
   /// Ask for the hint back in exchange for an ad, and return whether it was
@@ -396,8 +453,21 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
     if (agreed != true) return false;
+
+    final id = _level!.id;
+    final world = worldOf(id);
+    // No ad to show — the hint is granted, but nothing is reported as watched,
+    // so the ad funnel keeps meaning what it says.
     if (!AdManager.supported || !AdManager.rewardedReady) return true;
-    return AdManager.showRewarded();
+
+    Analytics.rewardedAdShown(id);
+    final earned = await AdManager.showRewarded();
+    if (earned) {
+      Analytics.hintAdWatched(id, world);
+    } else {
+      Analytics.hintAdDismissed(id, world);
+    }
+    return earned;
   }
 
   /// Pulse the target cell in gold, then drop the piece on it.
@@ -1459,7 +1529,10 @@ class _GameScreenState extends State<GameScreen>
     _timer = null;
     Sfx.exit();
     // Record completion → unlocks the next level (skipped for designer tests).
-    if (widget.levelOverride == null) ProgressStore.markCompleted(_level!.id);
+    if (widget.levelOverride == null) {
+      ProgressStore.markCompleted(_level!.id);
+      _reportWin();
+    }
     // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
       _status = GameStatus.won;
@@ -1500,6 +1573,7 @@ class _GameScreenState extends State<GameScreen>
     Sfx.die();
     Future.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
+      _reportFail();
       setState(() => _status = GameStatus.lost);
     });
   }
@@ -1578,6 +1652,7 @@ class _GameScreenState extends State<GameScreen>
     _deathCause = cause;
     Future.delayed(const Duration(milliseconds: 520), () {
       if (!mounted) return;
+      _reportFail();
       setState(() => _status = GameStatus.lost);
     });
   }
@@ -1586,6 +1661,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _timer = null;
     _deathCause = cause;
+    _reportFail();
     setState(() => _status = GameStatus.lost);
   }
 
@@ -1774,6 +1850,9 @@ class _GameScreenState extends State<GameScreen>
 
   /// Dev-only: open this level in the designer, pre-loaded for editing.
   void _openInDesigner() {
+    // The designer has two doors — the menu's "+" and this pencil — and both
+    // report, so the event counts entries rather than one particular button.
+    Analytics.levelDesignerOpened();
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => LevelDesignerScreen(
         initialLevel: _level,

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../analytics/analytics_service.dart';
 import '../app_routes.dart';
 import '../data/levels.dart';
 import '../models/level.dart';
@@ -33,7 +34,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   /// Marks whichever slot is currently the one to play, so the scroll can find
   /// it by layout instead of by arithmetic. It moves to a new slot whenever
   /// progress advances.
-  final GlobalKey _currentSlotKey = GlobalKey();
+  final GlobalKey _currentSlotKey = GlobalKey();
 
   @override
   void initState() {
@@ -140,11 +141,15 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                 alignment: Alignment.centerRight,
                                 child: _SideIcon(
                                   icon: Icons.add_rounded,
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const LevelDesignerScreen(),
-                                    ),
-                                  ),
+                                  onTap: () {
+                                    Analytics.levelDesignerOpened();
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const LevelDesignerScreen(),
+                                      ),
+                                    );
+                                  },
                                 ),
                               )
                             : null,
