@@ -377,12 +377,57 @@ re-running after a failed upload.
 
 ## What is left
 
-TestFlight works, but nothing is submitted to the App Store yet. Outstanding:
+The listing is filled in, mostly through the App Store Connect API rather than
+the web UI. Current state, read back from the API:
 
-1. **Internal testing group.** TestFlight shows "create a group and invite
-   testers", which is needed before anyone but you can install the build.
-2. **The listing.** Screenshots, description, keywords, support URL, age-rating
-   questionnaire, and the privacy policy URL from the Play Console. See above.
-3. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
-   "Dotto" was taken. If you want the bare name, Apple's dispute route is linked
-   from the error, and it needs a trademark claim.
+| Item | State |
+|---|---|
+| Version record | 1.0.3, **build 9 attached** |
+| Category | Games / Puzzle |
+| Age rating | 4+ (every descriptor "none") |
+| Subtitle | "Route the dot, watch it run" |
+| Privacy policy URL | <https://reshaped.dev/projects/dotto/privacy> |
+| Support + marketing URL | <https://reshaped.dev/projects/dotto> |
+| Description, keywords | set |
+| Screenshots | 4 iPhone + 2 iPad, uploaded |
+| Pricing | schedule set |
+| TestFlight group | "Alpha Testers" |
+
+The version record was created as **1.0** while every build is **1.0.3**. App
+Store Connect only offers builds whose version string matches the record, so no
+build was selectable until that was corrected. Worth remembering: the record's
+version is not derived from the build.
+
+Screenshots go in the `APP_IPHONE_67` slot even though they are 6.9" sized
+(1320x2868); the API has no `APP_IPHONE_69` display type. iPad 13" images
+(2064x2752) go in `APP_IPAD_PRO_3GEN_129`.
+
+### Still outstanding
+
+1. **App review contact phone.** The only hard blocker left. Apple requires a
+   number in `+CC …` form and rejects the record without one. Name and
+   `contact@reshaped.dev` are ready to go with it.
+2. **App Privacy questionnaire.** Not reachable through this API key, so it
+   needs doing in the web UI. The answer is "Data Not Collected": no account, no
+   analytics, progress kept on device. One nuance to be aware of before ticking
+   that box, below.
+3. **What's New.** Empty, and not required for a first release.
+4. **Submit for review.**
+5. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
+   "Dotto" was taken. Apple's dispute route needs a trademark claim.
+
+### The Google Fonts nuance
+
+`google_fonts` is not bundling anything: `pubspec.yaml` declares only
+`assets/sfx/`, and there are no `.ttf` or `.otf` files in the repo. So Poppins
+and Nunito are fetched over HTTPS on first launch, which means Google receives
+the player's IP address. The privacy policy already discloses this, correctly.
+
+For Apple's label this still reads as "Data Not Collected", since an IP sent to a
+CDN purely to service a request in real time falls under Apple's own exception.
+It is worth knowing rather than discovering during review.
+
+Bundling the two fonts as assets would remove the only third-party request
+outright, make the claim unambiguous, and let the game render its real typefaces
+on a first launch with no network. That is a change to the app, not to the
+release setup, so it has not been made here.
