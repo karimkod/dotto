@@ -4,11 +4,18 @@
 // players as it stands — Dotto targets France, GDPR applies, and ads are being
 // requested with no consent decision recorded. See init() for where it goes.
 //
-// EVERY ID IN THIS FILE IS A GOOGLE TEST ID. They serve test ads to anyone and
-// earn nothing; the real ones come from the AdMob console and must replace both
-// these unit ids and the app ids in AndroidManifest.xml and Info.plist at the
-// same time. Do not point a debug build at the real ids — Google reads that as
-// invalid traffic and can suspend the account.
+// THE IDS BELOW ARE LIVE. Every impression they serve is real, counted against
+// a real account, and the same is true of the app ids in AndroidManifest.xml
+// and Info.plist. Two consequences worth keeping in mind while developing:
+//
+//   * Tapping your own ads, or letting a debug build request them repeatedly,
+//     is invalid traffic. Google's response is to suspend the account, not to
+//     discard the clicks. Emulators and simulators are recognised as test
+//     devices automatically, so they are safe; a physical phone running a debug
+//     build is not, until it is registered as a test device with its device id
+//     via MobileAds.instance.updateRequestConfiguration.
+//   * A brand-new unit serves nothing for a few hours after creation, so an
+//     empty ad is not automatically a bug in this file.
 //
 // Everything here fails soft. Ads are a side channel: if the SDK will not
 // initialise, or no ad fills, or the player is offline, the game must carry on.
@@ -36,15 +43,20 @@ class AdManager {
   static bool _ready = false;
   static bool get ready => _ready;
 
-  // ----- test unit ids -----
+  // ----- unit ids -----
+  //
+  // Live units on the Dotto AdMob account, one pair per platform. A unit id is
+  // tied to the app id in AndroidManifest.xml / Info.plist, so an Android unit
+  // requested under the iOS app id (or the reverse) simply never fills — hence
+  // the platform switch rather than one shared constant.
 
   static String get _rewardedUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/5224354917'
-      : 'ca-app-pub-3940256099942544/1712485313';
+      ? 'ca-app-pub-3605343790686215/6607406377'
+      : 'ca-app-pub-3605343790686215/9812154217';
 
   static String get _interstitialUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/1033173712'
-      : 'ca-app-pub-3940256099942544/4411468910';
+      ? 'ca-app-pub-3605343790686215/9149809232'
+      : 'ca-app-pub-3605343790686215/8766665850';
 
   /// Start the SDK and warm both ad caches.
   ///

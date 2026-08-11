@@ -71,12 +71,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- AdMob application id. Google's PUBLIC TEST id, not Dotto's — see the
-	     matching note in android/app/src/main/AndroidManifest.xml. Both this
-	     and the unit ids in lib/ads/ad_manager.dart must be swapped for the
-	     real ones before a production release. -->
+	<!-- Dotto's live AdMob application id for iOS. This is a different id from
+	     the Android one in AndroidManifest.xml — same account, one app id per
+	     platform — and it must match the account the iOS unit ids in
+	     lib/ads/ad_manager.dart belong to, or those units never fill. -->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-3605343790686215~2432623578</string>
 	<!-- Ad networks that may attribute an install back to an ad. Without these
 	     entries iOS silently refuses their postbacks, so the networks cannot
 	     tell that their ad worked and bid less on this app's inventory. The
