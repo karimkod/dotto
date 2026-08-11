@@ -21,47 +21,14 @@ const _coral = Color(0xFFFF6B6B); // AppColors.coral — the outer glow's warmth
 const _hot = Color(0xFFFFD9A0); // lit top-left of the sphere
 const _deep = Color(0xFFF59331); // shaded lower edge
 
-/// The share of an Android adaptive layer that survives the mask: the layer is
-/// 108dp and only the middle 72dp is guaranteed visible.
-const _adaptiveSafeFraction = 72 / 108;
-
-/// How much a full-bleed target has to grow to match what the adaptive mask
-/// shows. Cropping to the safe zone is itself a zoom of 1 / (72/108) = 1.5, so
-/// an uncropped icon must apply that zoom itself or the mark lands smaller.
-const _fullBleedScale = 1 / _adaptiveSafeFraction;
-
-/// Draws the glowing dot centred in a [size] box. Content is laid out against
-/// Android's adaptive safe zone, staying inside the middle ~60% so the mask
-/// (which crops to a circle or squircle, then insets a further 16%) never clips
-/// the ball itself — only the outer, softest reach of the glow, which fades to
-/// nothing anyway.
-///
-/// [markScale] compensates for that safe-zone padding on targets nothing crops.
-/// Without it the same artwork reads at two different sizes: the ball is 40% of
-/// the canvas here, so it fills 40% of an iOS tile but 60% of an Android one,
-/// because the mask has zoomed in. Passing [_fullBleedScale] for uncropped
-/// targets makes the ball the same size on both.
-void paintMark(
-  Canvas canvas,
-  double size, {
-  required bool background,
-  double markScale = 1.0,
-}) {
+/// Draws the glowing dot centred in a [size] box. Content stays inside the
+/// middle ~60% so Android's adaptive mask (which crops to a circle or squircle,
+/// then insets a further 16%) never clips the ball itself — only the outer,
+/// softest reach of the glow, which fades to nothing anyway.
+void paintMark(Canvas canvas, double size, {required bool background}) {
   final c = Offset(size / 2, size / 2);
   if (background) {
     canvas.drawRect(Rect.fromLTWH(0, 0, size, size), Paint()..color = _cream);
-  }
-
-  // Scale about the centre so the mark grows without drifting. The cream field
-  // is filled before this and stays full-bleed either way. An unscaled mark
-  // skips the transform entirely rather than applying an identity one, so the
-  // already-shipped Android foreground stays byte-for-byte what it was.
-  final scaled = markScale != 1.0;
-  if (scaled) {
-    canvas.save();
-    canvas.translate(c.dx, c.dy);
-    canvas.scale(markScale);
-    canvas.translate(-c.dx, -c.dy);
   }
 
   final r = size * 0.20; // the ball
@@ -150,21 +117,12 @@ void paintMark(
         1.0,
       ]),
   );
-
-  if (scaled) {
-    canvas.restore();
-  }
 }
 
-Future<void> write(
-  String path,
-  int px, {
-  required bool background,
-  double markScale = 1.0,
-}) async {
+Future<void> write(String path, int px, {required bool background}) async {
   final recorder = PictureRecorder();
   final canvas = Canvas(recorder);
-  paintMark(canvas, px.toDouble(), background: background, markScale: markScale);
+  paintMark(canvas, px.toDouble(), background: background);
   final img = await recorder.endRecording().toImage(px, px);
   final bytes = await img.toByteData(format: ImageByteFormat.png);
   final f = File(path);
@@ -176,12 +134,7 @@ Future<void> write(
 
 void main() {
   test('generate app icons', () async {
-    // Full-bleed: iOS, the Play listing, and the Android legacy launcher icon.
-    // Nothing masks these, so they carry the zoom themselves.
-    await write('assets/icon/dotto_icon.png', 1024,
-        background: true, markScale: _fullBleedScale);
-    // Android adaptive foreground: the mask supplies the same zoom, so this one
-    // stays at its natural size.
+    await write('assets/icon/dotto_icon.png', 1024, background: true);
     await write('assets/icon/dotto_icon_foreground.png', 1024,
         background: false);
   });
