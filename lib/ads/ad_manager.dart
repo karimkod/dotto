@@ -1,4 +1,8 @@
-// AdMob: consent, initialisation, and the two ad formats Dotto uses.
+// AdMob: initialisation, and the two ad formats Dotto uses.
+//
+// NO CONSENT FLOW YET. There is no UMP handling here, so this must not reach
+// players as it stands — Dotto targets France, GDPR applies, and ads are being
+// requested with no consent decision recorded. See init() for where it goes.
 //
 // EVERY ID IN THIS FILE IS A GOOGLE TEST ID. They serve test ads to anyone and
 // earn nothing; the real ones come from the AdMob console and must replace both
@@ -42,15 +46,17 @@ class AdManager {
       ? 'ca-app-pub-3940256099942544/1033173712'
       : 'ca-app-pub-3940256099942544/4411468910';
 
-  /// Ask for consent (where required), then start the SDK and warm the cache.
+  /// Start the SDK and warm both ad caches.
   ///
-  /// Consent comes first deliberately: under GDPR the form has to be answered
-  /// before personalised ads may be requested, and Dotto ships in France, so
-  /// that path is the normal one rather than the exception.
+  /// No consent flow yet. UMP is deliberately left out for now and has to be
+  /// added before this ships to players: Dotto targets France, so GDPR applies,
+  /// and requesting ads there without a consent decision on record is not
+  /// something to leave to launch day. The hook belongs here, ahead of
+  /// initialize(), because the form has to be answered before personalised ads
+  /// may be requested.
   static Future<void> init() async {
     if (!supported || _ready) return;
     try {
-      await _requestConsent();
       await MobileAds.instance.initialize();
       _ready = true;
       unawaited(_loadRewarded());
@@ -59,40 +65,6 @@ class AdManager {
       // Leaving _ready false means every show() below turns into a no-op.
       debugPrint('AdMob init failed, continuing without ads: $e');
     }
-  }
-
-  /// Google's UMP consent flow: gather what the user's region requires, and
-  /// show the form if one is called for. A player who declines still gets ads,
-  /// just non-personalised ones — which is what the SDK does on its own once
-  /// consent is recorded, so there is nothing further to pass along here.
-  static Future<void> _requestConsent() async {
-    final completer = Completer<void>();
-    ConsentInformation.instance.requestConsentInfoUpdate(
-      ConsentRequestParameters(),
-      () async {
-        try {
-          await ConsentForm.loadAndShowConsentFormIfRequired((error) {
-            if (error != null) {
-              debugPrint('Consent form error: ${error.message}');
-            }
-          });
-        } catch (e) {
-          debugPrint('Consent form failed: $e');
-        }
-        if (!completer.isCompleted) completer.complete();
-      },
-      (error) {
-        // Region lookup failed — proceed without personalisation rather than
-        // blocking the player at a loading screen.
-        debugPrint('Consent info update failed: ${error.message}');
-        if (!completer.isCompleted) completer.complete();
-      },
-    );
-    // Never let a consent SDK that does not answer hold up the first frame.
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => debugPrint('Consent request timed out; carrying on'),
-    );
   }
 
   // ----- rewarded (hints) -----
