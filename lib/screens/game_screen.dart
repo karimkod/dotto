@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
+import '../ads/ad_pacing.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
@@ -155,6 +156,10 @@ class _GameScreenState extends State<GameScreen>
   // Win celebration: grid fades out, a full celebration screen fades in.
   late final AnimationController _winCtrl;
   bool _celebrationDone = false;
+
+  /// Set when a completed level makes an interstitial due; spent by the next
+  /// transition off the celebration screen.
+  bool _interstitialDue = false;
   String _winMessage = '';
 
   // Level-2 tutorial: a ghost hand that drags the Up arrow onto the cell.
@@ -1532,6 +1537,13 @@ class _GameScreenState extends State<GameScreen>
     if (widget.levelOverride == null) {
       ProgressStore.markCompleted(_level!.id);
       _reportWin();
+      // Decided here, spent at the transition. Counting on the win means one
+      // completion advances the cadence exactly once, whichever way the player
+      // then leaves the level — or if they never leave it at all.
+      _interstitialDue = AdPacing.noteLevelCompleted(
+        levelId: _level!.id,
+        usedHint: _hintsThisLevel > 0,
+      );
     }
     // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
@@ -1546,11 +1558,31 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
+  /// Show the between-levels interstitial if one is due.
+  ///
+  /// Called from the transitions off the celebration screen rather than when
+  /// the celebration ends, so the ad never lands on top of the win — the player
+  /// gets their moment, and the break happens as they move on, which is where
+  /// they expect a pause anyway.
+  ///
+  /// Silent on failure, in every sense: no ad loaded, no fill, no SDK, nothing
+  /// reported. The player just moves on.
+  Future<void> _maybeShowInterstitial() async {
+    if (!_interstitialDue) return;
+    _interstitialDue = false; // consumed either way — never retried later
+    final id = _level!.id;
+    if (await AdManager.showInterstitial()) {
+      Analytics.interstitialShown(id, 'between_levels');
+    }
+  }
+
   /// Load the next level in place (no trip back to the menu).
-  void _goToNextLevel() {
+  Future<void> _goToNextLevel() async {
     final next = _level!.id + 1;
     final data = levelDataFor(next);
     if (data == null) return;
+    await _maybeShowInterstitial();
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => GameScreen(
@@ -2245,7 +2277,11 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  void _goToMenu() => Navigator.of(context).pop(true);
+  Future<void> _goToMenu() async {
+    await _maybeShowInterstitial();
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
 
   /// The bottom button area, always occupying [_kFooterHeight] so the grid above
   /// never jumps when the footer swaps between Play, the win pause, and Continue.
