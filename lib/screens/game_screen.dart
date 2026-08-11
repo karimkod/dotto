@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../ads/ad_manager.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
 import '../data/level_hints.dart';
@@ -358,8 +359,16 @@ class _GameScreenState extends State<GameScreen>
     if (await _offerAd() && mounted) await _revealHint();
   }
 
-  /// Stand-in for the rewarded ad. Grants the hint on confirm; swapping in a
-  /// real AdMob rewarded unit means replacing this one method.
+  /// Ask for the hint back in exchange for an ad, and return whether it was
+  /// earned.
+  ///
+  /// The confirmation comes first: a video that starts the instant a button is
+  /// pressed feels like a trap. Only after the player agrees is the ad shown.
+  ///
+  /// When no ad can be served — offline, no fill, the SDK never started, or
+  /// running on web where there is no AdMob at all — the hint is given anyway.
+  /// The alternative is a player stuck behind an ad that will never arrive,
+  /// which punishes them for a failure that is entirely ours.
   Future<bool> _offerAd() async {
     final agreed = await showDialog<bool>(
       context: context,
@@ -386,7 +395,9 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
     );
-    return agreed == true;
+    if (agreed != true) return false;
+    if (!AdManager.supported || !AdManager.rewardedReady) return true;
+    return AdManager.showRewarded();
   }
 
   /// Pulse the target cell in gold, then drop the piece on it.

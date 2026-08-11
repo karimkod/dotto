@@ -3,6 +3,17 @@
         android:label="Dotto"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- AdMob application id. This is Google's PUBLIC TEST id, not Dotto's:
+             it serves test ads to any app that asks. Swap in the real id from
+             the AdMob console before a production release — shipping the test
+             id means no revenue, and using the real id during development can
+             get the account flagged for invalid traffic. The unit ids in
+             lib/ads/ad_manager.dart are test ids for the same reason and must
+             be swapped at the same time. The app crashes at startup if this
+             meta-data is missing entirely. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
