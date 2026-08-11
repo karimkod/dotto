@@ -33,8 +33,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   /// Marks whichever slot is currently the one to play, so the scroll can find
   /// it by layout instead of by arithmetic. It moves to a new slot whenever
   /// progress advances.
-  final GlobalKey _currentSlotKey = GlobalKey();
-  final int _hintCount = 3;
+  final GlobalKey _currentSlotKey = GlobalKey();
 
   @override
   void initState() {
@@ -124,7 +123,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  TopBar(hintCount: _hintCount, onHints: () {}),
+                  const TopBar(),
                   const SizedBox(height: 18),
                   // Wordmark, with a dev-only "+" (new level) balanced on the
                   // right so the title stays centered.

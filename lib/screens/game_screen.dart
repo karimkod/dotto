@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
+import '../data/level_hints.dart';
 import '../engine/simulator.dart'
     show
         adjacentWallKeys,
@@ -66,6 +67,12 @@ class _GameScreenState extends State<GameScreen>
   LevelData? _level;
 
   final Map<int, PlacedElement> _placed = {};
+
+  /// Hints are per-visit and deliberately not persisted: one free reveal each
+  /// time a level is opened, and nothing carried between levels.
+  int _freeHints = 1;
+  bool _hintRunning = false;
+  Timer? _idleTimer;
 
   /// Immovable, level-defined arrows (rendered + simulated, never interactive).
   final Map<int, PlacedElement> _forced = {};
@@ -149,6 +156,9 @@ class _GameScreenState extends State<GameScreen>
 
   // Level-2 tutorial: a ghost hand that drags the Up arrow onto the cell.
   late final AnimationController _handCtrl;
+
+  /// Drives the hint button's shake once the player has gone quiet.
+  late final AnimationController _wiggleCtrl;
   Timer? _handTimer;
   bool _showHand = false;
   static const _tutorialCell = (2, 2); // solution cell for level 2
@@ -253,6 +263,11 @@ class _GameScreenState extends State<GameScreen>
       vsync: this,
       duration: const Duration(milliseconds: 5400),
     );
+    // One full shake per cycle, at the ~0.5s period the wobble wants.
+    _wiggleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
     _handCtrl.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
         setState(() => _showHand = false);
@@ -271,6 +286,10 @@ class _GameScreenState extends State<GameScreen>
       _rotations.addAll(buildRotations(_level!));
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
+      // One free hint per level, and the idle clock starts now: a player who
+      // opens a level and never touches it is exactly who the nudge is for.
+      _freeHints = 1;
+      _noteActivity();
       // Level 2 teaches drag-and-drop: show the hint hand after a beat.
       if (_level!.id == 2) {
         _handTimer = Timer(const Duration(seconds: 2), _startHand);
@@ -282,6 +301,171 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted || _placed.isNotEmpty || _status != GameStatus.planning) return;
     setState(() => _showHand = true);
     _handCtrl.forward(from: 0);
+  }
+
+  // ----- hints -----
+
+  /// How long a player can sit doing nothing before the hint button starts
+  /// asking for attention.
+  static const _idleBeforeWiggle = Duration(seconds: 30);
+
+  /// The next placement to give away: the first one in the recorded solution
+  /// the player has not made, and still has the piece for.
+  ///
+  /// Skipping cells that are already occupied means a hint never fights the
+  /// player for a square — but it also means the hint only completes a winning
+  /// board if what is already down is right. A hint is a nudge toward the
+  /// recorded solution, not a promise that the current board can still reach it.
+  HintPlacement? _nextHint() {
+    final level = _level;
+    if (level == null) return null;
+    for (final p in recordedSolution(level.id)) {
+      if (_occupied(p.r, p.c)) continue;
+      if ((_kit[p.element.tool] ?? 0) <= 0) continue;
+      return p;
+    }
+    return null;
+  }
+
+  bool get _hintAvailable =>
+      _status == GameStatus.planning && !_hintRunning && _nextHint() != null;
+
+  /// Restart the idle clock and call off any wiggle. Every player action that
+  /// counts as "still thinking about this level" routes through here.
+  void _noteActivity() {
+    _idleTimer?.cancel();
+    if (_wiggleCtrl.isAnimating) {
+      _wiggleCtrl.stop();
+      _wiggleCtrl.value = 0;
+    }
+    if (!mounted || _status != GameStatus.planning) return;
+    _idleTimer = Timer(_idleBeforeWiggle, () {
+      // Nothing to point at, or nothing to point with: stay still rather than
+      // wave at a button that cannot help.
+      if (!mounted || !_hintAvailable) return;
+      _wiggleCtrl.repeat();
+    });
+  }
+
+  Future<void> _onHintPressed() async {
+    if (!_hintAvailable) return;
+    _noteActivity();
+    if (_freeHints > 0) {
+      setState(() => _freeHints--);
+      await _revealHint();
+      return;
+    }
+    if (await _offerAd() && mounted) await _revealHint();
+  }
+
+  /// Stand-in for the rewarded ad. Grants the hint on confirm; swapping in a
+  /// real AdMob rewarded unit means replacing this one method.
+  Future<bool> _offerAd() async {
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.ink, width: 3),
+        ),
+        title: const Text('Watch an ad for a hint?'),
+        content: const Text(
+          'Your free hint for this level is used up. Watch a short video to '
+          'reveal another piece.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Watch'),
+          ),
+        ],
+      ),
+    );
+    return agreed == true;
+  }
+
+  /// Pulse the target cell in gold, then drop the piece on it.
+  Future<void> _revealHint() async {
+    final hint = _nextHint();
+    if (hint == null) return;
+    final key = _idx(hint.r, hint.c);
+    setState(() => _hintRunning = true);
+    Sfx.shield(); // the rising shimmer — reads as "look here"
+
+    // Three beats of gold before the piece lands, so the eye arrives at the
+    // cell ahead of the placement instead of chasing it.
+    for (var i = 0; i < 3; i++) {
+      _glow(key, AppColors.accent, 1.0);
+      _cellPulse[key] = 0;
+      await Future.delayed(const Duration(milliseconds: 220));
+      if (!mounted || _status != GameStatus.planning) {
+        if (mounted) setState(() => _hintRunning = false);
+        return;
+      }
+      // The player may have filled the cell while the pulse ran.
+      if (_occupied(hint.r, hint.c)) {
+        setState(() => _hintRunning = false);
+        return;
+      }
+    }
+    setState(() => _hintRunning = false);
+    // Goes through the same funnel as a drop, so the kit count, the pop-in and
+    // the neighbour ripple all behave exactly as if the player had placed it.
+    _commitPlace(key, hint.element, decrementKit: true);
+  }
+
+  /// The hint button: a lightbulb with either the free-hint count or a video
+  /// icon, wobbling once the player has been still for a while.
+  ///
+  /// It greys out rather than disappearing when there is nothing left to
+  /// reveal — a control that vanishes mid-level reads as a bug.
+  Widget _buildHintButton() {
+    final enabled = _hintAvailable;
+    return AnimatedBuilder(
+      animation: _wiggleCtrl,
+      builder: (context, child) {
+        // A full sine cycle per repeat: ±5° and, importantly, exactly zero at
+        // value 0 — so a stopped controller leaves the button upright rather
+        // than parked at one end of the shake.
+        final swing = math.sin(_wiggleCtrl.value * 2 * math.pi) * 0.09;
+        return Transform.rotate(
+          key: const ValueKey('hint-wiggle'),
+          angle: swing,
+          child: child,
+        );
+      },
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.45,
+        child: BorderedTile(
+          background: AppColors.ink,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          onTap: enabled ? _onHintPressed : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('💡', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 5),
+              if (_freeHints > 0)
+                // "×1", not a bare "1" — it reads as a quantity the way the
+                // toolkit tiles do, and does not collide with their counts.
+                Text('×$_freeHints',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800))
+              else
+                const Icon(Icons.play_circle_fill_rounded,
+                    color: Colors.white, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Stop the tutorial hand for good once the player interacts.
@@ -298,6 +482,8 @@ class _GameScreenState extends State<GameScreen>
   void dispose() {
     _timer?.cancel();
     _handTimer?.cancel();
+    _idleTimer?.cancel();
+    _wiggleCtrl.dispose();
     _dotCtrl.dispose();
     _teleportCtrl.dispose();
     _spinCtrl.dispose();
@@ -708,6 +894,7 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
     _stopHand();
+    _noteActivity();
     setState(() {
       _placed[key] = el;
       if (decrementKit) {
@@ -729,6 +916,7 @@ class _GameScreenState extends State<GameScreen>
   void _removeAt(int key) {
     final piece = _placed[key];
     if (piece == null) return;
+    _noteActivity();
     setState(() {
       _placed.remove(key);
       _placeAnim.remove(key);
@@ -1553,23 +1741,7 @@ class _GameScreenState extends State<GameScreen>
           ),
         ],
         const Spacer(),
-        BorderedTile(
-          background: AppColors.ink,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          onTap: () {},
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text('👑', style: TextStyle(fontSize: 16)),
-              SizedBox(width: 5),
-              Text('x3',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800)),
-            ],
-          ),
-        ),
+        _buildHintButton(),
         const SizedBox(width: 8),
         // Small, unobtrusive feedback button (top-right).
         BorderedTile(

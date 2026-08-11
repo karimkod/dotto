@@ -44,20 +44,20 @@ class BorderedTile extends StatelessWidget {
   }
 }
 
-/// Top bar: profile (warm tint), crown hint counter (dark), settings (dark) —
-/// all with thick rounded outlines.
+/// Top bar: profile (warm tint) and settings (dark), with thick rounded
+/// outlines.
+///
+/// It used to carry a crown counter between the two. Hints are per-level and
+/// granted on the level itself, so a number on the menu had nothing to count —
+/// it showed a fixed 3 to everyone and did nothing when tapped.
 class TopBar extends StatelessWidget {
   const TopBar({
     super.key,
-    required this.hintCount,
     this.onProfile,
-    this.onHints,
     this.onSettings,
   });
 
-  final int hintCount;
   final VoidCallback? onProfile;
-  final VoidCallback? onHints;
   final VoidCallback? onSettings;
 
   @override
@@ -70,28 +70,6 @@ class TopBar extends StatelessWidget {
           width: 46,
           onTap: onProfile,
           child: const Icon(Icons.person_rounded, color: AppColors.ink, size: 24),
-        ),
-        const SizedBox(width: 10),
-        // Crown + count — dark background.
-        BorderedTile(
-          background: AppColors.ink,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          onTap: onHints,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('👑', style: TextStyle(fontSize: 18)),
-              const SizedBox(width: 6),
-              Text(
-                'x$hintCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
         ),
         const Spacer(),
         // Settings — dark background, white gear.
