@@ -1,7 +1,18 @@
-// The menu opens scrolled to the level you should play next. The path is not a
-// uniform stack — a world banner sits under the first level of each world — so
-// any position derived by counting levels drifts by every banner above the
-// target. These assert against where the card actually lands on screen.
+// The menu opens centred on the level you should play next, wherever that
+// level sits on the path. Two things have broken this:
+//
+//  * the path is not a uniform stack — a world banner sits under the first
+//    level of each world — so a position derived by counting levels drifts by
+//    every banner above the target;
+//  * the levels at either end have nothing past them to scroll into, so
+//    centring them needs empty space beyond the ends of the path.
+//
+// The cases below are the bottom, the middle and the top of the path, which is
+// one for each of those failures plus the ordinary case.
+//
+// Note the reference is the scroll viewport's centre, not the screen's: the
+// path sits between the top bar and the play button, so the two are ~25px
+// apart and measuring against the screen quietly loosens every assertion.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,11 +24,17 @@ import 'package:dotto/screens/menu_screen.dart';
 import 'package:dotto/widgets/level_card.dart';
 
 void main() {
-  /// Where the card for [n] sits vertically, or null if it is not laid out.
+  double viewportCentre(WidgetTester tester) {
+    final box =
+        tester.renderObject<RenderBox>(find.byType(SingleChildScrollView));
+    return box.localToGlobal(Offset(0, box.size.height / 2)).dy;
+  }
+
+  /// Where the card for level [n] sits vertically, or null if it is not laid
+  /// out at all (scrolled far enough off that it was never built).
   double? cardCentre(WidgetTester tester, int n) {
-    final finder = find.byWidgetPredicate(
-      (w) => w is LevelCard && w.level.number == n,
-    );
+    final finder =
+        find.byWidgetPredicate((w) => w is LevelCard && w.level.number == n);
     if (finder.evaluate().isEmpty) return null;
     final box = tester.renderObject<RenderBox>(finder);
     return box.localToGlobal(Offset(0, box.size.height / 2)).dy;
@@ -31,47 +48,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('opens centred on the next level to play', (tester) async {
-    // Far enough in that six world banners sit above the target — the exact
-    // case the old arithmetic got wrong, and by more than a screen.
+  void expectCentred(WidgetTester tester, int n) {
+    final centre = cardCentre(tester, n);
+    expect(centre, isNotNull,
+        reason: 'level $n is not on screen at all, let alone centred');
+    expect((centre! - viewportCentre(tester)).abs(), lessThan(1.0),
+        reason: 'level $n should sit in the middle of the path viewport');
+  }
+
+  // Ordered: ProgressStore is process-global, so each test builds on the last.
+  testWidgets('a fresh player opens centred on level 1', (tester) async {
+    // The bottom of the path. Nothing follows level 1 but its world banner, so
+    // this is the case that needs space past the end to be centred at all.
+    await pumpMenu(tester);
+    expectCentred(tester, 1);
+  });
+
+  testWidgets('centres mid-path, past several world banners', (tester) async {
+    // Six banners sit above the World 2 opener — the case a banner-blind
+    // calculation misses by roughly 500px.
     for (var n = 1; n < kWorld2Start; n++) {
       ProgressStore.markCompleted(n);
     }
     await pumpMenu(tester);
-
-    final target = kWorld2Start;
-    final centre = cardCentre(tester, target);
-    expect(centre, isNotNull,
-        reason: 'the level to play must be on screen at all, not scrolled past');
-
-    final viewportCentre = tester.view.physicalSize.height /
-        tester.view.devicePixelRatio /
-        2;
-    // Generous: this is asserting "centred", not pixel-exact placement. The old
-    // arithmetic was out by roughly six banner heights (~500px), far outside.
-    expect((centre! - viewportCentre).abs(), lessThan(80),
-        reason: 'level $target should sit near the middle of the viewport, '
-            'not above it');
+    expectCentred(tester, kWorld2Start);
   });
 
-  testWidgets('a level with no banners above it also centres', (tester) async {
-    // A control: near the top of the path almost every banner is below the
-    // target, so a banner-blind calculation would look fine here. If this one
-    // fails while the other passes, the centring itself is wrong rather than
-    // the banner accounting.
+  testWidgets('centres on the last level', (tester) async {
+    // The top of the path — the same end-of-list problem as level 1, mirrored.
     for (var n = 1; n < kLevelCount; n++) {
       ProgressStore.markCompleted(n);
     }
     await pumpMenu(tester);
-
-    final centre = cardCentre(tester, kLevelCount);
-    expect(centre, isNotNull);
-    final viewportCentre = tester.view.physicalSize.height /
-        tester.view.devicePixelRatio /
-        2;
-    // The last level cannot reach the centre — the list runs out — so it only
-    // has to be on screen and in the lower half, not centred.
-    expect(centre!, lessThan(viewportCentre * 2));
-    expect(centre, greaterThan(0));
+    expectCentred(tester, kLevelCount);
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../app_routes.dart';
@@ -189,9 +191,17 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       blendMode: BlendMode.dstIn,
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: SingleChildScrollView(
+        child: LayoutBuilder(builder: (context, constraints) {
+        // Empty space past both ends of the path, so the levels at the ends can
+        // be centred like any other. Without it the scroll simply runs out:
+        // level 1 is the last thing in the column, so centring it would need
+        // half a viewport of content underneath, and it ends up pinned near the
+        // bottom of the screen with four or five levels stacked above it — on a
+        // tall phone, further still. Same at the top for the final level.
+        final tail = math.max(0.0, constraints.maxHeight / 2 - _slotHeight / 2);
+        return SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.only(top: 8 + tail, bottom: 8 + tail),
         child: Stack(
           children: [
             Positioned.fill(
@@ -268,7 +278,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             ),
           ],
         ),
-        ),
+        );
+        }),
       ),
     );
   }
