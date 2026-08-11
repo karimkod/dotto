@@ -27,6 +27,11 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> with RouteAware {
   late List<Level> _levels;
   final ScrollController _scrollController = ScrollController();
+
+  /// Marks whichever slot is currently the one to play, so the scroll can find
+  /// it by layout instead of by arithmetic. It moves to a new slot whenever
+  /// progress advances.
+  final GlobalKey _currentSlotKey = GlobalKey();
   final int _hintCount = 3;
 
   @override
@@ -75,20 +80,20 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     );
   }
 
+  /// Centre the path on the level the player should play next.
+  ///
+  /// This asks the laid-out slot where it is rather than deriving a row from
+  /// its index: the column is not a uniform stack of slots — a world banner
+  /// sits under the first level of each world — so counting levels and
+  /// multiplying by [_slotHeight] under-measures by every banner above the
+  /// target, and lands the view short of it. Anything else added between slots
+  /// later is likewise accounted for on its own.
   void _scrollToCurrent() {
-    if (!_scrollController.hasClients) return;
-    // The path is rendered top-to-bottom as level 20 → level 1, so the visual
-    // row of a level is its position counted from the end of the list.
-    final visualRow = _levels.length - 1 - _levels.indexOf(_currentLevel);
-    final target = (visualRow * _slotHeight) -
-        (_scrollController.position.viewportDimension / 2) +
-        (_slotHeight / 2);
-    final clamped = target.clamp(
-      _scrollController.position.minScrollExtent,
-      _scrollController.position.maxScrollExtent,
-    );
-    _scrollController.animateTo(
-      clamped,
+    final ctx = _currentSlotKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.5, // 0.5 = centred in the viewport
       duration: const Duration(milliseconds: 600),
       curve: Curves.easeOutCubic,
     );
@@ -200,9 +205,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 for (var i = 0; i < _levels.length; i++)
                   () {
                     final level = _levels[_levels.length - 1 - i];
+                    final isCurrent = level.id == current.id;
                     final slot = _LevelSlot(
+                      key: isCurrent ? _currentSlotKey : null,
                       level: level,
-                      isCurrent: level.id == current.id,
+                      isCurrent: isCurrent,
                       onTap: () => _openLevel(level),
                     );
                     // Place a world banner just below the first level of each
@@ -288,6 +295,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
 /// One vertical slot on the path holding a single, centered level card.
 class _LevelSlot extends StatelessWidget {
   const _LevelSlot({
+    super.key,
     required this.level,
     required this.isCurrent,
     required this.onTap,
