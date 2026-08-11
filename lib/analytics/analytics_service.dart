@@ -1,16 +1,16 @@
 // Firebase Analytics: every event the game reports, in one place.
 //
-// NOT YET CONFIGURED. The Firebase project exists (dotto-d817e) but the
-// generated config does not: there is no firebase_options.dart, no
-// android/app/google-services.json and no ios/Runner/GoogleService-Info.plist
-// in this repo. Until someone runs `flutterfire configure` (see
-// docs/firebase-setup.md), Firebase.initializeApp throws, [enabled] stays
-// false, and every method below returns without doing anything.
+// Configured against project dotto-d817e: lib/firebase_options.dart supplies
+// the options, with android/app/google-services.json and
+// ios/Runner/GoogleService-Info.plist alongside as the native config. All three
+// carry the same ids and have to change together — see docs/firebase-setup.md.
 //
-// That is the deliberate shape of this file: analytics is an observer, and an
-// observer that can break the thing it observes is worse than no observer. Each
-// log is fire-and-forget, wrapped, and impossible to await from the game code —
-// so a slow network or a misconfigured project cannot stall a level.
+// Reporting is still best-effort by design. Analytics is an observer, and an
+// observer that can break the thing it observes is worse than no observer, so
+// every log is fire-and-forget, wrapped, and impossible to await from the game
+// code: a slow network, a device without Play Services, or a project that stops
+// answering costs statistics and nothing else. [enabled] says whether anything
+// is actually being recorded.
 //
 // Event and parameter names follow Firebase's rules, which are not advisory:
 // names are limited to 40 characters, parameters to 100, both must be
@@ -25,6 +25,8 @@ import 'dart:io' show Platform;
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+
+import '../firebase_options.dart';
 
 class Analytics {
   Analytics._();
@@ -45,17 +47,21 @@ class Analytics {
   /// True once Firebase has started and events are actually being recorded.
   static bool get enabled => _analytics != null;
 
-  /// Start Firebase. Safe to call when nothing is configured — that is the
-  /// current state of this repo, and it must not be fatal.
+  /// Start Firebase. Still guarded: a project can be configured and the start
+  /// can fail anyway — a device with no Play Services, a clock far enough out
+  /// to fail TLS — and none of that should cost the player their game.
   static Future<void> init() async {
     if (!supported || _analytics != null) return;
     try {
-      // No `options:` argument: on Android and iOS the native config files
-      // supply them. That is also why this throws until those files exist.
-      await Firebase.initializeApp();
+      // Options come from lib/firebase_options.dart rather than from the native
+      // config, so initialisation does not depend on the Google Services Gradle
+      // plugin having injected google-services.json into the Android build.
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       _analytics = FirebaseAnalytics.instance;
     } catch (e) {
-      debugPrint('Firebase not configured, analytics disabled: $e');
+      debugPrint('Firebase init failed, analytics disabled: $e');
     }
   }
 

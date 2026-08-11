@@ -1,78 +1,79 @@
-# Firebase setup — required before analytics reports anything
+# Firebase setup
 
-The code is wired up. The **configuration is not**, and cannot be generated
-from this repo — `flutterfire configure` has to run on a machine logged into
-the Firebase account. Until it does, `Firebase.initializeApp()` throws,
-`Analytics.enabled` stays false, and every event call returns silently.
+Analytics is configured against project **dotto-d817e**. The config was written
+by hand rather than generated — `flutterfire configure` needs a machine logged
+into the Firebase account, which the development environment here is not.
 
-Nothing is broken in that state. The game runs normally and reports nothing.
+## The three files
 
-## What is missing
-
-Three generated files, none of which are in the repo:
-
-| File | Purpose |
+| File | Role |
 |---|---|
-| `lib/firebase_options.dart` | Dart-side config (currently unused — see below) |
+| `lib/firebase_options.dart` | What actually initialises Firebase |
 | `android/app/google-services.json` | Android native config |
 | `ios/Runner/GoogleService-Info.plist` | iOS native config |
 
-## Generating them
+They all carry the same ids and **must change together**. A mismatch between the
+Dart options and the native config does not raise an error — it shows up as
+analytics being silent, which is a much harder thing to notice.
 
-```sh
-dart pub global activate flutterfire_cli
-flutterfire configure --project=dotto-d817e
+| | value |
+|---|---|
+| Project id | `dotto-d817e` |
+| Project number | `593272219819` |
+| Bundle / package | `com.karimkod.dotto` |
+| Android app id | `1:593272219819:android:c37f7e29ba239433adafee` |
+| iOS app id | `1:593272219819:ios:cdef52c41ffe61d9adafee` |
+
+The package must stay equal to `applicationId` in
+`android/app/build.gradle.kts`, which is also what the signing config, the Play
+listing and the AdMob app ids are tied to.
+
+## How initialisation actually happens
+
+`analytics_service.dart` calls:
+
+```dart
+Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
 ```
 
-Select **Android** and **iOS** when prompted. Web is deliberately excluded:
-`Analytics.supported` returns false on web, so a web config would go unused.
+Passing options explicitly means Firebase starts from the Dart values, so it
+does **not** depend on the Google Services Gradle plugin having processed
+`google-services.json`. That plugin is not installed, and consequently
+`google-services.json` is currently inert on Android — it is kept because it is
+the canonical record of the project, because `flutterfire configure` would
+regenerate it, and because dropping the explicit options later would make it
+load-bearing immediately.
 
-### The bundle ID must match
+If you do add the plugin (needed for Crashlytics, Messaging, and anything else
+that reads the native config directly):
 
-`flutterfire configure` asks for the application id, and it has to be the one
-this app actually ships with:
-
-```
-com.karimkod.dotto
-```
-
-That is the `applicationId` in `android/app/build.gradle.kts` and the iOS bundle
-id, and it is also what the AdMob app ids and the signing setup are tied to.
-
-**A `com.reshaped.dotto` package was mentioned when this work was requested —
-that is not this app's id.** A `google-services.json` generated for it would be
-rejected at build time by the Google Services Gradle plugin, which checks the
-package name in the JSON against the module's applicationId. If Firebase was
-already registered under that name, the Android app needs re-registering under
-`com.karimkod.dotto` in the Firebase console before configure will produce a
-usable file.
-
-## After generating
-
-`android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist`
-are enough on their own — `Firebase.initializeApp()` reads the native config
-with no `options:` argument, which is how `analytics_service.dart` calls it.
-
-Two build-side steps Firebase needs on Android, which `flutterfire configure`
-does **not** add for you:
-
-1. In `android/settings.gradle.kts`, add the Google Services plugin to the
-   `plugins` block:
+1. `android/settings.gradle.kts`, in the `plugins` block:
    `id("com.google.gms.google-services") version "4.4.2" apply false`
-2. In `android/app/build.gradle.kts`, apply it:
+2. `android/app/build.gradle.kts`, in its `plugins` block:
    `id("com.google.gms.google-services")`
 
-Without these the JSON is ignored and Firebase fails to initialise at runtime —
-with no build error, which makes it an easy one to lose an afternoon to.
+On iOS, `GoogleService-Info.plist` must also be a member of the Runner target in
+Xcode. Being present on disk is not enough — the file has to be in "Copy Bundle
+Resources", or the native SDK will not find it at runtime.
 
-If you would rather pass options explicitly, import the generated
-`firebase_options.dart` and change the call in `analytics_service.dart` to
-`Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`.
+## Not secret
 
-## Checking it worked
+A Firebase API key identifies a project; it does not authorise anything by
+itself, which is why these files are normally committed. What protects a project
+is its security rules and App Check, not the secrecy of the key. Analytics also
+has no rules to configure — it only writes.
 
-`Analytics.enabled` is true once initialisation succeeds. Events take a few
-hours to appear in the Firebase console; for immediate feedback use DebugView:
+## Web
+
+Deliberately absent. `Analytics.supported` returns false on web, no web app is
+registered, and `DefaultFirebaseOptions.currentPlatform` throws there rather
+than pretending to have a configuration.
+
+## Checking it works
+
+`Analytics.enabled` is true once initialisation succeeds — it is false in tests
+and on web by design. Events take a few hours to reach the console; DebugView is
+immediate:
 
 ```sh
 # Android
@@ -81,6 +82,6 @@ adb shell setprop debug.firebase.analytics.app com.karimkod.dotto
 
 ## What is reported
 
-See `lib/analytics/analytics_service.dart` — it is the whole list, with each
-event's parameters. Two of them (`level_skip`, `interstitial_clicked`) are
-defined but never called: the features do not exist yet.
+`lib/analytics/analytics_service.dart` is the complete list, with each event's
+parameters. Two entries (`level_skip`, `interstitial_clicked`) are defined but
+never called — the features do not exist yet.

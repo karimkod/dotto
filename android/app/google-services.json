@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "593272219819",
+    "project_id": "dotto-d817e",
+    "storage_bucket": "dotto-d817e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:593272219819:android:c37f7e29ba239433adafee",
+        "android_client_info": {
+          "package_name": "com.karimkod.dotto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGb5fGAyC-pRcRU6MUHb__b_vKha71HRE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
