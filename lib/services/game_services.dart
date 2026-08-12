@@ -61,22 +61,17 @@ const int kSpeedRunnerTarget = 5;
 class GameServices {
   GameServices._();
 
-  /// Android stays switched off until Play Games is set up properly.
+  /// Whether the Android side is configured well enough to sign in.
   ///
-  /// This is a safety gate, not tidiness. The Play Games SDK wants an
-  /// application id declared in AndroidManifest.xml:
+  /// True since the Play Games application id landed in AndroidManifest.xml
+  /// (as `@string/app_id`, defined in res/values/games-ids.xml). That entry is
+  /// what this gate was waiting for: the SDK fails as it starts without one,
+  /// natively, which the try/catch around [signIn] would not contain.
   ///
-  ///     <meta-data android:name="com.google.android.gms.games.APP_ID"
-  ///                android:value="@string/games_app_id"/>
-  ///
-  /// and starting it without one can bring the app down at launch — a native
-  /// failure, on the launch path, that the try/catch around [signIn] would not
-  /// contain. There is no id to declare until the Play Console side exists, so
-  /// Android does not sign in at all.
-  ///
-  /// Flip this to true in the same change that adds the manifest entry and
-  /// fills in the androidID fields above.
-  static const bool _androidReady = false;
+  /// If Android sign-in ever needs disabling in a hurry — a crash on some
+  /// device, a Play Console misconfiguration — setting this back to false is
+  /// the switch, and costs nothing but the achievements.
+  static const bool _androidReady = true;
 
   /// Where a games platform exists to talk to. Web has none, and `flutter test`
   /// has no plugin host.

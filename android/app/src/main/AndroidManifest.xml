@@ -10,6 +10,13 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3605343790686215~6715217582"/>
+        <!-- Play Games Services. Without this the SDK fails as it starts, which
+             on this app means at launch — see lib/services/game_services.dart.
+             The value must stay a @string reference: an all-digits literal is
+             parsed as an integer and overflows. -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/app_id"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

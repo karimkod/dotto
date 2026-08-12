@@ -3,6 +3,8 @@
 // correctly — a world badge that fires one level early, or never, is the only
 // failure a player would actually notice.
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dotto/data/levels.dart';
@@ -74,12 +76,26 @@ void main() {
       }
     });
 
-    test('Android stays off until the manifest app id is added', () {
-      // The ids alone are not enough: Play Games also needs its application id
-      // declared in AndroidManifest.xml, and starting the SDK without one can
-      // take the app down at launch. This flips in the same change that adds
-      // that entry — see docs/game-services-setup.md.
-      expect(GameServices.androidReady, isFalse);
+    test('Android is only switched on when the manifest backs it', () {
+      // The gate and the native config have to move together. Signing in
+      // without the application id declared can take the app down at launch,
+      // and it is a native failure that no Dart try/catch contains — so this
+      // asserts the wiring exists rather than pinning the flag to a value.
+      if (!GameServices.androidReady) return;
+
+      final manifest =
+          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+      expect(manifest, contains('com.google.android.gms.games.APP_ID'),
+          reason: 'Play Games sign-in is on but the manifest declares no '
+              'application id — the SDK fails as it starts');
+      expect(manifest, contains('android:value="@string/app_id"'),
+          reason: 'the id must be a @string reference: an all-digits literal '
+              'is parsed as an integer and overflows');
+
+      final res = File('android/app/src/main/res/values/games-ids.xml')
+          .readAsStringSync();
+      expect(res, contains('name="app_id"'),
+          reason: 'the manifest points at @string/app_id, which must exist');
     });
   });
 

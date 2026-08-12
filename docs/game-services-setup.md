@@ -28,44 +28,64 @@ restarts. Speed Runner is a session counter and deliberately does not.
 Create each achievement in App Store Connect with the id above, exactly. Ids are
 fixed once players have earned them.
 
-Nothing else to configure: Game Center needs no manifest entry, and the
-capability is enabled per-app in App Store Connect.
+The Game Center capability is declared in `ios/Runner/Runner.entitlements`:
 
-## Android — one thing left
+```xml
+<key>com.apple.developer.game-center</key>
+<true/>
+```
 
-**Achievement ids: done.** All ten Play Console ids are in
-`game_services.dart`, paired with their iOS counterparts. They differ only in
-their last character or two, so a test checks they are all distinct — a
-transposition would unlock the wrong badge rather than fail.
+and `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements` is set on all three
+Runner build configurations. Both halves are needed — an entitlements file that
+no build configuration points at is inert.
 
-Still missing, and the reason Android is switched off:
+**This changes what signing requires.** An entitlement must be backed by the App
+ID in the Apple Developer portal: `com.karimkod.dotto` needs Game Center enabled
+there, and the App Store provisioning profile regenerated to include it. If it
+is not, `flutter build ipa` fails at the export step — *after* a successful
+archive, which is a confusing place to land. The CI workflow fetches the profile
+through the App Store Connect API on every run, so once the portal is right, the
+next run picks it up with no further change here.
 
-1. **The application id in the manifest.** Play Games needs:
+## Android — configured
+
+All three pieces are in place:
+
+1. **Achievement ids** — all ten in `game_services.dart`, paired with their iOS
+   counterparts. They differ only in their last character or two, so a test
+   checks they are all distinct; a transposition would unlock the wrong badge
+   rather than fail.
+2. **The application id**, `593272219819`, in
+   `android/app/src/main/res/values/games-ids.xml` as `@string/app_id`. It must
+   stay a string resource: the value is all digits, and a raw numeric
+   `android:value` is parsed as an integer, overflows, and leaves the SDK with
+   the wrong id at runtime. (It is the same number as the Firebase project
+   number — both are the underlying Google Cloud project — but they are separate
+   settings.)
+3. **The manifest entry** pointing at it:
 
    ```xml
    <meta-data android:name="com.google.android.gms.games.APP_ID"
-              android:value="@string/games_app_id"/>
+              android:value="@string/app_id"/>
    ```
 
-   with `games_app_id` in `android/app/src/main/res/values/strings.xml`. The
-   value is the numeric project id from Play Console — as a **string resource**,
-   not a raw number: a bare numeric value gets parsed as an integer and the SDK
-   fails at runtime.
+`_androidReady` is now `true`, so Android signs in. A test asserts that when
+that flag is on, the manifest entry and the string resource both exist — the
+gate and the native config have to move together, because signing in without
+the id fails natively at launch where no Dart `try`/`catch` can help.
 
-Until then `_androidReady` is `false`, so Android never signs in. That gate is
-the point: starting the Play Games SDK with no application id can bring the app
-down at launch, and it is a native failure — the `try`/`catch` around `signIn`
-would not contain it.
+If Android sign-in ever needs killing quickly, `_androidReady = false` is the
+switch and costs nothing but the achievements.
 
-There is a second guard behind it. `Achievement.id` in the plugin returns
+A second guard sits behind it: `Achievement.id` in the plugin returns
 `androidID` on Android, so an empty id would be *sent* rather than skipped;
 `_unlock` refuses to send an empty one.
 
-### Switching Android on
+### Still to verify on a device
 
-Two steps now that the ids are in: add the manifest entry and string resource,
-then set `_androidReady = true`. Test on a device signed into Play Games — an
-emulator without Play Services will not do.
+None of this has run on hardware. Test on a real device signed into Play
+Games — an emulator without Play Services will not do — and check that sign-in
+succeeds and one achievement actually registers.
 
 ## Behaviour when signed out
 

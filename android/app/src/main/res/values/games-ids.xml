@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play Games Services application id.
+
+  It has to be a string resource rather than a literal in the manifest: the
+  value is all digits, and a raw numeric android:value is parsed as an integer,
+  which overflows and leaves the SDK with the wrong id at runtime. Referencing
+  @string/app_id keeps it a string.
+
+  This is the same number as the Firebase project number — both are the
+  underlying Google Cloud project — but they are separate settings and one can
+  change without the other.
+-->
+<resources>
+    <string name="app_id" translatable="false">593272219819</string>
+</resources>
