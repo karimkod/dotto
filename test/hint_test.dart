@@ -16,9 +16,14 @@ import 'package:dotto/data/levels.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level.dart';
 import 'package:dotto/screens/game_screen.dart';
+import 'package:dotto/services/free_hint_service.dart';
 import 'package:dotto/widgets/bouncy_button.dart';
 
 void main() {
+  // The free hint is a daily allowance held in a process-global service now,
+  // so one test spending it would otherwise starve the next.
+  setUp(FreeHintService.resetForTest);
+
   final allLevels = [for (var n = 1; n <= kLevelCount; n++) n];
 
   test('every level with a toolkit has a hint to give', () {
@@ -90,8 +95,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 30));
     }
 
-    // Free hint spent: the count is replaced by the watch-an-ad icon.
-    expect(find.byIcon(Icons.play_circle_fill_rounded), findsOneWidget);
+    // Free hint spent: the count is replaced by the regeneration countdown.
+    expect(find.text('24h 0m'), findsOneWidget,
+        reason: 'the daily hint is gone until tomorrow, and says so');
   });
 
   testWidgets('a second hint costs an ad, and declining costs nothing',
@@ -119,8 +125,8 @@ void main() {
 
     await tester.tap(find.text('💡'));
     await settleReveal();
-    expect(find.byIcon(Icons.play_circle_fill_rounded), findsOneWidget,
-        reason: 'the free hint is gone, so the button now offers an ad');
+    expect(find.text('24h 0m'), findsOneWidget,
+        reason: 'the free hint is gone until tomorrow');
 
     // Decline: no ad watched, so no piece revealed.
     await tester.tap(find.text('💡'));

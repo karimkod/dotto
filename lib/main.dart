@@ -11,6 +11,7 @@ import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
 import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
+import 'services/free_hint_service.dart';
 import 'services/game_services.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
@@ -28,6 +29,7 @@ Future<void> main() async {
   // Cached challenges load synchronously enough to decide the menu badge; the
   // network refresh behind it is unawaited.
   await ChallengeService.init();
+  await FreeHintService.init();
 
   // Firebase can start regardless — UMP emits the Consent Mode signals itself,
   // so there is no default state for this app to set first.

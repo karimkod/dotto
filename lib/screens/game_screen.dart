@@ -9,6 +9,7 @@ import '../ads/ad_manager.dart';
 import '../ads/ad_pacing.dart';
 import '../services/challenge_service.dart';
 import '../services/cloud_save_service.dart';
+import '../services/free_hint_service.dart';
 import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
@@ -87,11 +88,12 @@ class _GameScreenState extends State<GameScreen>
 
   final Map<int, PlacedElement> _placed = {};
 
-  /// Hints are per-visit and deliberately not persisted: one free reveal each
-  /// time a level is opened, and nothing carried between levels.
-  int _freeHints = 1;
   bool _hintRunning = false;
   Timer? _idleTimer;
+
+  /// Repaints the hint button while the free hint regenerates, so the countdown
+  /// on it stays honest. Minute resolution — the label never shows seconds.
+  Timer? _hintClock;
 
   /// Immovable, level-defined arrows (rendered + simulated, never interactive).
   final Map<int, PlacedElement> _forced = {};
@@ -316,10 +318,11 @@ class _GameScreenState extends State<GameScreen>
         _levelStartedAt = DateTime.now();
         Analytics.levelStart(_level!.id, worldOf(_level!.id));
       }
-      // One free hint per level, and the idle clock starts now: a player who
-      // opens a level and never touches it is exactly who the nudge is for.
-      _freeHints = 1;
+      // The free hint is a daily allowance now, held by FreeHintService, so
+      // there is nothing per-level to reset. The idle clock still starts here:
+      // a player who opens a level and never touches it is who the nudge is for.
       _noteActivity();
+      _startHintClock();
       // Level 2 teaches drag-and-drop: show the hint hand after a beat.
       if (_level!.id == 2) {
         _handTimer = Timer(const Duration(seconds: 2), _startHand);
@@ -444,6 +447,31 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
+  /// Hints the player can spend right now: the daily one if it has come back,
+  /// plus anything won from challenges.
+  int get _hintsInHand =>
+      (FreeHintService.available ? 1 : 0) + ChallengeService.bonusHints;
+
+  /// "14h 32m" while the daily hint regenerates, empty when one is ready.
+  String get _freeHintCountdown => FreeHintService.remainingLabel(
+        DateTime.now(),
+      );
+
+  /// Tick the button once a minute while the countdown is showing, and stop as
+  /// soon as it is not — a timer running behind a static label is just battery.
+  void _startHintClock() {
+    _hintClock?.cancel();
+    if (FreeHintService.available) return;
+    _hintClock = Timer.periodic(const Duration(minutes: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {});
+      if (FreeHintService.available) t.cancel();
+    });
+  }
+
   Future<void> _onHintPressed() async {
     if (!_hintAvailable) return;
     _noteActivity();
@@ -461,8 +489,10 @@ class _GameScreenState extends State<GameScreen>
   Future<bool> _payForHint() async {
     final id = _level!.id;
     final world = worldOf(id);
-    if (_freeHints > 0) {
-      setState(() => _freeHints--);
+    if (FreeHintService.spend()) {
+      // Start the countdown ticking so the button stops claiming a hint it no
+      // longer has.
+      setState(_startHintClock);
       _noteHintTaken(id, world, 'free');
       return true;
     }
@@ -622,15 +652,24 @@ class _GameScreenState extends State<GameScreen>
             children: [
               const Text('💡', style: TextStyle(fontSize: 16)),
               const SizedBox(width: 5),
-              if (_freeHints + ChallengeService.bonusHints > 0)
+              // Three states, in the order the player meets them: how many
+              // hints they have, how long until the next free one, or the ad
+              // that is the only way to get one sooner.
+              if (_hintsInHand > 0)
                 // "×1", not a bare "1" — it reads as a quantity the way the
                 // toolkit tiles do, and does not collide with their counts.
                 // Free and challenge-won hints are one number: the player has
                 // no reason to care which kind gets spent first.
-                Text('×${_freeHints + ChallengeService.bonusHints}',
+                Text('×$_hintsInHand',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
+                        fontWeight: FontWeight.w800))
+              else if (_freeHintCountdown.isNotEmpty)
+                Text(_freeHintCountdown,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800))
               else
                 const Icon(Icons.play_circle_fill_rounded,
@@ -657,6 +696,7 @@ class _GameScreenState extends State<GameScreen>
     _timer?.cancel();
     _handTimer?.cancel();
     _idleTimer?.cancel();
+    _hintClock?.cancel();
     _wiggleCtrl.dispose();
     _dotCtrl.dispose();
     _teleportCtrl.dispose();
