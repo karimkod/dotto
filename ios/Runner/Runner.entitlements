@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- The matching GAME_CENTER capability is enabled on the com.karimkod.dotto
+	     App ID, and the App Store profile was regenerated after enabling it.
+	     The entitlement, the capability and the profile all have to agree, or
+	     codesign rejects the build. -->
 	<key>com.apple.developer.game-center</key>
 	<true/>
 </dict>
