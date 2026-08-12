@@ -48,6 +48,14 @@ void main() {
     expect(find.text('Rate the app'), findsOneWidget);
     expect(find.text('Privacy policy'), findsOneWidget);
     expect(find.text('Reset progress'), findsOneWidget);
+
+    // The About block sits past the fold on a short screen — the list has
+    // grown — so scroll to it rather than asserting it is on screen at rest.
+    await tester.scrollUntilVisible(
+      find.text('Made by Reshaped'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Made by Reshaped'), findsOneWidget);
   });
 

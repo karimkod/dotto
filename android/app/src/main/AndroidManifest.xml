@@ -10,6 +10,21 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3605343790686215~6715217582"/>
+        <!-- Consent Mode v2 defaults, read by the Firebase SDK as it starts.
+             Same state ConsentManager.applyDefaults sets from Dart, declared
+             here too so the first moments of a launch — before any Dart runs —
+             are already governed. Ad signals default off; analytics storage is
+             left granted, since Dotto measures only its own use and no ad
+             identifier is involved. -->
+        <meta-data
+            android:name="google_analytics_default_allow_ad_storage"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_ad_user_data"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false"/>
         <!-- Play Games Services. Without this the SDK fails as it starts, which
              on this app means at launch — see lib/services/game_services.dart.
              The value must stay a @string reference: an all-digits literal is

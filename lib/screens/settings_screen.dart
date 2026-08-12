@@ -6,16 +6,19 @@
 // board, the menu and the icon are all cream with an ink outline (AppColors),
 // and a dark settings page would read as another app's screen.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../consent/consent_manager.dart';
 import '../progress/progress_store.dart';
 import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
+import 'consent_screen.dart';
 
 /// Where "Rate the app" points. The Android form opens the Play app directly;
 /// the https form is the fallback for a device with no Play app installed.
@@ -80,6 +83,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // a link the player can live without.
       }
     }
+  }
+
+  /// Re-open the consent screen so the choice can be changed.
+  ///
+  /// No ATT prompt here: iOS allows it once, and a second request returns the
+  /// prior answer without showing anything. A player who wants to change that
+  /// has to do it in iOS Settings, which is Apple's design, not ours.
+  Future<void> _openAdPreferences() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => ConsentScreen(
+          isUpdate: true,
+          onChosen: (choice) async {
+            await ConsentManager.choose(choice);
+            if (ctx.mounted) Navigator.of(ctx).pop();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _showAchievements() async {
@@ -187,6 +209,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (v) Haptics.medium();
                       },
                     ),
+                    if (!kIsWeb) ...[
+                      const SizedBox(height: 12),
+                      _ActionRow(
+                        icon: Icons.ads_click_rounded,
+                        label: 'Ad preferences',
+                        onTap: _openAdPreferences,
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     // Only offered where it can actually open something. Game
                     // Center and Play Games have their own screens; a row that

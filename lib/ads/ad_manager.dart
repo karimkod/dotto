@@ -1,8 +1,9 @@
 // AdMob: initialisation, and the two ad formats Dotto uses.
 //
-// NO CONSENT FLOW YET. There is no UMP handling here, so this must not reach
-// players as it stands — Dotto targets France, GDPR applies, and ads are being
-// requested with no consent decision recorded. See init() for where it goes.
+// Consent is handled in lib/consent/consent_manager.dart, and every request
+// built here carries it as the npa flag. Read the compliance note at the top of
+// that file before assuming Europe is covered: the consent screen is Dotto's
+// own, not a Google-certified CMP, which is what AdMob's EU policy asks for.
 //
 // THE IDS BELOW ARE LIVE. Every impression they serve is real, counted against
 // a real account, and the same is true of the app ids in AndroidManifest.xml
@@ -28,6 +29,8 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+import '../consent/consent_manager.dart';
 
 class AdManager {
   AdManager._();
@@ -58,14 +61,22 @@ class AdManager {
       ? 'ca-app-pub-3605343790686215/9149809232'
       : 'ca-app-pub-3605343790686215/8766665850';
 
+  /// Every ad request, carrying the player's choice.
+  ///
+  /// `npa=1` is the long-standing AdMob flag for "non-personalized", and it is
+  /// belt and braces alongside Consent Mode: Consent Mode signals travel
+  /// through Firebase, so if Firebase failed to start the signal never left,
+  /// while this rides on the ad request itself and cannot be lost. Sending both
+  /// is what makes "Standard Ads" mean it.
+  static AdRequest _request() => AdRequest(
+        extras: {'npa': ConsentManager.npa},
+      );
+
   /// Start the SDK and warm both ad caches.
   ///
-  /// No consent flow yet. UMP is deliberately left out for now and has to be
-  /// added before this ships to players: Dotto targets France, so GDPR applies,
-  /// and requesting ads there without a consent decision on record is not
-  /// something to leave to launch day. The hook belongs here, ahead of
-  /// initialize(), because the form has to be answered before personalised ads
-  /// may be requested.
+  /// Callers must not reach here before the player has answered the consent
+  /// screen — main() holds it back on a first launch. Once a choice exists,
+  /// every request built by [_request] carries it.
   static Future<void> init() async {
     if (!supported || _ready) return;
     try {
@@ -89,7 +100,7 @@ class AdManager {
     _loadingRewarded = true;
     await RewardedAd.load(
       adUnitId: _rewardedUnitId,
-      request: const AdRequest(),
+      request: _request(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
           _rewarded = ad;
@@ -152,7 +163,7 @@ class AdManager {
     _loadingInterstitial = true;
     await InterstitialAd.load(
       adUnitId: _interstitialUnitId,
-      request: const AdRequest(),
+      request: _request(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           _interstitial = ad;

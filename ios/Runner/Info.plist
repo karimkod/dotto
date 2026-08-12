@@ -77,6 +77,23 @@
 	     lib/ads/ad_manager.dart belong to, or those units never fill. -->
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3605343790686215~2432623578</string>
+	<!-- Shown in Apple's tracking prompt. Apple rejects builds whose purpose
+	     string is vague or missing, and it must describe what the identifier is
+	     actually used for. -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Dotto uses this identifier to show you relevant ads and improve your experience.</string>
+	<!-- Consent Mode v2 defaults, read by the Firebase SDK as it starts. They
+	     are the same state ConsentManager.applyDefaults sets from Dart, declared
+	     here as well so the very first moments of a launch — before any Dart
+	     runs — are already governed. Ad signals default off; analytics storage
+	     is left at its default granted, since Dotto measures only its own use
+	     and no ad identifier is involved. -->
+	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE</key>
+	<false/>
+	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA</key>
+	<false/>
+	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key>
+	<false/>
 	<!-- Ad networks that may attribute an install back to an ad. Without these
 	     entries iOS silently refuses their postbacks, so the networks cannot
 	     tell that their ad worked and bid less on this app's inventory. The
