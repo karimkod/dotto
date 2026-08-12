@@ -82,18 +82,10 @@
 	     actually used for. -->
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Dotto uses this identifier to show you relevant ads and improve your experience.</string>
-	<!-- Consent Mode v2 defaults, read by the Firebase SDK as it starts. They
-	     are the same state ConsentManager.applyDefaults sets from Dart, declared
-	     here as well so the very first moments of a launch — before any Dart
-	     runs — are already governed. Ad signals default off; analytics storage
-	     is left at its default granted, since Dotto measures only its own use
-	     and no ad identifier is involved. -->
-	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE</key>
-	<false/>
-	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA</key>
-	<false/>
-	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key>
-	<false/>
+	<!-- No Consent Mode defaults declared here. UMP owns the consent state and
+	     emits those signals itself; hardcoded defaults would be a second source
+	     of truth for the same thing, and one that cannot be updated when the
+	     player answers the form. -->
 	<!-- Ad networks that may attribute an install back to an ad. Without these
 	     entries iOS silently refuses their postbacks, so the networks cannot
 	     tell that their ad worked and bid less on this app's inventory. The

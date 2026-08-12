@@ -1,7 +1,9 @@
-// Consent is the one subsystem where a bug is a compliance problem rather than
-// a bad experience: an ad request that carries the wrong signal cannot be taken
-// back. These check the parts that are checkable off-device — what the choice
-// maps to, and that the screen cannot be escaped without answering.
+// Consent is now UMP's job, which changes what is worth testing here. The
+// choice itself, the consent state and the Consent Mode signals all live inside
+// Google's SDK and cannot be reached from a unit test — so what is left is the
+// wiring around it: whether ads are gated on UMP's answer, whether the
+// pre-prompt appears only when there is a form behind it, and whether that
+// screen can be escaped without continuing.
 
 import 'dart:io';
 
@@ -14,109 +16,114 @@ import 'package:dotto/screens/consent_screen.dart';
 void main() {
   setUp(ConsentManager.resetForTest);
 
-  group('the npa flag carries the choice', () {
-    test('standard ads request non-personalized', () {
-      ConsentManager.setForTest(given: true, personalized: false);
-      expect(ConsentManager.npa, '1',
-          reason: 'npa=1 is what tells AdMob not to personalize');
-      expect(ConsentManager.choice, AdConsent.standard);
+  group('ads wait for UMP', () {
+    test('nothing may be requested before UMP has answered', () {
+      // The default that matters. main() and the consent screen both gate
+      // AdManager.init on this, so starting false is what stops an ad going
+      // out ahead of the form.
+      expect(ConsentManager.canRequestAds, isFalse);
     });
 
-    test('personalized ads do not', () {
-      ConsentManager.setForTest(given: true, personalized: true);
-      expect(ConsentManager.npa, '0');
-      expect(ConsentManager.choice, AdConsent.personalized);
-    });
-
-    test('an unanswered player is treated as non-personalized', () {
-      // The important default. Before any choice exists the safe reading is the
-      // restrictive one — a request that slipped out early must not be
-      // personalized.
-      expect(ConsentManager.given, isFalse);
-      expect(ConsentManager.npa, '1');
-      expect(ConsentManager.choice, AdConsent.standard);
+    test('the gate opens once UMP allows it', () {
+      ConsentManager.setForTest(canRequestAds: true);
+      expect(ConsentManager.canRequestAds, isTrue);
     });
   });
 
-  group('platform defaults are declared, not just set from Dart', () {
-    // Dart runs after the SDKs have already started; these entries govern the
-    // gap. Their absence is invisible at runtime, which is why they are pinned.
-    test('Android manifest defaults every ad signal to false', () {
-      final manifest =
-          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
-      for (final key in [
-        'google_analytics_default_allow_ad_storage',
-        'google_analytics_default_allow_ad_user_data',
-        'google_analytics_default_allow_ad_personalization_signals',
-      ]) {
-        expect(manifest, contains(key), reason: '$key is not declared');
-      }
+  group('the pre-prompt appears only when it leads somewhere', () {
+    test('not on a platform with no UMP', () {
+      // Web and the test runner have no consent SDK; an explainer for a form
+      // that will never arrive is worse than no screen.
+      ConsentManager.setForTest(formAvailable: true);
+      expect(ConsentManager.needsPrePrompt, isFalse);
     });
 
-    test('Info.plist declares the same defaults and the ATT purpose string',
-        () {
-      final plist = File('ios/Runner/Info.plist').readAsStringSync();
-      for (final key in [
-        'GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE',
-        'GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA',
-        'GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS',
-      ]) {
-        expect(plist, contains(key), reason: '$key is not declared');
-      }
-      expect(plist, contains('NSUserTrackingUsageDescription'),
-          reason: 'Apple rejects a build that prompts without a purpose string');
+    test('not once it has been seen', () {
+      ConsentManager.setForTest(prePromptSeen: true, formAvailable: true);
+      expect(ConsentManager.needsPrePrompt, isFalse);
+    });
+
+    test('not where UMP has no form to show', () {
+      // Outside the EEA there is usually nothing behind Continue.
+      ConsentManager.setForTest(formAvailable: false);
+      expect(ConsentManager.needsPrePrompt, isFalse);
     });
   });
 
-  group('the consent screen', () {
-    testWidgets('offers both choices and reports which was picked',
-        (tester) async {
-      final picked = <AdConsent>[];
+  group('the consent mechanism is UMP, not ours', () {
+    /// Source with comments stripped — otherwise a comment explaining that
+    /// something was removed reads as the thing still being there.
+    String code(String path) => File(path)
+        .readAsLinesSync()
+        .where((l) => !l.trimLeft().startsWith('//'))
+        .join('\n');
+
+    test('no manual Consent Mode calls remain', () {
+      // Two sources of truth for consent is the failure mode this replaced:
+      // UMP owns the state and emits the signals itself.
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src, isNot(contains('setConsent(')),
+          reason: 'Consent Mode is UMP\'s to emit');
+      expect(src, contains('ConsentInformation.instance'),
+          reason: 'consent state must come from UMP');
+    });
+
+    test('ad requests carry no consent flag of their own', () {
+      final src = code('lib/ads/ad_manager.dart');
+      expect(src, isNot(contains("'npa'")),
+          reason: 'an npa extra would compete with what UMP already told the '
+              'SDK');
+    });
+
+    test('reopening from settings resets UMP first', () {
+      // Without the reset UMP considers consent obtained and shows nothing,
+      // which is indistinguishable from a broken button.
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src, contains('ConsentInformation.instance.reset()'));
+    });
+  });
+
+  group('the pre-prompt screen', () {
+    testWidgets('explains, offers one way on, and reports it', (tester) async {
+      var continued = 0;
       await tester.pumpWidget(MaterialApp(
-        home: ConsentScreen(onChosen: picked.add),
+        home: ConsentScreen(onContinue: () => continued++),
       ));
       await tester.pump();
 
       expect(find.text('Before we start…'), findsOneWidget);
-      expect(find.text('Personalized Ads'), findsOneWidget);
-      expect(find.text('Standard Ads'), findsOneWidget);
+      expect(
+          find.textContaining('you can choose how your data is used'),
+          findsOneWidget);
       expect(find.text('Privacy Policy'), findsOneWidget);
 
-      await tester.tap(find.text('Standard Ads'));
-      await tester.pump();
-      expect(picked, [AdConsent.standard]);
+      // No choice here: the form makes that decision.
+      expect(find.text('Personalized Ads'), findsNothing);
+      expect(find.text('Standard Ads'), findsNothing);
 
-      await tester.tap(find.text('Personalized Ads'));
+      await tester.tap(find.text('Continue'));
       await tester.pump();
-      expect(picked, [AdConsent.standard, AdConsent.personalized]);
+      expect(continued, 1);
     });
 
-    testWidgets('onboarding cannot be dismissed without answering',
-        (tester) async {
+    testWidgets('cannot be dismissed instead of continued', (tester) async {
       await tester.pumpWidget(MaterialApp(
-        home: ConsentScreen(onChosen: (_) {}),
+        home: ConsentScreen(onContinue: () {}),
       ));
       await tester.pump();
       final scope = tester.widget(find.byWidgetPredicate(
         (w) => w.runtimeType.toString().startsWith('PopScope'),
       )) as dynamic;
       expect(scope.canPop, isFalse,
-          reason: 'there is no game behind it yet, and no answer to act on');
+          reason: 'there is no game behind it and nothing decided by leaving');
       expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
     });
+  });
 
-    testWidgets('the settings version can be left', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: ConsentScreen(onChosen: (_) {}, isUpdate: true),
-      ));
-      await tester.pump();
-      final scope = tester.widget(find.byWidgetPredicate(
-        (w) => w.runtimeType.toString().startsWith('PopScope'),
-      )) as dynamic;
-      expect(scope.canPop, isTrue,
-          reason: 'a choice already exists to fall back on');
-      expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('Ad preferences'), findsOneWidget);
-    });
+  test('the ATT purpose string is still declared', () {
+    // Unchanged by the move to UMP — Apple rejects a build that prompts
+    // without one, and the prompt still fires after the form.
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+    expect(plist, contains('NSUserTrackingUsageDescription'));
   });
 }

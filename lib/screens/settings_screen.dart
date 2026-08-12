@@ -18,7 +18,6 @@ import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
-import 'consent_screen.dart';
 
 /// Where "Rate the app" points. The Android form opens the Play app directly;
 /// the https form is the fallback for a device with no Play app installed.
@@ -85,23 +84,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Re-open the consent screen so the choice can be changed.
+  /// Re-open Google's consent form so the choice can be changed.
   ///
-  /// No ATT prompt here: iOS allows it once, and a second request returns the
-  /// prior answer without showing anything. A player who wants to change that
-  /// has to do it in iOS Settings, which is Apple's design, not ours.
+  /// Straight to the form, with no pre-prompt: a player who went looking for
+  /// this has already been told what it is for, and an explainer in front of a
+  /// form they asked for is friction.
+  ///
+  /// No ATT prompt either — iOS allows that once, and a second request returns
+  /// the prior answer without showing anything. Changing it means going to iOS
+  /// Settings, which is Apple's design, not ours.
   Future<void> _openAdPreferences() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => ConsentScreen(
-          isUpdate: true,
-          onChosen: (choice) async {
-            await ConsentManager.choose(choice);
-            if (ctx.mounted) Navigator.of(ctx).pop();
-          },
-        ),
-      ),
-    );
+    await ConsentManager.reopenForm();
   }
 
   Future<void> _showAchievements() async {

@@ -1,9 +1,9 @@
 // AdMob: initialisation, and the two ad formats Dotto uses.
 //
-// Consent is handled in lib/consent/consent_manager.dart, and every request
-// built here carries it as the npa flag. Read the compliance note at the top of
-// that file before assuming Europe is covered: the consent screen is Dotto's
-// own, not a Google-certified CMP, which is what AdMob's EU policy asks for.
+// Consent is handled by UMP in lib/consent/consent_manager.dart. Nothing here
+// carries a consent flag: UMP owns that state and the SDK reads it directly.
+// What this file must respect is the gate — no ad request before UMP reports
+// that ads may be requested.
 //
 // THE IDS BELOW ARE LIVE. Every impression they serve is real, counted against
 // a real account, and the same is true of the app ids in AndroidManifest.xml
@@ -30,7 +30,6 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import '../consent/consent_manager.dart';
 
 class AdManager {
   AdManager._();
@@ -61,22 +60,13 @@ class AdManager {
       ? 'ca-app-pub-3605343790686215/9149809232'
       : 'ca-app-pub-3605343790686215/8766665850';
 
-  /// Every ad request, carrying the player's choice.
-  ///
-  /// `npa=1` is the long-standing AdMob flag for "non-personalized", and it is
-  /// belt and braces alongside Consent Mode: Consent Mode signals travel
-  /// through Firebase, so if Firebase failed to start the signal never left,
-  /// while this rides on the ad request itself and cannot be lost. Sending both
-  /// is what makes "Standard Ads" mean it.
-  static AdRequest _request() => AdRequest(
-        extras: {'npa': ConsentManager.npa},
-      );
-
   /// Start the SDK and warm both ad caches.
   ///
-  /// Callers must not reach here before the player has answered the consent
-  /// screen — main() holds it back on a first launch. Once a choice exists,
-  /// every request built by [_request] carries it.
+  /// Callers must not reach here until UMP reports that ads may be requested —
+  /// main() and the consent screen are the two places that check. Requests
+  /// carry no consent flag of their own: UMP holds the consent state and the
+  /// SDK reads it directly, so an npa extra here would be a second, competing
+  /// source of truth for something already decided.
   static Future<void> init() async {
     if (!supported || _ready) return;
     try {
@@ -100,7 +90,7 @@ class AdManager {
     _loadingRewarded = true;
     await RewardedAd.load(
       adUnitId: _rewardedUnitId,
-      request: _request(),
+      request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
           _rewarded = ad;
@@ -163,7 +153,7 @@ class AdManager {
     _loadingInterstitial = true;
     await InterstitialAd.load(
       adUnitId: _interstitialUnitId,
-      request: _request(),
+      request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           _interstitial = ad;

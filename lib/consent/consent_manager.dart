@@ -1,157 +1,208 @@
-// What the player agreed to, and telling Google about it.
+// Consent, via Google's User Messaging Platform.
 //
-// COMPLIANCE NOTE, worth reading before trusting this. Dotto's consent screen
-// is hand-built. Google's EU user consent policy requires publishers serving
-// ads to EEA/UK users to use a Google-certified CMP integrated with the IAB
-// TCF; a custom screen is not one, however carefully worded. The UMP SDK
-// bundled with google_mobile_ads is Google's own certified CMP and is free.
-// What is here satisfies Consent Mode mechanically — the signals are set
-// correctly and honoured — but it is not the certified consent flow AdMob asks
-// for in Europe, and Dotto targets France. Treat this as the app's own
-// preference screen and add UMP before serving EEA traffic at scale.
+// UMP is Google's own certified CMP, which is what AdMob's EU user consent
+// policy requires for EEA/UK traffic — a hand-built screen does not qualify,
+// however carefully worded, and Dotto ships in France. It replaced exactly such
+// a screen here.
 //
-// The mechanics themselves are conventional. Consent Mode v2 has four signals;
-// Dotto uses them like this:
+// What that buys, beyond compliance: UMP owns the consent state and emits the
+// Consent Mode v2 signals itself, straight to the SDKs. There is no
+// setConsent() call in this codebase any more, and no npa flag on ad requests —
+// both would now be a second, competing source of truth for something UMP
+// already knows. The only state kept locally is whether the pre-prompt has been
+// shown, which is a UX detail rather than a consent record.
 //
-//   analytics_storage    always granted — the game only measures itself
-//   ad_storage           always granted — needed to show any ad at all
-//   ad_user_data         granted only for personalized
-//   ad_personalization   granted only for personalized
-//
-// "Standard Ads" therefore still shows ads and still measures the game; what it
-// withholds is sending the player's data to Google for ad targeting.
+// Everything is best-effort. If UMP cannot be reached, [canRequestAds] falls
+// back to true so the game still serves ads outside the EEA rather than going
+// dark on a network error — UMP itself returns "not required" for most of the
+// world, so a failure there is far more likely to be transport than refusal.
 
 import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-enum AdConsent { personalized, standard }
 
 class ConsentManager {
   ConsentManager._();
 
-  static const _givenKey = 'consent_given';
-  static const _personalizedKey = 'consent_personalized';
-  static const _timestampKey = 'consent_timestamp';
+  /// Whether the pre-prompt has been shown. Not a consent record — UMP holds
+  /// that — just a note so a returning player is not re-introduced to the app.
+  static const _prePromptKey = 'consent_prompt_seen';
 
   static SharedPreferences? _prefs;
+  static bool _prePromptSeen = false;
+  static bool _canRequestAds = false;
 
-  static bool _given = false;
-  static bool _personalized = false;
+  /// Whether ads may be requested at all. False until UMP has been asked.
+  static bool get canRequestAds => _canRequestAds;
 
-  /// Whether the player has made a choice. Until they have, the app must not
-  /// request a personalized ad.
-  static bool get given => _given;
+  /// Whether to open on the pre-prompt.
+  ///
+  /// Only when UMP actually has a form to show — outside the EEA there is
+  /// nothing behind the Continue button, and a screen that explains a choice
+  /// the player will never be offered is worse than no screen.
+  static bool _formAvailable = false;
+  static bool get needsPrePrompt =>
+      _supported && !_prePromptSeen && _formAvailable;
 
-  static AdConsent get choice =>
-      _personalized ? AdConsent.personalized : AdConsent.standard;
-
-  /// The `npa` flag AdMob expects: "1" means non-personalized. Read by
-  /// AdManager when it builds a request.
-  static String get npa => _personalized ? '0' : '1';
-
-  /// Web has no AdMob and no ATT, so it never asks. `flutter test` has no
-  /// plugin host.
-  static bool get needsConsentUi {
+  static bool get _supported {
     if (kIsWeb) return false;
     if (Platform.environment.containsKey('FLUTTER_TEST')) return false;
-    return (Platform.isAndroid || Platform.isIOS) && !_given;
+    return Platform.isAndroid || Platform.isIOS;
   }
 
-  /// Load the saved choice. Must run before the first frame, since it decides
-  /// whether the consent screen is the first thing shown.
+  /// Devices that should be treated as if they were in the EEA, so the form can
+  /// be exercised from outside it.
+  ///
+  /// Empty by design: the id is printed by the SDK on first run — look for
+  /// "Use ConsentDebugSettings.testIdentifiers" in logcat or the Xcode console
+  /// — and is specific to a device and install. Debug builds only; these
+  /// settings are ignored in release, so a stray id here cannot affect players.
+  static const List<String> _testDeviceIds = <String>[];
+
+  /// Ask UMP what this user needs, and load the answer.
+  ///
+  /// Safe to call at launch: it is a network round trip, but nothing blocks on
+  /// it except the decision of which screen to open.
   static Future<void> init() async {
     try {
-      final prefs = _prefs = await SharedPreferences.getInstance();
-      _given = prefs.getBool(_givenKey) ?? false;
-      _personalized = prefs.getBool(_personalizedKey) ?? false;
+      _prefs = await SharedPreferences.getInstance();
+      _prePromptSeen = _prefs?.getBool(_prePromptKey) ?? false;
     } catch (_) {
-      // No storage: the player is asked again. Asking twice is a nuisance;
-      // assuming consent that was never given is not an option.
+      // No storage. The pre-prompt may be shown twice; harmless.
     }
-  }
+    if (!_supported) return;
 
-  /// The state everything starts in: nothing granted for advertising.
-  ///
-  /// Called before Firebase starts, so no ad signal can leave the device ahead
-  /// of a decision. Analytics storage is granted from the outset because Dotto
-  /// measures only its own use — no ad identifier is involved — and denying it
-  /// by default would lose first-open and session data that no consent regime
-  /// requires withholding.
-  static Future<void> applyDefaults() async {
-    await _setConsent(adUserData: false, adPersonalization: false);
-  }
+    final params = ConsentRequestParameters(
+      consentDebugSettings: kDebugMode && _testDeviceIds.isNotEmpty
+          ? ConsentDebugSettings(
+              debugGeography: DebugGeography.debugGeographyEea,
+              testIdentifiers: _testDeviceIds,
+            )
+          : null,
+    );
 
-  /// Record a choice and push it to Google immediately.
-  static Future<void> choose(AdConsent consent) async {
-    _given = true;
-    _personalized = consent == AdConsent.personalized;
-
-    final prefs = _prefs;
-    if (prefs != null) {
-      unawaited(prefs.setBool(_givenKey, true).catchError((_) => false));
-      unawaited(prefs
-          .setBool(_personalizedKey, _personalized)
-          .catchError((_) => false));
-      unawaited(prefs
-          .setInt(_timestampKey, DateTime.now().millisecondsSinceEpoch)
-          .catchError((_) => false));
+    final done = Completer<void>();
+    try {
+      ConsentInformation.instance.requestConsentInfoUpdate(
+        params,
+        () async {
+          try {
+            _formAvailable =
+                await ConsentInformation.instance.isConsentFormAvailable();
+            _canRequestAds = await ConsentInformation.instance.canRequestAds();
+          } catch (e) {
+            debugPrint('Consent status read failed: $e');
+            _canRequestAds = true;
+          }
+          if (!done.isCompleted) done.complete();
+        },
+        (error) {
+          // Region lookup failed. Outside the EEA UMP reports "not required"
+          // anyway, so treating a transport error as "no form, ads allowed"
+          // keeps the game working where consent was never needed. It does mean
+          // an EEA user with a broken connection could see an ad before the
+          // form — Google's own reference flow makes the same trade.
+          debugPrint('Consent info update failed: ${error.message}');
+          _canRequestAds = true;
+          if (!done.isCompleted) done.complete();
+        },
+      );
+    } catch (e) {
+      debugPrint('UMP unavailable: $e');
+      _canRequestAds = true;
+      if (!done.isCompleted) done.complete();
     }
 
-    await _setConsent(
-      adUserData: _personalized,
-      adPersonalization: _personalized,
+    // Never let a consent service that does not answer hold up the first frame.
+    await done.future.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        debugPrint('Consent request timed out; carrying on');
+        _canRequestAds = true;
+      },
     );
   }
 
-  static Future<void> _setConsent({
-    required bool adUserData,
-    required bool adPersonalization,
-  }) async {
-    if (kIsWeb) return;
+  /// Show the UMP form if one is required, then re-read whether ads may run.
+  ///
+  /// Resolves when the form is dismissed — or immediately, if none was needed.
+  static Future<void> showFormIfRequired() async {
+    if (!_supported) return;
+    final done = Completer<void>();
     try {
-      await FirebaseAnalytics.instance.setConsent(
-        analyticsStorageConsentGranted: true,
-        adStorageConsentGranted: true,
-        adUserDataConsentGranted: adUserData,
-        adPersonalizationSignalsConsentGranted: adPersonalization,
-      );
+      await ConsentForm.loadAndShowConsentFormIfRequired((error) {
+        if (error != null) debugPrint('Consent form error: ${error.message}');
+        if (!done.isCompleted) done.complete();
+      });
     } catch (e) {
-      // Firebase may not have started yet, or at all. The npa flag on each ad
-      // request still carries the choice, so the player's decision is honoured
-      // either way.
-      debugPrint('Consent Mode update failed: $e');
+      debugPrint('Consent form failed: $e');
+      if (!done.isCompleted) done.complete();
+    }
+    await done.future.timeout(const Duration(seconds: 60), onTimeout: () {
+      debugPrint('Consent form never dismissed; carrying on');
+    });
+    try {
+      _canRequestAds = await ConsentInformation.instance.canRequestAds();
+    } catch (_) {
+      _canRequestAds = true;
     }
   }
 
-  /// Apple's tracking prompt. iOS only, and only meaningful once.
+  /// Remember that the pre-prompt has been shown.
+  static Future<void> markPrePromptSeen() async {
+    _prePromptSeen = true;
+    final prefs = _prefs;
+    if (prefs == null) return;
+    unawaited(prefs.setBool(_prePromptKey, true).catchError((_) => false));
+  }
+
+  /// Settings → Ad preferences: wipe UMP's record and ask again.
   ///
-  /// Deliberately independent of the GDPR choice: Apple requires the prompt
-  /// before the IDFA may be read at all, whatever the player picked here. A
-  /// player who chose Standard Ads and then allows tracking still gets
-  /// non-personalized ads — the stricter of the two answers wins, which is the
-  /// only defensible way to combine them.
+  /// No pre-prompt this time. A player who went looking for this screen has
+  /// already been told what it is for, and an explainer in front of a form they
+  /// asked for is friction.
+  ///
+  /// The reset is deliberate rather than incidental: without it UMP considers
+  /// consent obtained and shows nothing, which is indistinguishable from a
+  /// broken button.
+  static Future<void> reopenForm() async {
+    if (!_supported) return;
+    try {
+      await ConsentInformation.instance.reset();
+    } catch (e) {
+      debugPrint('Consent reset failed: $e');
+      return;
+    }
+    await init();
+    await showFormIfRequired();
+  }
+
+  /// Apple's tracking prompt. iOS only, and only ever meaningful once.
+  ///
+  /// After the UMP form, not beside it: two consent dialogs at once reads as a
+  /// wall of permissions, and Apple's own guidance is to explain before asking.
+  /// UMP's answer does not decide this one — Apple requires the prompt before
+  /// the IDFA may be read at all, whatever was agreed for GDPR.
   static Future<void> requestTrackingAuthorization() async {
     if (kIsWeb) return;
     if (Platform.environment.containsKey('FLUTTER_TEST')) return;
     if (!Platform.isIOS) return;
     try {
-      final status =
-          await AppTrackingTransparency.trackingAuthorizationStatus;
-      // Only `notDetermined` can be asked. The rest are already settled, and
-      // asking again does nothing but return the same answer.
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      // Only `notDetermined` can be asked. Every other state is settled, and
+      // asking again just returns the same answer without showing anything.
       if (status == TrackingStatus.notDetermined) {
-        // A beat after the consent screen dismisses, so the system sheet does
-        // not arrive on top of a disappearing route.
+        // A beat after the form dismisses, so the system sheet does not arrive
+        // on top of a disappearing route.
         await Future.delayed(const Duration(milliseconds: 250));
         await AppTrackingTransparency.requestTrackingAuthorization();
       }
     } catch (e) {
-      // Denied, restricted, or unavailable — all mean the same thing here: no
+      // Denied, restricted, or unavailable all mean the same thing here: no
       // IDFA. Ads still serve, contextually.
       debugPrint('ATT request failed: $e');
     }
@@ -160,15 +211,21 @@ class ConsentManager {
   /// Tests only.
   @visibleForTesting
   static void resetForTest() {
-    _given = false;
-    _personalized = false;
+    _prePromptSeen = false;
+    _formAvailable = false;
+    _canRequestAds = false;
     _prefs = null;
   }
 
-  /// Tests only: set state without touching storage or Firebase.
+  /// Tests only: set state without touching the platform.
   @visibleForTesting
-  static void setForTest({required bool given, required bool personalized}) {
-    _given = given;
-    _personalized = personalized;
+  static void setForTest({
+    bool prePromptSeen = false,
+    bool formAvailable = false,
+    bool canRequestAds = false,
+  }) {
+    _prePromptSeen = prePromptSeen;
+    _formAvailable = formAvailable;
+    _canRequestAds = canRequestAds;
   }
 }

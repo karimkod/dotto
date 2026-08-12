@@ -20,60 +20,45 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ProgressStore.init();
   await SettingsStore.init();
-  // Must precede Analytics.init: the default consent state has to be in place
-  // before Firebase starts, or the first ping leaves the device before the
-  // player has said anything. Also decides whether the consent screen is the
-  // first thing shown, so it cannot be deferred either.
+  // Blocking, but bounded: it decides which screen opens, and it caps itself at
+  // eight seconds rather than letting a slow consent service delay the game.
   await ConsentManager.init();
 
-  // Firebase start-up touches the network, so it does not block the first
-  // frame — but the defaults it needs are applied inside, ahead of it.
-  unawaited(_startAnalytics());
+  // Firebase can start regardless — UMP emits the Consent Mode signals itself,
+  // so there is no default state for this app to set first.
+  unawaited(Analytics.init());
   // Optional and quiet: a player who never signs in should not be able to tell
   // this exists.
   unawaited(GameServices.signIn());
-  // Ads wait for a decision. Starting the SDK is harmless, but requesting an ad
-  // before the player has chosen is the thing consent exists to prevent, so on
-  // a first launch this is left to the consent screen.
-  if (!ConsentManager.needsConsentUi) unawaited(AdManager.init());
+  // Ads only once UMP says they are allowed. On a first EEA launch that is
+  // false until the form has been answered, and the consent screen starts them.
+  if (ConsentManager.canRequestAds) unawaited(AdManager.init());
 
-  runApp(DottoApp(showConsent: ConsentManager.needsConsentUi));
-}
-
-/// Consent defaults, then Firebase. The order is the whole point: Consent Mode
-/// defaults set after initialisation would arrive too late to govern the first
-/// events.
-Future<void> _startAnalytics() async {
-  await ConsentManager.applyDefaults();
-  await Analytics.init();
-  // Re-send the stored choice now that Firebase is running: applyDefaults ran
-  // against an SDK that had not started, so it recorded the defaults and
-  // nothing else.
-  if (ConsentManager.given) await ConsentManager.choose(ConsentManager.choice);
+  runApp(DottoApp(showPrePrompt: ConsentManager.needsPrePrompt));
 }
 
 class DottoApp extends StatefulWidget {
-  const DottoApp({super.key, this.showConsent = false});
+  const DottoApp({super.key, this.showPrePrompt = false});
 
-  /// Whether to open on the consent screen rather than the menu.
-  final bool showConsent;
+  /// Whether to open on the pre-prompt rather than the menu.
+  final bool showPrePrompt;
 
   @override
   State<DottoApp> createState() => _DottoAppState();
 }
 
 class _DottoAppState extends State<DottoApp> {
-  late bool _needsConsent = widget.showConsent;
+  late bool _prePrompt = widget.showPrePrompt;
 
-  Future<void> _onConsentChosen(AdConsent consent) async {
-    await ConsentManager.choose(consent);
-    // Apple's prompt comes after ours: the GDPR choice is the app's own
-    // question, and stacking two system-looking dialogs at once reads as a
-    // wall of permissions. iOS only; a no-op everywhere else.
+  Future<void> _onContinue() async {
+    // Order matters and is Apple's as much as Google's: explain, then Google's
+    // form, then Apple's prompt. Two system dialogs at once reads as a wall of
+    // permissions.
+    await ConsentManager.markPrePromptSeen();
+    await ConsentManager.showFormIfRequired();
     await ConsentManager.requestTrackingAuthorization();
-    // Only now may ads load — with the npa flag the choice implies.
-    unawaited(AdManager.init());
-    if (mounted) setState(() => _needsConsent = false);
+    if (ConsentManager.canRequestAds) unawaited(AdManager.init());
+    if (mounted) setState(() => _prePrompt = false);
   }
 
   @override
@@ -84,8 +69,8 @@ class _DottoAppState extends State<DottoApp> {
       theme: AppTheme.light,
       // Lets the menu notice it has been uncovered and re-read progress.
       navigatorObservers: [routeObserver],
-      home: _needsConsent
-          ? ConsentScreen(onChosen: _onConsentChosen)
+      home: _prePrompt
+          ? ConsentScreen(onContinue: _onContinue)
           : const MenuScreen(),
     );
   }
