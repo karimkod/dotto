@@ -43,6 +43,7 @@ dependencies:
   firebase_analytics: ^12.4.6
   url_launcher: ^6.3.2
   package_info_plus: ^10.2.1
+  games_services: ^5.0.0
 
 dev_dependencies:
   flutter_test:

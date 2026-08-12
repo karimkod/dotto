@@ -7,6 +7,7 @@ import 'analytics/analytics_service.dart';
 import 'app_routes.dart';
 import 'progress/progress_store.dart';
 import 'screens/menu_screen.dart';
+import 'services/game_services.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
 
@@ -25,6 +26,9 @@ Future<void> main() async {
   // until `flutterfire configure` has been run it fails outright. Neither
   // should delay or block the first frame.
   unawaited(Analytics.init());
+  // Optional and quiet: a player who never signs in should not be able to tell
+  // this exists.
+  unawaited(GameServices.signIn());
   runApp(const DottoApp());
 }
 

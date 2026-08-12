@@ -44,6 +44,17 @@ int worldOf(int level) {
   return 1;
 }
 
+/// Every level number belonging to [world].
+Iterable<int> levelsInWorld(int world) sync* {
+  for (var n = 1; n <= kLevelCount; n++) {
+    if (worldOf(n) == world) yield n;
+  }
+}
+
+/// Whether [completed] contains every level of [world].
+bool isWorldComplete(int world, Set<int> completed) =>
+    levelsInWorld(world).every(completed.contains);
+
 /// Hardcoded menu level list — World 1 (1–15), World 2 (16–20), World 3 (21–30),
 /// World 4 (31–50).
 ///

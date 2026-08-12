@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
 import '../ads/ad_pacing.dart';
+import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
@@ -345,6 +346,14 @@ class _GameScreenState extends State<GameScreen>
       Analytics.worldUnlocked(worldOf(id + 1));
     }
     if (completed.length >= kLevelCount) Analytics.gameCompleted();
+
+    GameServices.onLevelCompleted(
+      world: world,
+      worldFinished: isWorldComplete(world, completed),
+      totalCompleted: completed.length,
+      levelCount: kLevelCount,
+      lifetimeHints: ProgressStore.hintsUsed(),
+    );
   }
 
   void _reportFail() {
@@ -419,6 +428,7 @@ class _GameScreenState extends State<GameScreen>
     ProgressStore.bumpHintsUsed();
     Analytics.hintUsed(levelId, worldId, type);
     Analytics.setHintsUsedTotal(ProgressStore.hintsUsed());
+    GameServices.onHintUsed(ProgressStore.hintsUsed());
   }
 
   /// Ask for the hint back in exchange for an ad, and return whether it was

@@ -11,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../progress/progress_store.dart';
+import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
 import '../theme/app_theme.dart';
@@ -79,6 +80,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // a link the player can live without.
       }
     }
+  }
+
+  Future<void> _showAchievements() async {
+    if (await GameServices.showAchievements()) return;
+    if (!mounted) return;
+    // Not signed in, or the platform refused. Say so plainly rather than
+    // letting the tap appear to do nothing.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sign in to game services to see these.')),
+    );
   }
 
   void _rate() {
@@ -177,6 +188,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
+                    // Only offered where it can actually open something. Game
+                    // Center and Play Games have their own screens; a row that
+                    // did nothing would be worse than no row.
+                    if (GameServices.supported) ...[
+                      _ActionRow(
+                        icon: Icons.emoji_events_rounded,
+                        label: 'Achievements',
+                        onTap: _showAchievements,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     _ActionRow(
                       icon: Icons.star_rounded,
                       label: 'Rate the app',
