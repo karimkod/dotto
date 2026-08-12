@@ -1,11 +1,13 @@
 // Game Center on iOS, Play Games Services on Android.
 //
-// ANDROID IS NOT WIRED UP YET. Every androidID below is empty, waiting on the
-// Play Console setup. That is not merely inert: the plugin's Achievement.id
-// returns androidID on Android, so an empty one would hand Play Games a blank
-// achievement id. [_unlock] refuses to send an empty id for exactly that
-// reason, which makes Android a silent no-op until the real ids are pasted in —
-// the same shape as being signed out.
+// Both platforms are wired up. The iOS column holds the reverse-domain ids
+// registered in App Store Connect, the Android column the generated Play
+// Console ones, and all ten exist on both sides.
+//
+// The plugin's Achievement.id returns androidID on Android, so a blank one
+// would hand Play Games an empty achievement id. [_unlock] still refuses to
+// send one, which is now a safety net against a half-filled table rather than
+// the state the app ships in.
 //
 // Everything here is optional and fire-and-forget. A player who never signs in,
 // declines Game Center, or plays offline must see no difference in the game, so
@@ -120,8 +122,9 @@ class GameServices {
 
   static void _unlock(_Ach ach) {
     if (!supported || !_signedIn) return;
-    // The guard that keeps Android quiet until its ids exist. Sending a blank
-    // id would be an error report per achievement, several times a level.
+    // Sending a blank id would be an error report per achievement, several
+    // times a level. Every id is filled in now, so this only ever fires if one
+    // is removed again.
     if (ach.forPlatform.isEmpty) return;
     unawaited(
       GamesServices.unlock(
