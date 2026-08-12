@@ -27,6 +27,16 @@ class ProgressStore {
 
   static void bumpHintsUsed() => impl.bumpHintsUsed();
 
+  /// Merge a saved snapshot into local progress.
+  ///
+  /// Union for levels, max for the hint count — see CloudSaveService for why
+  /// that direction is the only safe one.
+  static void importProgress({
+    required Set<int> levels,
+    required int hintsUsed,
+  }) =>
+      impl.importProgress(levels: levels, hintsUsed: hintsUsed);
+
   /// Erase every completed level, putting the player back to level 1. The
   /// lifetime hint count is left alone — it is a usage statistic, not progress.
   static void clear() => impl.clear();

@@ -48,3 +48,19 @@ void clear() {
     web.window.localStorage.removeItem(_key);
   } catch (_) {}
 }
+
+void importProgress({required Set<int> levels, required int hintsUsed}) {
+  try {
+    // Read storage directly rather than calling hintsUsed(): the parameter
+    // shares that name and shadows the function throughout this body. The
+    // signature is fixed by the facade, so the read moves instead.
+    final current =
+        int.tryParse(web.window.localStorage.getItem(_hintsKey) ?? '') ?? 0;
+    final set = completed()..addAll(levels);
+    web.window.localStorage
+        .setItem(_key, jsonEncode({'completed': set.toList()..sort()}));
+    if (hintsUsed > current) {
+      web.window.localStorage.setItem(_hintsKey, '$hintsUsed');
+    }
+  } catch (_) {}
+}

@@ -20,6 +20,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:games_services/games_services.dart';
 
+import 'cloud_save_service.dart';
+
 /// The achievements Dotto reports, with their per-platform ids.
 ///
 /// iOS uses the reverse-domain ids registered in App Store Connect. The Android
@@ -101,7 +103,11 @@ class GameServices {
       _signedIn = await GamesServices.isSignedIn;
     } catch (e) {
       debugPrint('Game services sign-in failed, achievements off: $e');
+      return;
     }
+    // Saved games are per-account, so the cloud is only reachable once there is
+    // an account. This is the earliest honest moment to pull it.
+    if (_signedIn) await CloudSaveService.load();
   }
 
   /// Open the platform's own achievements screen.

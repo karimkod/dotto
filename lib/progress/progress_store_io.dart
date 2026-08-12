@@ -69,3 +69,13 @@ void clear() {
   if (prefs == null) return;
   unawaited(prefs.remove(_key).catchError((_) => false));
 }
+
+void importProgress({required Set<int> levels, required int hintsUsed}) {
+  _cache.addAll(levels);
+  if (hintsUsed > _hints) _hints = hintsUsed;
+  final prefs = _prefs;
+  if (prefs == null) return;
+  final payload = jsonEncode({'completed': _cache.toList()..sort()});
+  unawaited(prefs.setString(_key, payload).catchError((_) => false));
+  unawaited(prefs.setInt(_hintsKey, _hints).catchError((_) => false));
+}

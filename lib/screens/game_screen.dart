@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
 import '../ads/ad_pacing.dart';
+import '../services/cloud_save_service.dart';
 import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
@@ -347,6 +348,7 @@ class _GameScreenState extends State<GameScreen>
     }
     if (completed.length >= kLevelCount) Analytics.gameCompleted();
 
+    CloudSaveService.save();
     GameServices.onLevelCompleted(
       world: world,
       worldFinished: isWorldComplete(world, completed),
@@ -429,6 +431,7 @@ class _GameScreenState extends State<GameScreen>
     Analytics.hintUsed(levelId, worldId, type);
     Analytics.setHintsUsedTotal(ProgressStore.hintsUsed());
     GameServices.onHintUsed(ProgressStore.hintsUsed());
+    CloudSaveService.save();
   }
 
   /// Ask for the hint back in exchange for an ad, and return whether it was

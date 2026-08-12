@@ -9,6 +9,7 @@ import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
 import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
+import 'services/cloud_save_service.dart';
 import 'services/game_services.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
@@ -47,8 +48,28 @@ class DottoApp extends StatefulWidget {
   State<DottoApp> createState() => _DottoAppState();
 }
 
-class _DottoAppState extends State<DottoApp> {
+class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   late bool _prePrompt = widget.showPrePrompt;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Leaving the app is the last certain moment to write: a process killed
+    // from the background gets no further warning. The per-event saves already
+    // cover the common path; this catches whatever the last one missed.
+    if (state == AppLifecycleState.paused) CloudSaveService.save();
+  }
 
   Future<void> _onContinue() async {
     // Order matters and is Apple's as much as Google's: explain, then Google's

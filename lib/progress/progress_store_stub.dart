@@ -17,3 +17,8 @@ int hintsUsed() => _hints;
 void bumpHintsUsed() => _hints++;
 
 void clear() => _completed.clear();
+
+void importProgress({required Set<int> levels, required int hintsUsed}) {
+  _completed.addAll(levels);
+  if (hintsUsed > _hints) _hints = hintsUsed;
+}

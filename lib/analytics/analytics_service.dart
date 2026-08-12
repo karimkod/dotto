@@ -162,6 +162,12 @@ class Analytics {
 
   static void levelDesignerOpened() => _log('level_designer_opened');
 
+  /// Cloud save trouble. Reported so a platform that quietly stops accepting
+  /// saves is visible in the data — the player is told nothing, by design.
+  /// [op] is 'save' or 'load'.
+  static void cloudSaveFailed(String op) =>
+      _log('cloud_save_failed', {'operation': op});
+
   // ----- user properties -----
 
   /// Firebase stores user properties as strings, whatever they describe.
