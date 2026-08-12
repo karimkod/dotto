@@ -375,10 +375,30 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _reportFail() {
-    if (widget.levelOverride != null) return;
+    // Counted for every board, including challenges and designer previews —
+    // the fail overlay decides whether to offer a hint from this, and a
+    // challenge player gets stuck exactly like anyone else. Only the analytics
+    // event is campaign-only.
     _attempts++;
+    if (widget.levelOverride != null) return;
     Analytics.levelFail(_level!.id, worldOf(_level!.id), _attempts);
   }
+
+  /// Whether the fail overlay should offer a hint.
+  ///
+  /// Never on the first fail: losing once is how the level teaches itself, and
+  /// an offer of help before the player has thought about it reads as the game
+  /// assuming they cannot do it.
+  ///
+  /// The availability test is against the *recorded solution*, not the current
+  /// board. By the time a run has failed the player has usually placed every
+  /// piece they own, so the kit is empty and [_nextHint] finds nothing — asking
+  /// it here would hide the offer in precisely the situation it exists for.
+  /// [_onFailHintPressed] clears the board first, which puts the pieces back.
+  bool get _offerHintOnFail =>
+      _attempts >= 2 &&
+      _level != null &&
+      recordedSolution(_level!.id).isNotEmpty;
 
   // ----- hints -----
 
@@ -427,26 +447,55 @@ class _GameScreenState extends State<GameScreen>
   Future<void> _onHintPressed() async {
     if (!_hintAvailable) return;
     _noteActivity();
+    if (await _payForHint()) await _revealHint();
+  }
+
+  /// Take payment for one hint, in the order that costs the player least.
+  ///
+  /// Free hint, then anything won from a challenge, then an ad. Returns whether
+  /// a hint was actually paid for — false means the player declined the ad or
+  /// none could be served, and nothing should be revealed.
+  ///
+  /// Shared with the fail overlay so both routes charge identically; two copies
+  /// of this would eventually disagree about who pays what.
+  Future<bool> _payForHint() async {
     final id = _level!.id;
     final world = worldOf(id);
     if (_freeHints > 0) {
       setState(() => _freeHints--);
       _noteHintTaken(id, world, 'free');
-      await _revealHint();
-      return;
+      return true;
     }
     // Hints won from challenges are spent before an ad is ever offered — a
     // player who earned one should not be asked to watch a video to use it.
     if (ChallengeService.spendBonusHint()) {
       setState(() {});
       _noteHintTaken(id, world, 'bonus');
-      await _revealHint();
-      return;
+      return true;
     }
     if (await _offerAd() && mounted) {
       _noteHintTaken(id, world, 'ad');
-      await _revealHint();
+      return true;
     }
+    return false;
+  }
+
+  /// "Use Hint" on the fail overlay.
+  ///
+  /// The board is cleared first, then the piece is placed onto it. Clearing is
+  /// what makes this work at all: a failed run usually has every piece already
+  /// down, and a hint has nowhere to go until they are back in the kit. It also
+  /// gives the player a clean board with one square settled, which is a better
+  /// place to think from than a wrong arrangement with a correction bolted on.
+  ///
+  /// Declining the ad leaves them on the overlay with Try Again — nothing is
+  /// cleared, so refusing costs them nothing.
+  Future<void> _onFailHintPressed() async {
+    if (_hintRunning) return;
+    if (!await _payForHint()) return;
+    if (!mounted) return;
+    _clearAll(); // returns every placed piece to the kit and resets the dot
+    await _revealHint();
   }
 
   void _noteHintTaken(int levelId, int worldId, String type) {
@@ -2492,9 +2541,9 @@ class _GameScreenState extends State<GameScreen>
               ),
               if (_deathCause != null) ...[
                 const SizedBox(height: 4),
-                const Text(
-                  'Try Again',
-                  style: TextStyle(
+                Text(
+                  _offerHintOnFail ? 'Almost! Want a hand?' : 'Almost!',
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSoft,
@@ -2502,12 +2551,30 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ],
               const SizedBox(height: 20),
-              _PillButton(
-                label: 'Retry',
-                icon: Icons.refresh_rounded,
-                filled: true,
-                onTap: _retry,
-              ),
+              // Offered from the second fail, and only when a hint would
+              // actually place something. It leads, because at this point it is
+              // the more useful of the two.
+              if (_offerHintOnFail) ...[
+                _PillButton(
+                  label: 'Use Hint',
+                  icon: Icons.lightbulb_rounded,
+                  filled: true,
+                  onTap: _onFailHintPressed,
+                ),
+                const SizedBox(height: 10),
+                _PillButton(
+                  label: 'Try Again',
+                  icon: Icons.refresh_rounded,
+                  filled: false,
+                  onTap: _retry,
+                ),
+              ] else
+                _PillButton(
+                  label: 'Try Again',
+                  icon: Icons.refresh_rounded,
+                  filled: true,
+                  onTap: _retry,
+                ),
               const SizedBox(height: 10),
               _PillButton(
                 label: 'Clear & Edit',

@@ -400,11 +400,11 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 120; i++) {
       await tester.pump(const Duration(milliseconds: 16));
-      if (find.text('Retry').evaluate().isNotEmpty) break;
+      if (find.text('Try Again').evaluate().isNotEmpty) break;
     }
-    expect(find.text('Retry'), findsOneWidget, reason: 'the run should fail');
+    expect(find.text('Try Again'), findsOneWidget, reason: 'the run should fail');
 
-    await tester.tap(find.text('Retry'));
+    await tester.tap(find.text('Try Again'));
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
@@ -704,5 +704,51 @@ void main() {
     expect(find.text('Back to Menu'), findsOneWidget,
         reason: 'the arrow under the patrol must still redirect the dot');
     expect(find.text('Retry'), findsNothing, reason: 'the dot should not die');
+  });
+
+  // The fail overlay offers a hint, but not on the first loss: losing once is
+  // how a level teaches itself, and offering help before the player has thought
+  // about it reads as the game assuming they cannot do it.
+  testWidgets('the hint offer waits for the second fail', (tester) async {
+    const level16 = Level(
+      id: 16,
+      number: 16,
+      title: 'First Danger',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level16)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 4);
+
+    Future<void> failOnce() async {
+      await tester.tap(find.text('Play'));
+      await tester.pump();
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    // Park the arrow off the dot's path so the run always ends on the
+    // destroyer, leaving the kit empty — and a hint still to give, because the
+    // arrow is in the wrong place rather than the right one.
+    await _dragArrow(tester, tester.getCenter(find.text('UP')),
+        boardRect.topLeft + geo.center(0, 0));
+
+    await failOnce();
+    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Use Hint'), findsNothing,
+        reason: 'the first fail is left alone');
+
+    await tester.tap(find.text('Try Again'));
+    await tester.pump(const Duration(milliseconds: 40));
+    await failOnce();
+
+    // Second fail: both options, with the hint leading.
+    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Use Hint'), findsOneWidget,
+        reason: 'by the second loss a hand is worth offering');
   });
 }

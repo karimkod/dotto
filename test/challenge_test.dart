@@ -22,7 +22,7 @@ void main() {
     String reward = 'hint',
   }) =>
       {
-        if (id != null) 'id': id,
+        'id': ?id,
         'title': 'Teleport Maze',
         'description': 'Navigate through portals',
         'startDate': startDate ?? start.millisecondsSinceEpoch,
