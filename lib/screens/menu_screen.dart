@@ -11,6 +11,8 @@ import '../utils/dev_mode.dart';
 import '../widgets/level_card.dart';
 import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
+import '../services/challenge_service.dart';
+import 'challenges_screen.dart';
 import 'game_screen.dart';
 import 'level_designer_screen.dart';
 import 'settings_screen.dart';
@@ -100,6 +102,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       duration: const Duration(milliseconds: 600),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  /// True when this week's challenge exists and has not been beaten.
+  bool get _hasUnplayedChallenge {
+    final live = ChallengeService.currentAt(DateTime.now());
+    return live != null && !ChallengeService.isCompleted(live.id);
+  }
+
+  Future<void> _openChallenges() async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ChallengesScreen()));
+    // The badge may have gone out while they were in there.
+    if (mounted) setState(() {});
   }
 
   void _openSettings() {
@@ -308,7 +323,33 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           children: [
             _SideIcon(icon: Icons.lock_outline_rounded, locked: true),
             const SizedBox(height: 14),
-            _SideIcon(icon: Icons.calendar_today_rounded, onTap: () {}),
+            // The calendar was already here doing nothing; challenges are what
+            // it always looked like it meant.
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _SideIcon(
+                  icon: Icons.calendar_today_rounded,
+                  onTap: _openChallenges,
+                ),
+                // A dot, not a count: the badge says "there is something new",
+                // and the screen itself says what.
+                if (_hasUnplayedChallenge)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.coral,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.ink, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

@@ -162,6 +162,11 @@ class Analytics {
 
   static void levelDesignerOpened() => _log('level_designer_opened');
 
+  /// A weekly challenge finished. [id] is the document id, so a challenge can
+  /// be followed from Firestore through to its completion rate.
+  static void challengeCompleted(String id, String title) =>
+      _log('challenge_completed', {'challenge_id': id, 'challenge_title': title});
+
   /// Cloud save trouble. Reported so a platform that quietly stops accepting
   /// saves is visible in the data — the player is told nothing, by design.
   /// [op] is 'save' or 'load'.

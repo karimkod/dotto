@@ -45,6 +45,7 @@ dependencies:
   package_info_plus: ^10.2.1
   games_services: ^5.0.0
   app_tracking_transparency: ^2.0.7
+  cloud_firestore: ^6.8.0
 
 dev_dependencies:
   flutter_test:

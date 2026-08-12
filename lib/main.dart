@@ -9,6 +9,7 @@ import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
 import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
+import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/game_services.dart';
 import 'settings/settings_store.dart';
@@ -24,6 +25,9 @@ Future<void> main() async {
   // Blocking, but bounded: it decides which screen opens, and it caps itself at
   // eight seconds rather than letting a slow consent service delay the game.
   await ConsentManager.init();
+  // Cached challenges load synchronously enough to decide the menu badge; the
+  // network refresh behind it is unawaited.
+  await ChallengeService.init();
 
   // Firebase can start regardless — UMP emits the Consent Mode signals itself,
   // so there is no default state for this app to set first.

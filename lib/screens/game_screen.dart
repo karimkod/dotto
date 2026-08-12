@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../ads/ad_manager.dart';
 import '../ads/ad_pacing.dart';
+import '../services/challenge_service.dart';
 import '../services/cloud_save_service.dart';
 import '../services/game_services.dart';
 import '../settings/haptics.dart';
@@ -29,6 +30,7 @@ import '../engine/simulator.dart'
 import '../models/game_state.dart';
 import '../models/grid_cell.dart';
 import '../models/level.dart';
+import '../models/challenge.dart';
 import '../models/level_data.dart';
 import '../progress/progress_store.dart';
 import '../theme/app_theme.dart';
@@ -55,14 +57,25 @@ const double _kFooterHeight = 82;
 /// [GestureDetector] (no [DragTarget]) so all coordinate math is under our
 /// control — reliable across platforms including web.
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.level, this.levelOverride});
+  const GameScreen({
+    super.key,
+    required this.level,
+    this.levelOverride,
+    this.challenge,
+  });
 
   final Level level;
 
-  /// When set (used by the dev level designer), the screen plays this level
-  /// definition directly instead of looking it up by number. Progress is not
-  /// recorded and there is no "next level".
+  /// When set (the dev level designer, and challenges), the screen plays this
+  /// level definition directly instead of looking it up by number. Progress is
+  /// not recorded and there is no "next level" — which is exactly what a
+  /// challenge wants too, so challenges ride on the same path rather than
+  /// needing their own exception in the win handler.
   final LevelData? levelOverride;
+
+  /// Set when this board is a weekly challenge. Completion is recorded against
+  /// the challenge instead of the campaign.
+  final Challenge? challenge;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -162,6 +175,9 @@ class _GameScreenState extends State<GameScreen>
   /// Set when a completed level makes an interstitial due; spent by the next
   /// transition off the celebration screen.
   bool _interstitialDue = false;
+
+  /// What the just-finished challenge paid out, for the celebration line.
+  ChallengeReward _challengeReward = ChallengeReward.none;
   String _winMessage = '';
 
   // Level-2 tutorial: a ghost hand that drags the Up arrow onto the cell.
@@ -419,6 +435,14 @@ class _GameScreenState extends State<GameScreen>
       await _revealHint();
       return;
     }
+    // Hints won from challenges are spent before an ad is ever offered — a
+    // player who earned one should not be asked to watch a video to use it.
+    if (ChallengeService.spendBonusHint()) {
+      setState(() {});
+      _noteHintTaken(id, world, 'bonus');
+      await _revealHint();
+      return;
+    }
     if (await _offerAd() && mounted) {
       _noteHintTaken(id, world, 'ad');
       await _revealHint();
@@ -549,10 +573,12 @@ class _GameScreenState extends State<GameScreen>
             children: [
               const Text('💡', style: TextStyle(fontSize: 16)),
               const SizedBox(width: 5),
-              if (_freeHints > 0)
+              if (_freeHints + ChallengeService.bonusHints > 0)
                 // "×1", not a bare "1" — it reads as a quantity the way the
                 // toolkit tiles do, and does not collide with their counts.
-                Text('×$_freeHints',
+                // Free and challenge-won hints are one number: the player has
+                // no reason to care which kind gets spent first.
+                Text('×${_freeHints + ChallengeService.bonusHints}',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -1558,11 +1584,20 @@ class _GameScreenState extends State<GameScreen>
         usedHint: _hintsThisLevel > 0,
       );
     }
+    // A challenge is recorded against itself, never against the campaign — it
+    // rides the levelOverride path above, so nothing here touches progress.
+    final challenge = widget.challenge;
+    if (challenge != null) {
+      final reward = ChallengeService.complete(challenge);
+      _challengeReward = reward;
+    }
     // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
       _status = GameStatus.won;
       _celebrationDone = false;
-      _winMessage = _winMessages[math.Random().nextInt(_winMessages.length)];
+      _winMessage = widget.challenge != null
+          ? 'Challenge complete!'
+          : _winMessages[math.Random().nextInt(_winMessages.length)];
     });
     _winCtrl.forward(from: 0);
     // Rising chime as the celebration screen comes in (after the ~0.5s pause).
@@ -2128,6 +2163,29 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ),
               ),
+              if (_challengeReward == ChallengeReward.hint) ...[
+                const SizedBox(height: 12),
+                Opacity(
+                  opacity: msgOpacity,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.ink, width: 3),
+                    ),
+                    child: const Text(
+                      '💡 +1 hint',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               Opacity(
                 opacity: subT,
