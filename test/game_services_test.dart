@@ -44,6 +44,45 @@ void main() {
     });
   });
 
+  group('achievement ids', () {
+    test('there are ten, and none is blank', () {
+      expect(GameServices.allIds, hasLength(10));
+      for (final (ios, android) in GameServices.allIds) {
+        expect(ios, isNotEmpty);
+        expect(android, isNotEmpty,
+            reason: 'a blank Android id would be sent as an empty string');
+      }
+    });
+
+    test('every id is distinct', () {
+      // The Play ids differ only in their last character or two
+      // (…EAIQAA, …EAIQAQ, …EAIQAg). A transposition would unlock the wrong
+      // badge silently — the platform has no idea which one was meant.
+      final ios = GameServices.allIds.map((p) => p.$1).toList();
+      final android = GameServices.allIds.map((p) => p.$2).toList();
+      expect(ios.toSet(), hasLength(ios.length), reason: 'duplicate iOS id');
+      expect(android.toSet(), hasLength(android.length),
+          reason: 'duplicate Android id — two achievements point at one badge');
+    });
+
+    test('the id shapes match their platforms', () {
+      for (final (ios, android) in GameServices.allIds) {
+        expect(ios, startsWith('com.karimkod.dotto.'),
+            reason: 'Game Center ids are reverse-domain');
+        expect(android, startsWith('CgkI'),
+            reason: 'Play ids are generated and all share this prefix');
+      }
+    });
+
+    test('Android stays off until the manifest app id is added', () {
+      // The ids alone are not enough: Play Games also needs its application id
+      // declared in AndroidManifest.xml, and starting the SDK without one can
+      // take the app down at launch. This flips in the same change that adds
+      // that entry — see docs/game-services-setup.md.
+      expect(GameServices.androidReady, isFalse);
+    });
+  });
+
   group('world membership', () {
     test('every level belongs to exactly one world', () {
       final seen = <int>{};

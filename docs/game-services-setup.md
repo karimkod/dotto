@@ -31,13 +31,16 @@ fixed once players have earned them.
 Nothing else to configure: Game Center needs no manifest entry, and the
 capability is enabled per-app in App Store Connect.
 
-## Android — not done yet
+## Android — one thing left
 
-Two things are missing, and both are needed before Android can be switched on:
+**Achievement ids: done.** All ten Play Console ids are in
+`game_services.dart`, paired with their iOS counterparts. They differ only in
+their last character or two, so a test checks they are all distinct — a
+transposition would unlock the wrong badge rather than fail.
 
-1. **Achievement ids.** Play Console generates them (`CgkI…ABw`); they cannot be
-   chosen. Paste each into the `androidID` slot in `game_services.dart`.
-2. **The application id in the manifest.** Play Games needs:
+Still missing, and the reason Android is switched off:
+
+1. **The application id in the manifest.** Play Games needs:
 
    ```xml
    <meta-data android:name="com.google.android.gms.games.APP_ID"
@@ -60,8 +63,8 @@ There is a second guard behind it. `Achievement.id` in the plugin returns
 
 ### Switching Android on
 
-One change: paste the ids, add the manifest entry and string resource, set
-`_androidReady = true`. Then test on a device signed into Play Games — an
+Two steps now that the ids are in: add the manifest entry and string resource,
+then set `_androidReady = true`. Test on a device signed into Play Games — an
 emulator without Play Services will not do.
 
 ## Behaviour when signed out
