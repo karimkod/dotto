@@ -402,18 +402,63 @@ Screenshots go in the `APP_IPHONE_67` slot even though they are 6.9" sized
 (1320x2868); the API has no `APP_IPHONE_69` display type. iPad 13" images
 (2064x2752) go in `APP_IPAD_PRO_3GEN_129`.
 
+App review contact is set too: Abdelkrim Bournane, `contact@reshaped.dev`,
+`+33 6 98 87 16 07`, no demo account required, with review notes explaining that
+the game is offline and needs no login.
+
+### Everything above describes 1.0.3, which predates ads
+
+`main` is now **1.1.0+7** and has picked up `google_mobile_ads`,
+`firebase_analytics`, `firebase_core` and `games_services`. Build 9, the build
+attached to the listing, is 1.0.3 and contains none of that, so the listing as
+filled in is correct **for build 9 only**. Submitting 1.1.0 instead changes four
+answers:
+
+1. **App Privacy is no longer "Data Not Collected".** AdMob and Firebase
+   Analytics both collect. At minimum that means identifiers, usage data and
+   diagnostics, and for AdMob it means data used for advertising. Ticking "not
+   collected" with those SDKs linked is a misdeclaration, and Apple does check.
+2. **The age rating's `advertising` flag must flip to `true`.** It is currently
+   `false`, which is right for build 9 and wrong for 1.1.0.
+3. **The published privacy policy contradicts the app.** It still says Dotto
+   "currently shows no advertising and contains no advertising SDK", and it
+   promises the policy "would be updated before the change shipped". Apple reads
+   the URL you give it.
+4. **No ATT.** There is no `NSUserTrackingUsageDescription` in `Info.plist` and
+   no `AppTrackingTransparency` call anywhere, so the app cannot ask for the
+   IDFA and AdMob is limited to non-personalised ads on iOS. That is a valid way
+   to ship, but it should be a decision rather than an oversight.
+
+### GDPR: real ad units are live with no consent flow
+
+`lib/ads/ad_manager.dart` opens with its own warning:
+
+> NO CONSENT FLOW YET. There is no UMP handling here, so this must not reach
+> [production] ... requested with no consent decision recorded.
+
+`f827b1a` removed the UMP flow and said the gap "is fine while every id is a
+Google test id and nothing is published, and it is not fine the day real ids go
+in". The very next commit, `5f2c463`, put the real ids in: the units in
+`ad_manager.dart` and the `GADApplicationIdentifier` in `Info.plist` are all
+publisher ids, not Google's `ca-app-pub-3940256099942544` test id.
+
+So the condition the code sets for itself has already been crossed on `main`.
+Dotto targets France, the GDPR applies, and ads would be requested with no
+consent on record. This wants fixing before 1.1.0 goes anywhere near review,
+and it is a legal exposure rather than a store-policy one.
+
 ### Still outstanding
 
-1. **App review contact phone.** The only hard blocker left. Apple requires a
-   number in `+CC …` form and rejects the record without one. Name and
-   `contact@reshaped.dev` are ready to go with it.
-2. **App Privacy questionnaire.** Not reachable through this API key, so it
-   needs doing in the web UI. The answer is "Data Not Collected": no account, no
-   analytics, progress kept on device. One nuance to be aware of before ticking
-   that box, below.
+1. **App Privacy questionnaire.** Must be done in the web UI. Every
+   `appDataUsages` path returns 404 for this key, as does
+   `appStoreVersionExperiments`, which does exist, so this is a role limitation
+   on the App Manager team key rather than a wrong URL. The answer is "Data Not
+   Collected": no account, no analytics, progress kept on device. Read the
+   Google Fonts note below before ticking it.
+2. **Submit for review.** Deliberately not done from here; pushing an app into
+   Apple's review queue is the owner's call, not a script's.
 3. **What's New.** Empty, and not required for a first release.
-4. **Submit for review.**
-5. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
+4. **Store name follow-up.** The listing reads "Dotto : Puzzle Game" because
    "Dotto" was taken. Apple's dispute route needs a trademark claim.
 
 ### The Google Fonts nuance
