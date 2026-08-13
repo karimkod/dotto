@@ -1998,14 +1998,19 @@ class _GameScreenState extends State<GameScreen>
         ],
         const Spacer(),
         _buildHintButton(),
-        const SizedBox(width: 8),
-        // Small, unobtrusive feedback button (top-right).
-        BorderedTile(
-          width: 44,
-          onTap: _showFeedbackDialog,
-          child: const Icon(Icons.chat_bubble_outline_rounded,
-              color: AppColors.ink, size: 20),
-        ),
+        // The playtest feedback box, and dev-only like the designer beside it.
+        // It writes to a local store with an "Export all (JSON)" dump and goes
+        // nowhere near a support inbox — shipped to players it reads as a way
+        // to contact us that silently discards everything they write.
+        if (isDevMode) ...[
+          const SizedBox(width: 8),
+          BorderedTile(
+            width: 44,
+            onTap: _showFeedbackDialog,
+            child: const Icon(Icons.chat_bubble_outline_rounded,
+                color: AppColors.ink, size: 20),
+          ),
+        ],
       ],
     );
   }
