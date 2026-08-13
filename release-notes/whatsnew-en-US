@@ -1,8 +1,6 @@
 What's New:
-• Animated splash screen
-• Sign in to save progress and earn achievements
-• Hint offered when stuck on a level
-• Free hint renews every 24 hours
-• Onboarding improvements
-• Menu scroll position fixed
-• Bug fixes
+• Weekly Challenges — play a new challenge every week
+• First challenge live: Arrow Maze
+• Firestore rules and security hardening
+• Dev tools removed from production builds
+• Bug fixes and stability improvements
