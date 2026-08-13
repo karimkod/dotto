@@ -1,6 +1,6 @@
-What's New:
-• Weekly Challenges — play a new challenge every week
-• First challenge live: Arrow Maze
-• Firestore rules and security hardening
-• Dev tools removed from production builds
-• Bug fixes and stability improvements
+What's New in v1.3.0:
+• Push notifications — get notified when new challenges drop
+• Hint reminders — we'll let you know when your free hint is ready
+• Notification settings — control what you receive in Settings
+• Splash screen animation
+• Bug fixes and improvements
