@@ -9,6 +9,7 @@ import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
 import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/free_hint_service.dart';
@@ -77,7 +78,7 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused) CloudSaveService.save();
   }
 
-  Future<void> _onContinue() async {
+  Future<void> _onContinue(BuildContext context) async {
     // Order matters and is Apple's as much as Google's: explain, then Google's
     // form, then Apple's prompt. Two system dialogs at once reads as a wall of
     // permissions.
@@ -85,8 +86,28 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     await ConsentManager.showFormIfRequired();
     await ConsentManager.requestTrackingAuthorization();
     if (ConsentManager.canRequestAds) unawaited(AdManager.init());
-    if (mounted) setState(() => _prePrompt = false);
+    if (!context.mounted) return;
+    _prePrompt = false;
+    // Replace rather than pop: the consent screen was pushed over the splash,
+    // and there is nothing behind it worth returning to.
+    Navigator.of(context).pushReplacement(_fadeTo((_) => const MenuScreen()));
   }
+
+  /// What the splash opens into: the consent pre-prompt on a first launch,
+  /// otherwise straight to the menu.
+  Widget _afterSplash(BuildContext context) => _prePrompt
+      ? ConsentScreen(onContinue: () => _onContinue(context))
+      : const MenuScreen();
+
+  /// A cross-fade rather than a slide. The splash and the menu share a
+  /// background, so sliding would move a cream panel across a cream one.
+  static PageRouteBuilder<void> _fadeTo(WidgetBuilder builder) =>
+      PageRouteBuilder<void>(
+        pageBuilder: (context, _, _) => builder(context),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 450),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -96,9 +117,7 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       // Lets the menu notice it has been uncovered and re-read progress.
       navigatorObservers: [routeObserver],
-      home: _prePrompt
-          ? ConsentScreen(onContinue: _onContinue)
-          : const MenuScreen(),
+      home: SplashScreen(next: _afterSplash),
     );
   }
 }

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FAF8F5</color>
+    <!-- The window colour Android paints before Flutter's first frame. Same
+         cream as AppColors.background and the adaptive icon, so launch is one
+         continuous colour rather than a white flash into the game. -->
+    <color name="launch_background">#FAF8F5</color>
 </resources>

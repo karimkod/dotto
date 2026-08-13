@@ -6,9 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dotto/main.dart';
 
 void main() {
-  testWidgets('Dotto menu renders title and play button', (tester) async {
+  testWidgets('Dotto opens on the splash, then the menu', (tester) async {
     await tester.pumpWidget(const DottoApp());
     await tester.pump();
+
+    // The app now opens on the splash rather than straight into the menu.
+    expect(find.text('DOTTO'), findsOneWidget,
+        reason: 'the opening mark comes first');
+    expect(find.text('Level 1'), findsNothing);
+
+    // 1800ms of opening, then a 450ms cross-fade into whatever comes next.
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pumpAndSettle();
 
     // Wordmark.
     expect(find.text('Dotto'), findsOneWidget);
