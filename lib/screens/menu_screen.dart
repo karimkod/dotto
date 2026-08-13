@@ -220,16 +220,24 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
         child: LayoutBuilder(builder: (context, constraints) {
-        // Empty space past both ends of the path, so the levels at the ends can
-        // be centred like any other. Without it the scroll simply runs out:
-        // level 1 is the last thing in the column, so centring it would need
-        // half a viewport of content underneath, and it ends up pinned near the
-        // bottom of the screen with four or five levels stacked above it — on a
-        // tall phone, further still. Same at the top for the final level.
+        // Empty space above the path, and only above it. The two ends are not
+        // the same case.
+        //
+        // The top needs it: the last level is the last thing in the column, so
+        // centring it would take half a viewport of content above it that does
+        // not exist, and without the space the scroll runs out with it
+        // stranded low on the screen.
+        //
+        // The bottom must not have it. Level 1 is the start of the climb and
+        // belongs at the bottom of the screen — but padding underneath gives
+        // the scroll somewhere further to go, so a fresh player opened on
+        // level 1 sitting dead centre with empty space beneath it. Without the
+        // padding the scroll ends with the World 1 banner at the bottom edge,
+        // which is where it should be.
         final tail = math.max(0.0, constraints.maxHeight / 2 - _slotHeight / 2);
         return SingleChildScrollView(
         controller: _scrollController,
-        padding: EdgeInsets.only(top: 8 + tail, bottom: 8 + tail),
+        padding: EdgeInsets.only(top: 8 + tail, bottom: 8),
         child: Stack(
           children: [
             Positioned.fill(
