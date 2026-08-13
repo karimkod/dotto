@@ -116,9 +116,43 @@ where Firestore's cache may not answer before the screen draws. The cache
 round-trips through the same parser as the network path, so there is one set of
 rules rather than two.
 
-## Not verified
+## Publishing a document
 
-No device has run this, and no document exists yet. The parser and streak logic
-are tested; the Firestore read, the offline cache and the rules are not. Before
-trusting it: apply the rules, publish one document, and check it appears — then
-turn off the network and check it still does.
+The database is live (`(default)`, **nam5**, created 2026-08-13 — a location is
+permanent, so it stays there) and the rules above are deployed from
+`firestore.rules` in the project root:
+
+```
+npx firebase-tools deploy --only firestore:rules --project dotto-d817e
+```
+
+Documents cannot be written by any client, so authoring needs an admin
+credential. There is no service account key for this project, so
+`scripts/create_challenge.js` borrows the Firebase CLI's own login instead:
+
+```
+node scripts/create_challenge.js scripts/challenge_week_2026_33.json
+```
+
+It reads a plain-JSON challenge in the documented shape, converts it to
+Firestore's typed representation — `startDate`/`endDate` become real timestamps
+— and writes it. It needs `npx firebase-tools login` to have been run, and
+nothing else.
+
+**Put the JSON under `scripts/` and it gets checked.**
+`test/challenge_document_test.dart` reads the file off disk and puts it through
+`Challenge.fromMap` and the solver, so a field name the app does not read, or a
+board that cannot be beaten, fails the suite instead of the player's week. This
+is the gap the section above warns about — solvability is *not* validated
+anywhere at runtime.
+
+## Verified
+
+`week_2026_33` ("Arrow Maze") is published and live from 2026-08-12 to
+2026-08-19. Checked from an anonymous client holding only the app's API key:
+the document reads, a write to it is `PERMISSION_DENIED`, and a read of any
+other collection is `PERMISSION_DENIED`.
+
+Still unverified: no device has fetched this through the app, so the Firestore
+read path, the badge and the offline cache are still untested end to end. Check
+it appears in-game, then turn off the network and check it still does.

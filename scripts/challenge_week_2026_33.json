@@ -1,0 +1,29 @@
+{
+  "id": "week_2026_33",
+  "title": "Arrow Maze",
+  "description": "Guide the ball through a maze of arrows",
+  "startDate": "2026-08-12T00:00:00.000Z",
+  "endDate": "2026-08-19T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 5,
+    "cols": 5,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [4, 4],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "down", "position": [0, 2] },
+      { "type": "arrow", "direction": "right", "position": [2, 2] }
+    ],
+    "pieces": [
+      { "type": "arrow", "direction": "right", "count": 2 },
+      { "type": "arrow", "direction": "down", "count": 2 }
+    ]
+  }
+}

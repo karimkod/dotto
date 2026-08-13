@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Challenges are published by us and played by everyone: world-readable, and
+// writable by nobody holding a client credential. Authoring goes through the
+// Admin SDK, which bypasses rules entirely.
+//
+// The default-deny at the bottom is not decoration. Nothing else in the app
+// touches Firestore, so any other path being reachable would be a mistake
+// rather than a feature — and Firestore's own default depends on how the
+// database was created, which is not something to rely on.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
