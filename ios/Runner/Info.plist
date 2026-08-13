@@ -278,5 +278,13 @@
 			<string>3qcr597p9d.skadnetwork</string>
 		</dict>
 	</array>
+	<!-- Lets iOS hand a push to the app while it is in the background, which is
+	     what allows FCM to deliver anything other than a plain alert. Alerts
+	     alone would work without this; a data payload would not, and the topic
+	     messages carry a `route` for the tap handler. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

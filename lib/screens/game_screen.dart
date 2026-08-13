@@ -37,7 +37,9 @@ import '../progress/progress_store.dart';
 import '../theme/app_theme.dart';
 import '../utils/dev_mode.dart';
 import '../widgets/bouncy_button.dart';
+import '../services/notification_service.dart';
 import '../widgets/feedback_dialog.dart';
+import '../widgets/notification_prompt_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/game_toolbar.dart';
 import '../widgets/top_bar.dart';
@@ -493,6 +495,10 @@ class _GameScreenState extends State<GameScreen>
       // Start the countdown ticking so the button stops claiming a hint it no
       // longer has.
       setState(_startHintClock);
+      // Queue the "it's back" reminder for the moment it actually returns. Not
+      // awaited: the hint has already been spent and the player is waiting to
+      // see it, so scheduling must not sit in front of that.
+      unawaited(NotificationService.scheduleHintReady(DateTime.now()));
       _noteHintTaken(id, world, 'free');
       return true;
     }
@@ -1679,6 +1685,9 @@ class _GameScreenState extends State<GameScreen>
     if (challenge != null) {
       final reward = ChallengeService.complete(challenge);
       _challengeReward = reward;
+      // The streak is no longer at risk, so the warning queued for later this
+      // week would arrive telling them to do something they have just done.
+      unawaited(NotificationService.cancelStreakAtRisk());
     }
     // Brief beat with the dot at the exit, then the grid fades to celebration.
     setState(() {
@@ -1692,6 +1701,26 @@ class _GameScreenState extends State<GameScreen>
     // Rising chime as the celebration screen comes in (after the ~0.5s pause).
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) Sfx.levelComplete();
+    });
+    _maybeAskAboutNotifications();
+  }
+
+  /// Ask about notifications, once, on the back of a win.
+  ///
+  /// A win is the one moment the player has just been given something and is
+  /// pleased about it, which is the only honest time to ask for a permission.
+  /// It waits for the celebration to arrive first — a dialog on top of the win
+  /// animation would cover the thing being celebrated.
+  ///
+  /// [NotificationPromptDialog.maybeShow] decides whether it is due, so this is
+  /// safe to call on every win; only the first one gets a dialog.
+  void _maybeAskAboutNotifications() {
+    // The designer's own test runs are not a player finishing a level.
+    if (widget.levelOverride != null) return;
+    if (!NotificationService.shouldPrompt) return;
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      unawaited(NotificationPromptDialog.maybeShow(context));
     });
   }
 

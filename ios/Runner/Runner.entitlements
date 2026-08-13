@@ -8,5 +8,17 @@
 	     codesign rejects the build. -->
 	<key>com.apple.developer.game-center</key>
 	<true/>
+	<!-- Push. "production" is what an App Store profile carries, and this file
+	     is what the CI release build signs against — a mismatch here is a
+	     codesign failure, not a runtime one, so it fails the build rather than
+	     shipping broken.
+
+	     The APNs environment is chosen by the profile, not by this string:
+	     a development profile still talks to the sandbox with "production"
+	     present. What this does require is the Push Notifications capability
+	     being enabled on the com.karimkod.dotto App ID and the profiles
+	     regenerated afterwards — the same dance Game Center above needed. -->
+	<key>aps-environment</key>
+	<string>production</string>
 </dict>
 </plist>

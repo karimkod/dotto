@@ -9,3 +9,12 @@ import 'package:flutter/widgets.dart';
 
 final RouteObserver<PageRoute<dynamic>> routeObserver =
     RouteObserver<PageRoute<dynamic>>();
+
+/// The app's navigator, reachable without a BuildContext.
+///
+/// A notification tap arrives from the platform, not from the widget tree —
+/// including when it launched the app from cold, before any screen has built —
+/// so there is no context to navigate with. Everything else in the app should
+/// keep using the context it already has; this exists for the one caller that
+/// genuinely has none.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

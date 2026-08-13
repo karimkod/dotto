@@ -13,10 +13,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../consent/consent_manager.dart';
 import '../services/game_services.dart';
+import '../services/notification_service.dart';
 import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/bouncy_button.dart';
+import '../widgets/settings_tiles.dart';
+import 'notification_settings_screen.dart';
 
 /// Where "Rate the app" points. The Android form opens the Play app directly;
 /// the https form is the fallback for a device with no Play app installed.
@@ -115,6 +117,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// The notifications sub-screen. Awaited so the row's own state — which
+  /// depends on OS permission the player may have changed while in there — is
+  /// re-read on the way back.
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
   void _rate() {
     final isAndroid = Theme.of(context).platform == TargetPlatform.android;
     if (isAndroid) {
@@ -134,26 +146,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  _RoundIcon(
-                    icon: Icons.arrow_back_rounded,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text('Settings', style: AppTheme.title),
-                    ),
-                  ),
-                  // Balances the back button so the title stays centred.
-                  const SizedBox(width: 46),
-                ],
-              ),
+              const SettingsHeader(title: 'Settings'),
               const SizedBox(height: 24),
               Expanded(
                 child: ListView(
                   children: [
-                    _ToggleRow(
+                    SettingsToggleRow(
                       icon: Icons.volume_up_rounded,
                       label: 'Sound',
                       value: _sound,
@@ -163,7 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    _ToggleRow(
+                    SettingsToggleRow(
                       icon: Icons.vibration_rounded,
                       label: 'Haptics',
                       value: _haptics,
@@ -176,10 +174,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     if (!kIsWeb) ...[
                       const SizedBox(height: 12),
-                      _ActionRow(
+                      SettingsActionRow(
                         icon: Icons.ads_click_rounded,
                         label: 'Ad preferences',
                         onTap: _openAdPreferences,
+                      ),
+                    ],
+                    // Only where notifications can actually be delivered.
+                    if (NotificationService.supported) ...[
+                      const SizedBox(height: 12),
+                      SettingsActionRow(
+                        icon: Icons.notifications_rounded,
+                        label: 'Notifications',
+                        onTap: _openNotifications,
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -187,20 +194,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // Center and Play Games have their own screens; a row that
                     // did nothing would be worse than no row.
                     if (GameServices.supported) ...[
-                      _ActionRow(
+                      SettingsActionRow(
                         icon: Icons.emoji_events_rounded,
                         label: 'Achievements',
                         onTap: _showAchievements,
                       ),
                       const SizedBox(height: 12),
                     ],
-                    _ActionRow(
+                    SettingsActionRow(
                       icon: Icons.star_rounded,
                       label: 'Rate the app',
                       onTap: _rate,
                     ),
                     const SizedBox(height: 12),
-                    _ActionRow(
+                    SettingsActionRow(
                       icon: Icons.privacy_tip_rounded,
                       label: 'Privacy policy',
                       onTap: () => _open(_privacyUrl),
@@ -213,116 +220,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// A settings row with a switch. Same bordered-tile language as the rest of the
-/// game, rather than a Material ListTile.
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Tile(
-      onTap: () => onChanged(!value),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.ink, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.card,
-            activeTrackColor: AppColors.accent,
-            inactiveThumbColor: AppColors.card,
-            inactiveTrackColor: AppColors.border,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const colour = AppColors.ink;
-    return _Tile(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, color: colour, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: colour, size: 22),
-        ],
-      ),
-    );
-  }
-}
-
-/// The shared card: white surface, thick ink outline, like every other pressable
-/// thing in the game.
-class _Tile extends StatelessWidget {
-  const _Tile({required this.child, required this.onTap});
-
-  final Widget child;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BouncyButton(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.ink, width: 3),
-        ),
-        child: child,
       ),
     );
   }
@@ -363,32 +260,6 @@ class _About extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// The circular back button, matching the menu's side icons.
-class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BouncyButton(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        width: 46,
-        height: 46,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.ink, width: 3),
-        ),
-        child: Icon(icon, color: AppColors.ink, size: 22),
-      ),
     );
   }
 }

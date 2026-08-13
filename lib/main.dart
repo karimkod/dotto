@@ -7,6 +7,7 @@ import 'analytics/analytics_service.dart';
 import 'app_routes.dart';
 import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
+import 'screens/challenges_screen.dart';
 import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
 import 'screens/sign_in_screen.dart';
@@ -15,6 +16,7 @@ import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/free_hint_service.dart';
 import 'services/game_services.dart';
+import 'services/notification_service.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
 
@@ -40,6 +42,11 @@ Future<void> main() async {
   // Firebase can start regardless — UMP emits the Consent Mode signals itself,
   // so there is no default state for this app to set first.
   unawaited(Analytics.init());
+  // Reads preferences and reconnects whatever permission already exists. It
+  // does NOT ask for permission — that happens after a first level is won, by
+  // which point the player knows what they are being offered. Unawaited: no
+  // screen depends on it, and it must not stand between launch and the game.
+  unawaited(NotificationService.init());
   // Optional and quiet: a player who never signs in should not be able to tell
   // this exists.
   unawaited(GameServices.signIn());
@@ -67,10 +74,21 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A tapped notification arrives from the platform with no BuildContext, so
+    // it is handed the navigator key instead. Pushing rather than replacing:
+    // the player came from outside the app and should be able to get back to
+    // wherever they were.
+    NotificationService.onNavigate = (route) {
+      if (route != '/challenges') return;
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const ChallengesScreen()),
+      );
+    };
   }
 
   @override
   void dispose() {
+    NotificationService.onNavigate = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -142,6 +160,7 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Dotto',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       // Lets the menu notice it has been uncovered and re-read progress.

@@ -239,6 +239,21 @@ class Analytics {
   static void cloudSaveFailed(String op) =>
       _log('cloud_save_failed', {'operation': op});
 
+  // ----- notifications -----
+
+  /// The pre-prompt, not the system dialog. Shown once ever, after a first
+  /// level is finished.
+  static void notificationPromptShown() => _log('notification_prompt_shown');
+
+  /// Accepted and denied are reported against the OS answer rather than the
+  /// button: someone can tap "Enable Notifications" and then decline the system
+  /// dialog behind it, and counting that as an acceptance would make the
+  /// pre-prompt look like it works better than it does.
+  static void notificationPromptAccepted() =>
+      _log('notification_prompt_accepted');
+
+  static void notificationPromptDenied() => _log('notification_prompt_denied');
+
   // ----- user properties -----
 
   /// Firebase stores user properties as strings, whatever they describe.
