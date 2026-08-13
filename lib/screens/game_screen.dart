@@ -1998,11 +1998,10 @@ class _GameScreenState extends State<GameScreen>
         ],
         const Spacer(),
         _buildHintButton(),
-        // The playtest feedback box, and dev-only like the designer beside it.
-        // It writes to a local store with an "Export all (JSON)" dump and goes
-        // nowhere near a support inbox — shipped to players it reads as a way
-        // to contact us that silently discards everything they write.
-        if (isDevMode) ...[
+        // The playtest feedback box. Gated harder than the designer beside it:
+        // debug builds only, so it is absent from the public web build as well
+        // as from the store one.
+        if (isFeedbackEnabled) ...[
           const SizedBox(width: 8),
           BorderedTile(
             width: 44,
