@@ -19,6 +19,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:games_services/games_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'cloud_save_service.dart';
 
@@ -88,6 +89,38 @@ class GameServices {
 
   static bool _signedIn = false;
   static bool get signedIn => _signedIn;
+
+  /// Whether the onboarding sign-in offer has been made.
+  ///
+  /// Asked once, on a first launch, and never again: a player who declined has
+  /// answered, and asking each launch is how an optional feature turns into a
+  /// nuisance. Settings → Achievements is the way back in.
+  static const _promptedKey = 'sign_in_prompted';
+  static SharedPreferences? _prefs;
+  static bool _prompted = false;
+
+  /// Whether onboarding should offer to sign in. False once asked, once signed
+  /// in, or where there is no games platform to sign in to.
+  static bool get needsSignInPrompt => supported && !_prompted && !_signedIn;
+
+  /// Load the "already asked" flag. Call before the first frame.
+  static Future<void> init() async {
+    try {
+      final prefs = _prefs = await SharedPreferences.getInstance();
+      _prompted = prefs.getBool(_promptedKey) ?? false;
+    } catch (_) {
+      // No storage. The offer may be made twice, which is a nuisance rather
+      // than a fault.
+    }
+  }
+
+  /// Remember that the offer was made — whatever the player answered.
+  static void markSignInPrompted() {
+    _prompted = true;
+    final prefs = _prefs;
+    if (prefs == null) return;
+    unawaited(prefs.setBool(_promptedKey, true).catchError((_) => false));
+  }
 
   /// Levels finished since launch, for Speed Runner. Not persisted — the
   /// achievement is about one sitting.
@@ -218,9 +251,11 @@ class GameServices {
 
   /// Tests only.
   @visibleForTesting
-  static void resetForTest() {
+  static void resetForTest({bool prompted = false}) {
     _sessionCompletions = 0;
     _signedIn = false;
+    _prompted = prompted;
+    _prefs = null;
   }
 
   /// Tests only: every (iOS, Android) id pair the game can report.

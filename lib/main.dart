@@ -9,6 +9,7 @@ import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
 import 'screens/consent_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/sign_in_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
@@ -31,6 +32,10 @@ Future<void> main() async {
   // network refresh behind it is unawaited.
   await ChallengeService.init();
   await FreeHintService.init();
+  // Loads the "already offered sign-in" flag, which decides whether onboarding
+  // has one more step. Must precede the unawaited signIn below, since that can
+  // flip signedIn and make the offer unnecessary.
+  await GameServices.init();
 
   // Firebase can start regardless — UMP emits the Consent Mode signals itself,
   // so there is no default state for this app to set first.
@@ -90,13 +95,26 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     _prePrompt = false;
     // Replace rather than pop: the consent screen was pushed over the splash,
     // and there is nothing behind it worth returning to.
-    Navigator.of(context).pushReplacement(_fadeTo((_) => const MenuScreen()));
+    Navigator.of(context).pushReplacement(_fadeTo(_afterConsent));
   }
 
-  /// What the splash opens into: the consent pre-prompt on a first launch,
-  /// otherwise straight to the menu.
+  /// What the splash opens into. Onboarding is a chain, and each step decides
+  /// only whether it is needed — so a returning player falls straight through
+  /// to the menu without any of it running.
   Widget _afterSplash(BuildContext context) => _prePrompt
       ? ConsentScreen(onContinue: () => _onContinue(context))
+      : _afterConsent(context);
+
+  /// After consent: offer sign-in once, then the menu.
+  ///
+  /// Deliberately not conditional on the consent screen having shown — outside
+  /// the EEA there is no form, and a first launch there should still get the
+  /// offer.
+  Widget _afterConsent(BuildContext context) => GameServices.needsSignInPrompt
+      ? SignInScreen(
+          onDone: () => Navigator.of(context)
+              .pushReplacement(_fadeTo((_) => const MenuScreen())),
+        )
       : const MenuScreen();
 
   /// A cross-fade rather than a slide. The splash and the menu share a
