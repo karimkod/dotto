@@ -9,16 +9,35 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../analytics/analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
 
 const _privacyUrl = 'https://reshaped.dev/projects/dotto/privacy';
 
-class ConsentScreen extends StatelessWidget {
+class ConsentScreen extends StatefulWidget {
   const ConsentScreen({super.key, required this.onContinue});
 
   /// Runs the UMP form, then ATT, then moves on.
   final VoidCallback onContinue;
+
+  @override
+  State<ConsentScreen> createState() => _ConsentScreenState();
+}
+
+/// Stateful only so "shown" can be reported once, on mount. Reporting it from
+/// build would count every rebuild and turn the first funnel step into noise.
+class _ConsentScreenState extends State<ConsentScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Analytics.onboardingConsentShown();
+  }
+
+  void _continue() {
+    Analytics.onboardingConsentCompleted();
+    widget.onContinue();
+  }
 
   Future<void> _openPrivacy() async {
     try {
@@ -69,7 +88,7 @@ class ConsentScreen extends StatelessWidget {
                   ),
                 ),
                 BouncyButton(
-                  onTap: onContinue,
+                  onTap: _continue,
                   borderRadius: BorderRadius.circular(18),
                   child: Container(
                     width: double.infinity,

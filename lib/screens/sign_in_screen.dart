@@ -12,6 +12,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../analytics/analytics_service.dart';
 import '../services/game_services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
@@ -39,6 +40,12 @@ class _SignInScreenState extends State<SignInScreen>
   );
 
   @override
+  void initState() {
+    super.initState();
+    Analytics.onboardingSignInShown();
+  }
+
+  @override
   void dispose() {
     _tick.dispose();
     super.dispose();
@@ -60,9 +67,11 @@ class _SignInScreenState extends State<SignInScreen>
       // The spinner is cleared first: onDone normally navigates away, but if it
       // ever did not, a button left spinning is a dead end.
       setState(() => _busy = false);
+      Analytics.onboardingSignInFailed();
       widget.onDone();
       return;
     }
+    Analytics.onboardingSignInAccepted();
     setState(() {
       _signedIn = true;
       _busy = false;
@@ -73,6 +82,7 @@ class _SignInScreenState extends State<SignInScreen>
   }
 
   void _skip() {
+    Analytics.onboardingSignInSkipped();
     GameServices.markSignInPrompted();
     widget.onDone();
   }

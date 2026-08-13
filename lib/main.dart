@@ -88,7 +88,7 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     // form, then Apple's prompt. Two system dialogs at once reads as a wall of
     // permissions.
     await ConsentManager.markPrePromptSeen();
-    await ConsentManager.showFormIfRequired();
+    await ConsentManager.showFormIfRequired(duringOnboarding: true);
     await ConsentManager.requestTrackingAuthorization();
     if (ConsentManager.canRequestAds) unawaited(AdManager.init());
     if (!context.mounted) return;
@@ -112,10 +112,21 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   /// offer.
   Widget _afterConsent(BuildContext context) => GameServices.needsSignInPrompt
       ? SignInScreen(
-          onDone: () => Navigator.of(context)
-              .pushReplacement(_fadeTo((_) => const MenuScreen())),
+          onDone: () =>
+              Navigator.of(context).pushReplacement(_fadeTo((_) => _menu())),
         )
-      : const MenuScreen();
+      : _menu();
+
+  /// The menu, and the end of the funnel.
+  ///
+  /// Reaching it is what "onboarding completed" means — not the splash, which
+  /// runs before any of it. The call is safe to make from a builder: it reports
+  /// nothing unless an onboarding step actually ran this launch, and at most
+  /// once either way.
+  Widget _menu() {
+    Analytics.onboardingCompleted();
+    return const MenuScreen();
+  }
 
   /// A cross-fade rather than a slide. The splash and the menu share a
   /// background, so sliding would move a cream panel across a cream one.

@@ -25,6 +25,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../analytics/analytics_service.dart';
+
 class ConsentManager {
   ConsentManager._();
 
@@ -130,8 +132,16 @@ class ConsentManager {
   /// Show the UMP form if one is required, then re-read whether ads may run.
   ///
   /// Resolves when the form is dismissed — or immediately, if none was needed.
-  static Future<void> showFormIfRequired() async {
+  ///
+  /// [duringOnboarding] gates the funnel events. Settings → Ad preferences
+  /// calls this too, and a returning player changing their mind is not part of
+  /// the first-launch funnel — counting it there would inflate a step that is
+  /// supposed to measure new players only.
+  static Future<void> showFormIfRequired({
+    bool duringOnboarding = false,
+  }) async {
     if (!_supported) return;
+    if (duringOnboarding) Analytics.onboardingUmpShown();
     final done = Completer<void>();
     try {
       await ConsentForm.loadAndShowConsentFormIfRequired((error) {
@@ -150,6 +160,7 @@ class ConsentManager {
     } catch (_) {
       _canRequestAds = true;
     }
+    if (duringOnboarding) Analytics.onboardingUmpCompleted();
   }
 
   /// Remember that the pre-prompt has been shown.
@@ -199,7 +210,16 @@ class ConsentManager {
         // A beat after the form dismisses, so the system sheet does not arrive
         // on top of a disappearing route.
         await Future.delayed(const Duration(milliseconds: 250));
-        await AppTrackingTransparency.requestTrackingAuthorization();
+        Analytics.onboardingAttShown();
+        final result =
+            await AppTrackingTransparency.requestTrackingAuthorization();
+        // Only `authorized` is a yes. Restricted means a policy said no on the
+        // player's behalf, which counts the same way from here.
+        if (result == TrackingStatus.authorized) {
+          Analytics.onboardingAttAccepted();
+        } else {
+          Analytics.onboardingAttDenied();
+        }
       }
     } catch (e) {
       // Denied, restricted, or unavailable all mean the same thing here: no

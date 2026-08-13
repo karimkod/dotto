@@ -162,6 +162,72 @@ class Analytics {
 
   static void levelDesignerOpened() => _log('level_designer_opened');
 
+  // ----- onboarding funnel -----
+  //
+  // A first launch only. Every step marks the funnel as running, and
+  // [onboardingCompleted] refuses to fire unless one did — so a returning
+  // player, or an install that predates this code, cannot report finishing a
+  // funnel they never entered. Without that guard the last step would count
+  // every launch and the funnel would read as ~100% completion forever.
+
+  static bool _onboardingRan = false;
+
+  static void _onboardingStep(String name) {
+    _onboardingRan = true;
+    _log(name);
+  }
+
+  static void onboardingConsentShown() =>
+      _onboardingStep('onboarding_consent_shown');
+
+  static void onboardingConsentCompleted() =>
+      _onboardingStep('onboarding_consent_completed');
+
+  static void onboardingUmpShown() => _onboardingStep('onboarding_ump_shown');
+
+  /// Fired when the form closes, whatever was chosen — the choice itself is
+  /// UMP's to record, and this only measures how many people got through it.
+  static void onboardingUmpCompleted() =>
+      _onboardingStep('onboarding_ump_completed');
+
+  static void onboardingAttShown() => _onboardingStep('onboarding_att_shown');
+
+  static void onboardingAttAccepted() =>
+      _onboardingStep('onboarding_att_accepted');
+
+  static void onboardingAttDenied() =>
+      _onboardingStep('onboarding_att_denied');
+
+  static void onboardingSignInShown() =>
+      _onboardingStep('onboarding_signin_shown');
+
+  static void onboardingSignInAccepted() =>
+      _onboardingStep('onboarding_signin_accepted');
+
+  static void onboardingSignInSkipped() =>
+      _onboardingStep('onboarding_signin_skipped');
+
+  /// Declined, cancelled, or unavailable — indistinguishable from here, and
+  /// from the player's side too.
+  static void onboardingSignInFailed() =>
+      _onboardingStep('onboarding_signin_failed');
+
+  /// The menu, reached for the first time. Only counts if the player actually
+  /// went through onboarding this launch.
+  static void onboardingCompleted() {
+    if (!_onboardingRan) return;
+    _onboardingRan = false; // at most once per launch
+    _log('onboarding_completed');
+  }
+
+  /// Tests only.
+  @visibleForTesting
+  static void resetOnboardingForTest() => _onboardingRan = false;
+
+  /// Tests only: whether any onboarding step has been reported this launch.
+  @visibleForTesting
+  static bool get onboardingRan => _onboardingRan;
+
   /// A weekly challenge finished. [id] is the document id, so a challenge can
   /// be followed from Firestore through to its completion rate.
   static void challengeCompleted(String id, String title) =>
