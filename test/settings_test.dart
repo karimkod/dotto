@@ -7,8 +7,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:dotto/data/levels.dart';
-import 'package:dotto/progress/progress_store.dart';
 import 'package:dotto/screens/settings_screen.dart';
 import 'package:dotto/settings/settings_store.dart';
 
@@ -47,7 +45,9 @@ void main() {
     expect(find.text('Haptics'), findsOneWidget);
     expect(find.text('Rate the app'), findsOneWidget);
     expect(find.text('Privacy policy'), findsOneWidget);
-    expect(find.text('Reset progress'), findsOneWidget);
+    // Reset progress is gone. Erasing a game is not something to leave one tap
+    // away, and cloud save would restore it on the next sync regardless.
+    expect(find.text('Reset progress'), findsNothing);
 
     // The About block sits past the fold on a short screen — the list has
     // grown — so scroll to it rather than asserting it is on screen at rest.
@@ -78,59 +78,5 @@ void main() {
     await tester.tap(find.text('Haptics'));
     await tester.pump();
     expect(SettingsStore.hapticsOn, isFalse);
-  });
-
-  group('reset progress', () {
-    testWidgets('asks before erasing, and cancelling keeps everything',
-        (tester) async {
-      ProgressStore.markCompleted(1);
-      ProgressStore.markCompleted(2);
-      await pumpSettings(tester);
-
-      await tester.tap(find.text('Reset progress'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Are you sure'), findsOneWidget,
-          reason: 'erasing a game must never happen on one tap');
-
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(ProgressStore.completed(), containsAll([1, 2]));
-    });
-
-    testWidgets('confirming erases progress and leaves the screen',
-        (tester) async {
-      ProgressStore.markCompleted(1);
-      ProgressStore.markCompleted(2);
-      // Pushed on top of something, so the pop after erasing has somewhere to
-      // land — which is what the real flow does from the menu.
-      await tester.pumpWidget(MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
-              child: const Text('open'),
-            ),
-          ),
-        ),
-      ));
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Reset progress'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Erase everything'));
-      await tester.pumpAndSettle();
-
-      expect(ProgressStore.completed(), isEmpty);
-      expect(find.text('Settings'), findsNothing,
-          reason: 'the player should be back where they can see the reset map');
-
-      // And the level list agrees: back to level 1 open, nothing else.
-      final levels = buildInitialLevels();
-      expect(levels.first.isUnlocked, isTrue);
-      expect(levels.where((l) => l.isCompleted), isEmpty);
-    });
   });
 }

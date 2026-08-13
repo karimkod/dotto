@@ -110,13 +110,51 @@ class GameServices {
     if (_signedIn) await CloudSaveService.load();
   }
 
-  /// Open the platform's own achievements screen.
+  /// What to call the games service in text the player reads.
+  static String get platformName {
+    if (kIsWeb) return 'game services';
+    return Platform.isAndroid ? 'Play Games' : 'Game Center';
+  }
+
+  /// Make sure there is an account, asking for one if there is not.
   ///
-  /// Returns false when there is nothing to show — not signed in, or no games
-  /// platform — so the caller can keep the entry point out of the way rather
-  /// than opening nothing.
+  /// There is only one sign-in call to make: `games_services` exposes a single
+  /// [GamesServices.signIn], and both platforms do the silent attempt
+  /// themselves and escalate to their own prompt only when that fails. A
+  /// separate "try silent first" step is therefore not something this layer can
+  /// express — the platform already did it, at launch.
+  ///
+  /// What this adds over the launch attempt is a second chance: the player may
+  /// have signed in elsewhere since, or declined then and be willing now.
+  static Future<bool> ensureSignedIn() async {
+    if (!supported) return false;
+    if (_signedIn) return true;
+    try {
+      // Cheap re-check first — signing in may have happened outside the game.
+      if (await GamesServices.isSignedIn) {
+        _signedIn = true;
+        return true;
+      }
+      await GamesServices.signIn();
+      _signedIn = await GamesServices.isSignedIn;
+      // A first sign-in is also the first chance to pull a cloud save.
+      if (_signedIn) await CloudSaveService.load();
+      return _signedIn;
+    } catch (e) {
+      // Cancelled, no Play Services, no network. All the same to the caller.
+      debugPrint('Game services sign-in failed: $e');
+      return false;
+    }
+  }
+
+  /// Open the platform's own achievements screen, signing in if needed.
+  ///
+  /// Returns false when it could not be shown — no games platform, sign-in
+  /// declined, or the platform refused — so the caller can say something
+  /// useful rather than leaving a tap that appears to do nothing.
   static Future<bool> showAchievements() async {
-    if (!supported || !_signedIn) return false;
+    if (!supported) return false;
+    if (!await ensureSignedIn()) return false;
     try {
       await GamesServices.showAchievements();
       return true;

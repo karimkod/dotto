@@ -1,7 +1,7 @@
-// Settings: sound, haptics, reset, and the outward links.
+// Settings: sound, haptics, ad preferences, achievements and the outward links.
 //
 // Styled to the game rather than to Material: cream field, thick ink outlines,
-// coral for the one destructive action. The brief for this screen described
+// The brief for this screen described
 // Dotto as dark with gold accents, which is not what the app looks like — the
 // board, the menu and the icon are all cream with an ink outline (AppColors),
 // and a dark settings page would read as another app's screen.
@@ -12,7 +12,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../consent/consent_manager.dart';
-import '../progress/progress_store.dart';
 import '../services/game_services.dart';
 import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
@@ -97,13 +96,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await ConsentManager.reopenForm();
   }
 
+  /// Open the platform achievements screen, prompting for sign-in if needed.
+  ///
+  /// [GameServices.showAchievements] handles the sign-in itself, so the only
+  /// thing left here is what to say when it could not happen — named after the
+  /// service the player would actually be signing in to, rather than the
+  /// generic phrase that meant nothing on either platform.
   Future<void> _showAchievements() async {
     if (await GameServices.showAchievements()) return;
     if (!mounted) return;
-    // Not signed in, or the platform refused. Say so plainly rather than
-    // letting the tap appear to do nothing.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sign in to game services to see these.')),
+      SnackBar(
+        content: Text(
+          'Sign in to ${GameServices.platformName} to view achievements',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -114,42 +122,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       _open(_appStoreUrl);
     }
-  }
-
-  Future<void> _confirmReset() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.ink, width: 3),
-        ),
-        title: const Text('Reset progress?'),
-        content: const Text(
-          'Are you sure? This will erase all your progress and put you back '
-          'at level 1. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.coral),
-            child: const Text('Erase everything'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    ProgressStore.clear();
-    Haptics.heavy();
-    // Straight back to the menu, which re-reads progress as it is uncovered —
-    // leaving the player on a settings page after wiping their game would hide
-    // the one thing they need to see.
-    Navigator.of(context).pop();
   }
 
   @override
@@ -233,13 +205,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: 'Privacy policy',
                       onTap: () => _open(_privacyUrl),
                     ),
-                    const SizedBox(height: 24),
-                    _ActionRow(
-                      icon: Icons.delete_forever_rounded,
-                      label: 'Reset progress',
-                      destructive: true,
-                      onTap: _confirmReset,
-                    ),
                     const SizedBox(height: 32),
                     _About(version: _version),
                   ],
@@ -305,17 +270,15 @@ class _ActionRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.destructive = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
-    final colour = destructive ? AppColors.coral : AppColors.ink;
+    const colour = AppColors.ink;
     return _Tile(
       onTap: onTap,
       child: Row(
@@ -326,7 +289,7 @@ class _ActionRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: destructive ? AppColors.coral : AppColors.text,
+                color: AppColors.text,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),

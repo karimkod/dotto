@@ -4,6 +4,8 @@
 // The conditions are ordered, first match wins: web has dart.library.js_interop,
 // mobile and the VM have dart.library.io, and the stub catches anything else.
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'progress_store_stub.dart'
     if (dart.library.js_interop) 'progress_store_web.dart'
     if (dart.library.io) 'progress_store_io.dart' as impl;
@@ -37,7 +39,10 @@ class ProgressStore {
   }) =>
       impl.importProgress(levels: levels, hintsUsed: hintsUsed);
 
-  /// Erase every completed level, putting the player back to level 1. The
-  /// lifetime hint count is left alone — it is a usage statistic, not progress.
+  /// Erase every completed level. No longer reachable from the game — the
+  /// Reset progress row is gone — but kept because the cloud-save tests need a
+  /// clean slate between cases, and because a player-facing reset is the kind
+  /// of thing that comes back.
+  @visibleForTesting
   static void clear() => impl.clear();
 }

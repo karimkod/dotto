@@ -13,6 +13,30 @@ import 'package:dotto/services/game_services.dart';
 void main() {
   setUp(GameServices.resetForTest);
 
+  group('signing in', () {
+    test('the service is named for the platform the player would use', () {
+      // "Sign in to game services" meant nothing on either platform. Under
+      // test there is no Platform to ask, so the neutral fallback is what
+      // shows here; on a device it reads Play Games or Game Center.
+      expect(GameServices.platformName, isNotEmpty);
+    });
+
+    test('asking to sign in without a platform fails rather than throws', () {
+      // The Achievements row calls this on tap; a throw would be a crash on a
+      // button press.
+      expect(GameServices.ensureSignedIn(), completion(isFalse));
+    });
+
+    test('showing achievements now signs in first, and still reports back',
+        () async {
+      // showAchievements no longer needs the caller to have signed in — it
+      // does it — but must still answer false when it could not, so the
+      // caller can say something useful.
+      expect(GameServices.signedIn, isFalse);
+      await expectLater(GameServices.showAchievements(), completion(isFalse));
+    });
+  });
+
   group('safety', () {
     test('stands down where there is no games platform', () {
       // No plugin host under test; kIsWeb is checked before dart:io so the web
