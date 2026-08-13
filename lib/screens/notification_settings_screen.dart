@@ -10,8 +10,12 @@
 // screen look broken, and silently keeping a switch "on" that can post nothing
 // is a lie the player has no way to see through.
 
-import 'package:app_settings/app_settings.dart';
+import 'dart:io' show Platform;
+
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
@@ -46,12 +50,34 @@ class _NotificationSettingsScreenState
     setState(() => _permitted = ok);
   }
 
+  /// Open the OS screen where notifications can be turned back on.
+  ///
+  /// Done per-platform rather than through a package that covers both. The
+  /// obvious one, `app_settings`, ships only a Swift Package and no podspec,
+  /// and this project's iOS pipeline pins CocoaPods — which does not fail
+  /// locally on Windows or Android, only in the macOS CI job, at `pub get`,
+  /// before anything is built. Not worth that for one link.
+  ///
+  /// Both paths are best-effort: the row above already says what is wrong,
+  /// which is the part that matters. The link is a shortcut, not the message.
   Future<void> _openSystemSettings() async {
+    if (kIsWeb) return;
     try {
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      if (Platform.isAndroid) {
+        // Straight to this app's notification settings, rather than the app
+        // info page they would then have to find "Notifications" on.
+        const intent = AndroidIntent(
+          action: 'android.settings.APP_NOTIFICATION_SETTINGS',
+          arguments: {'android.provider.extra.APP_PACKAGE': 'com.karimkod.dotto'},
+        );
+        await intent.launch();
+      } else if (Platform.isIOS) {
+        // iOS has no notification-specific deep link; this lands on Dotto's own
+        // settings page, where Notifications is the first row.
+        await launchUrl(Uri.parse('app-settings:'));
+      }
     } catch (_) {
-      // Nothing to open on this platform. The row above still explains what is
-      // wrong, which is the part that matters.
+      // Nothing on the device can open it.
     }
   }
 

@@ -29,6 +29,16 @@ name: iOS Release to App Store
 #     ITMS-90068 against build 7: from Spring 2027 an upload must declare 15.0
 #     or later. That and the Xcode version below are the two knobs for when
 #     Apple next moves the floor.
+#   * Profiles are downloaded per run through the App Store Connect API — there
+#     is no profile in a secret and no Fastlane match. That means a portal
+#     change is picked up automatically, with one exception: adding a capability
+#     to the App ID invalidates existing profiles instead of updating them, and
+#     the invalid one is what the API keeps handing out until it is regenerated
+#     by hand. The verify step below exists for exactly that case.
+#   * CocoaPods is pinned, so every iOS plugin needs a podspec. A dependency
+#     that ships only a Package.swift fails here at `flutter pub get`, before
+#     anything is built — and does not fail on Windows or Linux, where the iOS
+#     tooling never runs. test/ios_plugins_test.dart runs that check locally.
 
 on:
   push:
@@ -126,6 +136,44 @@ jobs:
           issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+
+      # The profile is fetched fresh above, so it is always whatever the portal
+      # currently holds — but "current" is not the same as "correct". Enabling a
+      # capability on an App ID does NOT regenerate the profiles that reference
+      # it; Apple marks them invalid and waits for someone to press the button.
+      # A profile missing an entitlement the app declares fails in codesign,
+      # deep inside the archive step, with a message that names neither the
+      # profile nor the capability. This turns that into one line, before any
+      # build time is spent.
+      - name: Verify the profile carries the entitlements the app declares
+        run: |
+          set -uo pipefail
+          DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          DECODED=$(mktemp)
+          missing=""
+
+          # Every entitlement key the app asks for, paired with what has to be
+          # switched on in the developer portal to satisfy it.
+          check() {
+            local key="$1" capability="$2" found=0
+            for p in "$DIR"/*.mobileprovision; do
+              [ -e "$p" ] || continue
+              security cms -D -i "$p" > "$DECODED" 2>/dev/null || continue
+              grep -q "com.karimkod.dotto" "$DECODED" || continue
+              if grep -q "$key" "$DECODED"; then found=1; break; fi
+            done
+            if [ "$found" -ne 1 ]; then
+              echo "::error::Profile is missing '$key'. Enable $capability on the com.karimkod.dotto App ID, REGENERATE the 'com.karimkod.dotto AppStore' profile (enabling a capability invalidates it rather than updating it), and re-run."
+              missing="yes"
+            else
+              echo "ok: $key"
+            fi
+          }
+
+          check "aps-environment" "Push Notifications"
+          check "com.apple.developer.game-center" "Game Center"
+
+          [ -z "$missing" ] || exit 1
 
       - name: Write ExportOptions.plist
         run: |
