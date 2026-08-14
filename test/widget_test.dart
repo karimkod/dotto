@@ -31,5 +31,8 @@ void main() {
     // Everything past the frontier is drawn locked, not merely unplayable — the
     // padlock is what tells the player the climb is gated at all.
     expect(find.byIcon(Icons.lock_outline_rounded), findsWidgets);
+    // The achievements shortcut on the left rail is a trophy, whatever the
+    // sign-in state — it never wore a padlock over it.
+    expect(find.byIcon(Icons.emoji_events_rounded), findsOneWidget);
   });
 }

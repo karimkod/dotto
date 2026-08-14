@@ -12,6 +12,7 @@ import '../widgets/level_card.dart';
 import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
 import '../services/challenge_service.dart';
+import '../services/game_services.dart';
 import 'challenges_screen.dart';
 import 'game_screen.dart';
 import 'level_designer_screen.dart';
@@ -108,6 +109,23 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   bool get _hasUnplayedChallenge {
     final live = ChallengeService.currentAt(DateTime.now());
     return live != null && !ChallengeService.isCompleted(live.id);
+  }
+
+  /// Open the platform achievements screen, prompting for sign-in if needed.
+  ///
+  /// [GameServices.showAchievements] handles the sign-in itself; all that is
+  /// left here is saying why nothing opened when it could not.
+  Future<void> _showAchievements() async {
+    if (await GameServices.showAchievements()) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Sign in to ${GameServices.platformName} to view achievements',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _openChallenges() async {
@@ -320,8 +338,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     );
   }
 
-  /// Circular shortcuts sitting to the LEFT of the dashed line: a locked daily
-  /// challenge and a calendar.
+  /// Circular shortcuts sitting to the LEFT of the dashed line: achievements
+  /// and a calendar.
   Widget _buildSideIcons() {
     return Positioned.fill(
       child: Align(
@@ -329,7 +347,12 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SideIcon(icon: Icons.lock_outline_rounded, locked: true),
+            // A trophy, always: the icon names what is behind it, and does not
+            // change with whether the player happens to be signed in.
+            _SideIcon(
+              icon: Icons.emoji_events_rounded,
+              onTap: _showAchievements,
+            ),
             const SizedBox(height: 14),
             // The calendar was already here doing nothing; challenges are what
             // it always looked like it meant.
@@ -448,33 +471,26 @@ class _SideIcon extends StatelessWidget {
   const _SideIcon({
     required this.icon,
     this.onTap,
-    this.locked = false,
   });
 
   final IconData icon;
   final VoidCallback? onTap;
-  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: locked ? null : onTap,
+      onTap: onTap,
       child: Container(
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: locked ? const Color(0xFFEDEBE7) : AppColors.card,
+          color: AppColors.card,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: locked
-                ? AppColors.locked.withValues(alpha: 0.55)
-                : AppColors.ink,
-            width: 3,
-          ),
+          border: Border.all(color: AppColors.ink, width: 3),
         ),
         child: Icon(
           icon,
-          color: locked ? AppColors.locked : AppColors.ink,
+          color: AppColors.ink,
           size: 22,
         ),
       ),
