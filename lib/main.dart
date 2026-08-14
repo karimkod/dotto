@@ -27,9 +27,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ProgressStore.init();
   await SettingsStore.init();
+  // Started here, awaited below. Everything Firebase-backed needs this to have
+  // finished first — Firestore for the challenges, Messaging for the
+  // notification state — and it used to run after them, so the first challenge
+  // refresh of every launch failed with `[core/no-app]` and fell back to cache.
+  // Kicked off rather than awaited on the spot so it overlaps with the consent
+  // wait below instead of being added to it.
+  final firebaseReady = Analytics.init();
   // Blocking, but bounded: it decides which screen opens, and it caps itself at
   // eight seconds rather than letting a slow consent service delay the game.
   await ConsentManager.init();
+  await firebaseReady;
   // Cached challenges load synchronously enough to decide the menu badge; the
   // network refresh behind it is unawaited.
   await ChallengeService.init();
@@ -38,9 +46,10 @@ Future<void> main() async {
   // has one more step.
   await GameServices.init();
 
-  // Firebase can start regardless — UMP emits the Consent Mode signals itself,
-  // so there is no default state for this app to set first.
-  unawaited(Analytics.init());
+  // Firebase itself started above. Starting it before the consent form is
+  // deliberate and unchanged: UMP emits the Consent Mode signals itself, so
+  // there is no default state for this app to set first.
+  //
   // Reads preferences and reconnects whatever permission already exists. It
   // does NOT ask for permission — that happens after a first level is won, by
   // which point the player knows what they are being offered. Unawaited: no
