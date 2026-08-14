@@ -12,6 +12,15 @@
 // normally committed. What guards the project is its security rules and App
 // Check, not the secrecy of this key.
 //
+// Not secret does not mean not real. The key written here by hand was one the
+// project had never issued, and every keyed call was refused with
+// API_KEY_SERVICE_BLOCKED — which reads like a restriction problem and is not
+// one. Android and iOS carried the same string, which is itself the tell:
+// Firebase issues a separate key per platform, so one key across both means it
+// was invented rather than copied. Take these from
+// `gcloud services api-keys list --project=dotto-d817e` and get-key-string, or
+// from the console; never type one that looks plausible.
+//
 // Web is absent deliberately: Analytics.supported returns false there, so no
 // web app was registered and currentPlatform throws rather than pretending.
 
@@ -39,7 +48,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBGb5fGAyC-pRcRU6MUHb__b_vKha71HRE',
+    apiKey: 'AIzaSyBtOOpHb9gg5JrU0mrWBBqo7LqULO0Um0g',
     appId: '1:593272219819:android:c37f7e29ba239433adafee',
     messagingSenderId: '593272219819',
     projectId: 'dotto-d817e',
@@ -47,7 +56,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBGb5fGAyC-pRcRU6MUHb__b_vKha71HRE',
+    apiKey: 'AIzaSyBdhtUHhSZNwojDsQuA-ua_yJ4B61fpR98',
     appId: '1:593272219819:ios:cdef52c41ffe61d9adafee',
     messagingSenderId: '593272219819',
     projectId: 'dotto-d817e',
