@@ -103,14 +103,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// [GameServices.showAchievements] handles the sign-in itself, so the only
   /// thing left here is what to say when it could not happen — named after the
   /// service the player would actually be signing in to, rather than the
-  /// generic phrase that meant nothing on either platform.
+  /// generic phrase that meant nothing on either platform. Only when there is
+  /// no account, though: asking a player who just came back from the Play
+  /// Games account picker to sign in reads as the sign-in having failed.
   Future<void> _showAchievements() async {
     if (await GameServices.showAchievements()) return;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Sign in to ${GameServices.platformName} to view achievements',
+          GameServices.signedIn
+              ? "Couldn't open achievements. Try again."
+              : 'Sign in to ${GameServices.platformName} to view achievements',
         ),
         behavior: SnackBarBehavior.floating,
       ),

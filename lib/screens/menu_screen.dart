@@ -114,14 +114,18 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   /// Open the platform achievements screen, prompting for sign-in if needed.
   ///
   /// [GameServices.showAchievements] handles the sign-in itself; all that is
-  /// left here is saying why nothing opened when it could not.
+  /// left here is saying why nothing opened when it could not — and there are
+  /// two whys. Telling a player who has just signed in to sign in is the worse
+  /// of the two failures, so [GameServices.signedIn] picks between them.
   Future<void> _showAchievements() async {
     if (await GameServices.showAchievements()) return;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Sign in to ${GameServices.platformName} to view achievements',
+          GameServices.signedIn
+              ? "Couldn't open achievements. Try again."
+              : 'Sign in to ${GameServices.platformName} to view achievements',
         ),
         behavior: SnackBarBehavior.floating,
       ),

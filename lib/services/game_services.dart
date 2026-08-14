@@ -228,32 +228,46 @@ class GameServices {
     return true;
   }
 
+  /// How long to let a just-finished sign-in settle before asking the platform
+  /// for a screen.
+  ///
+  /// [GamesServices.signIn] resolves the moment the account is authenticated,
+  /// which on Android is while Play Games' own account picker is still coming
+  /// down and this app's activity has not resumed. Asking for the achievements
+  /// UI in that window is refused — the player signed in successfully and was
+  /// then told to sign in. A beat is enough, and it is only paid on the tap
+  /// that actually signed in.
+  static const _postSignInSettle = Duration(milliseconds: 500);
+
   /// Open the platform's own achievements screen, signing in if needed.
   ///
   /// Returns false when it could not be shown — no games platform, sign-in
   /// declined, or the platform refused — so the caller can say something
-  /// useful rather than leaving a tap that appears to do nothing.
+  /// useful rather than leaving a tap that appears to do nothing. [signedIn]
+  /// afterwards separates the two: true means there is an account and the
+  /// screen itself would not open.
   static Future<bool> showAchievements() async {
     if (!supported) return false;
-    if (!await ensureSignedIn()) return false;
-    try {
-      await GamesServices.showAchievements();
-      return true;
-    } catch (e) {
-      debugPrint('Could not show achievements: $e');
-    }
+    if (await _openAchievements()) return true;
     // The remembered sign-in can outlive the account behind it — signing out of
     // the Play Games app is done from the Play Games app, and says nothing to
     // this one. A refusal here is the only notice given, so drop the flag and
     // try once more, properly. The retry is a real sign-in, which is allowed:
     // this is a tap on Achievements, not a launch.
     _setSignedIn(false);
+    return _openAchievements();
+  }
+
+  /// One attempt: have an account, then show the screen.
+  static Future<bool> _openAchievements() async {
+    final hadAccount = _signedIn;
     if (!await ensureSignedIn()) return false;
+    if (!hadAccount) await Future<void>.delayed(_postSignInSettle);
     try {
       await GamesServices.showAchievements();
       return true;
     } catch (e) {
-      debugPrint('Could not show achievements after re-authenticating: $e');
+      debugPrint('Could not show achievements: $e');
       return false;
     }
   }

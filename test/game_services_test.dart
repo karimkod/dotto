@@ -68,6 +68,16 @@ void main() {
       expect(GameServices.signedIn, isFalse);
       await expectLater(GameServices.showAchievements(), completion(isFalse));
     });
+
+    test('a failed showAchievements leaves the reason readable', () async {
+      // The snackbar is chosen from `signedIn` after the call: no account means
+      // "sign in", an account means "could not open". Getting this wrong is the
+      // bug it exists for — a player who had just completed the Play Games
+      // account picker was told to sign in, as if it had failed.
+      await expectLater(GameServices.showAchievements(), completion(isFalse));
+      expect(GameServices.signedIn, isFalse,
+          reason: 'nothing signed in, so the sign-in message is the right one');
+    });
   });
 
   group('safety', () {
