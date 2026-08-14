@@ -12,7 +12,16 @@
           "package_name": "com.karimkod.dotto"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "593272219819-u1p38gbj7h7sd8nf49mh1uq4g8hgdr7d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.karimkod.dotto",
+            "certificate_hash": "fa1a049f14dada381e74d979261d27e8811c041a"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBtOOpHb9gg5JrU0mrWBBqo7LqULO0Um0g"
