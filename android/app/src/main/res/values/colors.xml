@@ -5,4 +5,9 @@
          cream as AppColors.background and the adaptive icon, so launch is one
          continuous colour rather than a white flash into the game. -->
     <color name="launch_background">#FAF8F5</color>
+    <!-- Dotto's gold. Android tints the notification icon and the app name in
+         the shade with this; it does not touch the body text or the shade
+         background, so it needs contrast against a light shade as much as a
+         dark one. -->
+    <color name="notification_color">#F5A623</color>
 </resources>

@@ -167,7 +167,12 @@ class NotificationService {
     final plugin = _local = FlutterLocalNotificationsPlugin();
     await plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // The same white silhouette the pushed notifications use, so a
+        // scheduled reminder and a pushed one are the same app in the status
+        // bar. It replaces '@mipmap/ic_launcher', which Android reduced to a
+        // featureless block: it keeps only the alpha, and the launcher icon is
+        // opaque corner to corner.
+        android: AndroidInitializationSettings('ic_notification'),
         // All three false: iOS permission is requested by the prompt dialog,
         // not silently at startup by the plugin.
         iOS: DarwinInitializationSettings(

@@ -49,6 +49,22 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="challenges" />
+        <!-- The status bar icon for a pushed notification. Without this Android
+             falls back to the launcher icon, and a launcher icon in the status
+             bar is the grey square everyone recognises as an app that did not
+             supply one: the system keeps only the alpha and the full-bleed
+             background becomes a solid block.
+
+             ic_notification is therefore a white silhouette on transparency,
+             not artwork — see scripts/make_notification_icon.py. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <!-- Tints that silhouette, and the app name beside it, in the shade.
+             Only applies to messages that do not carry their own colour. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
         <!-- Scheduled reminders are hours or days out, so a reboot inside that
              window would otherwise drop them silently: Android clears the alarm
              table on restart. These receivers re-register whatever was pending.
