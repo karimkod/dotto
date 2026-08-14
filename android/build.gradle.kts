@@ -1,3 +1,13 @@
+// Declared here, applied in app/build.gradle.kts. Without it google-services.json
+// is a file sitting in the source tree that nothing reads: the plugin is what
+// turns it into the string resources the native SDKs look up at startup, which
+// is why Analytics reported "Missing google_app_id" and switched itself off on
+// Android. Firebase still started, because Dart passes DefaultFirebaseOptions to
+// initializeApp — but that reaches the Dart plugins only, not the native SDKs.
+plugins {
+    id("com.google.gms.google-services") version "4.4.2" apply false
+}
+
 allprojects {
     repositories {
         google()

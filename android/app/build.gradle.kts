@@ -4,6 +4,10 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    // Reads android/app/google-services.json and generates the resources the
+    // native Firebase SDKs read at startup. Version declared in the root build
+    // file. Applied after the Android plugin, which it extends.
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
