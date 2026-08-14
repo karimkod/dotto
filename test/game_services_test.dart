@@ -45,9 +45,10 @@ void main() {
       expect(GameServices.signedIn, isFalse);
     });
 
-    test('sign-in is a no-op rather than a crash', () async {
-      // main() fires this before runApp.
-      await expectLater(GameServices.signIn(), completes);
+    test('restoring sign-in state is a no-op rather than a crash', () async {
+      // main() fires this before runApp. It reads the state and never signs in
+      // — nothing on the launch path may raise the platform's sign-in dialog.
+      await expectLater(GameServices.restoreSignInState(), completes);
       expect(GameServices.signedIn, isFalse);
     });
 

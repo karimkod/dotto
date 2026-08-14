@@ -71,7 +71,7 @@ class GameServices {
   /// True since the Play Games application id landed in AndroidManifest.xml
   /// (as `@string/app_id`, defined in res/values/games-ids.xml). That entry is
   /// what this gate was waiting for: the SDK fails as it starts without one,
-  /// natively, which the try/catch around [signIn] would not contain.
+  /// natively, which the try/catch around [ensureSignedIn] would not contain.
   ///
   /// If Android sign-in ever needs disabling in a hurry — a crash on some
   /// device, a Play Console misconfiguration — setting this back to false is
@@ -126,16 +126,20 @@ class GameServices {
   /// achievement is about one sitting.
   static int _sessionCompletions = 0;
 
-  /// Sign in quietly. No UI on failure: a player who has never opened Game
-  /// Center should not be met with an error about a feature they did not ask
-  /// for.
-  static Future<void> signIn() async {
+  /// Pick up an account that already exists, without asking for one.
+  ///
+  /// Deliberately not a sign-in: it only reads the current state. Signing in is
+  /// something the player does — from the onboarding offer or from Achievements
+  /// — and a launch that raises the platform's sign-in dialog on its own is the
+  /// bug this replaced. Reading the state still matters, because a returning
+  /// player who signed in on a previous launch should keep earning achievements
+  /// and syncing saves without being asked anything.
+  static Future<void> restoreSignInState() async {
     if (!supported) return;
     try {
-      await GamesServices.signIn();
       _signedIn = await GamesServices.isSignedIn;
     } catch (e) {
-      debugPrint('Game services sign-in failed, achievements off: $e');
+      debugPrint('Game services state unreadable, achievements off: $e');
       return;
     }
     // Saved games are per-account, so the cloud is only reachable once there is
@@ -151,14 +155,10 @@ class GameServices {
 
   /// Make sure there is an account, asking for one if there is not.
   ///
-  /// There is only one sign-in call to make: `games_services` exposes a single
-  /// [GamesServices.signIn], and both platforms do the silent attempt
-  /// themselves and escalate to their own prompt only when that fails. A
-  /// separate "try silent first" step is therefore not something this layer can
-  /// express — the platform already did it, at launch.
-  ///
-  /// What this adds over the launch attempt is a second chance: the player may
-  /// have signed in elsewhere since, or declined then and be willing now.
+  /// The only place [GamesServices.signIn] is called from, and it may show the
+  /// platform's own dialog — so every caller must be a player action: the Sign
+  /// In button on the onboarding screen, or Achievements. Nothing on the launch
+  /// path may call this.
   static Future<bool> ensureSignedIn() async {
     if (!supported) return false;
     if (_signedIn) return true;

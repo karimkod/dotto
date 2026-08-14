@@ -35,8 +35,7 @@ Future<void> main() async {
   await ChallengeService.init();
   await FreeHintService.init();
   // Loads the "already offered sign-in" flag, which decides whether onboarding
-  // has one more step. Must precede the unawaited signIn below, since that can
-  // flip signedIn and make the offer unnecessary.
+  // has one more step.
   await GameServices.init();
 
   // Firebase can start regardless — UMP emits the Consent Mode signals itself,
@@ -47,9 +46,11 @@ Future<void> main() async {
   // which point the player knows what they are being offered. Unawaited: no
   // screen depends on it, and it must not stand between launch and the game.
   unawaited(NotificationService.init());
-  // Optional and quiet: a player who never signs in should not be able to tell
-  // this exists.
-  unawaited(GameServices.signIn());
+  // Reads whether an account is already signed in — it never asks for one.
+  // Sign-in is player-initiated only: the onboarding offer, or Achievements.
+  // Launching straight into the platform's sign-in dialog is exactly what this
+  // must not do.
+  unawaited(GameServices.restoreSignInState());
   // Ads only once UMP says they are allowed. On a first EEA launch that is
   // false until the form has been answered, and the consent screen starts them.
   if (ConsentManager.canRequestAds) unawaited(AdManager.init());
