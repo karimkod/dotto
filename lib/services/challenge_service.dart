@@ -89,6 +89,13 @@ class ChallengeService {
 
   static bool isCompleted(String id) => _completed.contains(id);
 
+  /// How many challenges have ever been beaten.
+  ///
+  /// Counted from the completed set rather than by walking [_challenges]: the
+  /// Firestore fetch keeps only the last 52 weeks, so a player's older wins
+  /// would quietly stop counting once they aged out of the collection.
+  static int get completedCount => _completed.length;
+
   /// The challenge running right now, if any.
   static Challenge? currentAt(DateTime now) {
     for (final c in _challenges) {

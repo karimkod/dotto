@@ -184,6 +184,32 @@ class GameServices {
     await CloudSaveService.load();
   }
 
+  /// The player's gamer tag, or null when there is nobody to name.
+  ///
+  /// Never signs anybody in: this is decoration on a screen the player opened
+  /// to read their own numbers, so a profile screen that raised the platform's
+  /// account picker would be the same launch-time ambush [restoreSignInState]
+  /// exists to avoid.
+  ///
+  /// Given a deadline for the same reason that call is. [Player.getPlayerName]
+  /// resolves off the player event channel, which simply stays silent when the
+  /// platform has nothing to say — the future would never complete, and the
+  /// name would never arrive nor be given up on.
+  static Future<String?> playerName() async {
+    if (!supported || !_signedIn) return null;
+    try {
+      final name = await Player.getPlayerName()
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      if (name == null || name.isEmpty) return null;
+      return name;
+    } catch (e) {
+      // Not authenticated after all, or no plugin host. Either way the screen
+      // falls back to its own title.
+      debugPrint('Player name unavailable: $e');
+      return null;
+    }
+  }
+
   /// What to call the games service in text the player reads.
   static String get platformName {
     if (kIsWeb) return 'game services';

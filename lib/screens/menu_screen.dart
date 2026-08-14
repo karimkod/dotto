@@ -16,6 +16,7 @@ import '../services/game_services.dart';
 import 'challenges_screen.dart';
 import 'game_screen.dart';
 import 'level_designer_screen.dart';
+import 'profile_screen.dart';
 import 'settings_screen.dart';
 
 /// Vertical slot height per level node on the path.
@@ -139,6 +140,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     if (mounted) setState(() {});
   }
 
+  void _openProfile() {
+    // Read-only, so nothing needs picking up on the way back — but the same
+    // didPopNext that catches a finished level refreshes the menu anyway.
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+  }
+
   void _openSettings() {
     // Nothing to await: settings can reset progress, and the menu re-reads it
     // through didPopNext when this route is popped — the same path a finished
@@ -170,7 +178,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  TopBar(onSettings: _openSettings),
+                  TopBar(onProfile: _openProfile, onSettings: _openSettings),
                   const SizedBox(height: 18),
                   // Wordmark, with a dev-only "+" (new level) balanced on the
                   // right so the title stays centered.
