@@ -96,6 +96,15 @@ class GameServices {
   /// answered, and asking each launch is how an optional feature turns into a
   /// nuisance. Settings → Achievements is the way back in.
   static const _promptedKey = 'sign_in_prompted';
+
+  /// Whether the player has ever signed in successfully.
+  ///
+  /// Written from [ensureSignedIn], read back at launch. Without it, "are we
+  /// signed in?" has to be re-derived from [GamesServices.isSignedIn] on every
+  /// launch — and that probe is the one thing here that cannot be relied on
+  /// (see [restoreSignInState]), so a bad answer meant being asked to sign in
+  /// all over again.
+  static const _signedInKey = 'signed_in';
   static SharedPreferences? _prefs;
   static bool _prompted = false;
 
@@ -103,11 +112,13 @@ class GameServices {
   /// in, or where there is no games platform to sign in to.
   static bool get needsSignInPrompt => supported && !_prompted && !_signedIn;
 
-  /// Load the "already asked" flag. Call before the first frame.
+  /// Load the "already asked" and "already signed in" flags. Call before the
+  /// first frame.
   static Future<void> init() async {
     try {
       final prefs = _prefs = await SharedPreferences.getInstance();
       _prompted = prefs.getBool(_promptedKey) ?? false;
+      _signedIn = supported && (prefs.getBool(_signedInKey) ?? false);
     } catch (_) {
       // No storage. The offer may be made twice, which is a nuisance rather
       // than a fault.
@@ -117,9 +128,18 @@ class GameServices {
   /// Remember that the offer was made — whatever the player answered.
   static void markSignInPrompted() {
     _prompted = true;
+    _write(_promptedKey, true);
+  }
+
+  static void _setSignedIn(bool value) {
+    _signedIn = value;
+    _write(_signedInKey, value);
+  }
+
+  static void _write(String key, bool value) {
     final prefs = _prefs;
     if (prefs == null) return;
-    unawaited(prefs.setBool(_promptedKey, true).catchError((_) => false));
+    unawaited(prefs.setBool(key, value).catchError((_) => false));
   }
 
   /// Levels finished since launch, for Speed Runner. Not persisted — the
@@ -131,20 +151,37 @@ class GameServices {
   /// Deliberately not a sign-in: it only reads the current state. Signing in is
   /// something the player does — from the onboarding offer or from Achievements
   /// — and a launch that raises the platform's sign-in dialog on its own is the
-  /// bug this replaced. Reading the state still matters, because a returning
-  /// player who signed in on a previous launch should keep earning achievements
-  /// and syncing saves without being asked anything.
+  /// bug this replaced.
+  ///
+  /// This can only ever turn sign-in *on*, never off. [GamesServices.isSignedIn]
+  /// is not the simple query it looks like: it opens a subscription on the
+  /// player event channel and resolves on the first thing that arrives, and a
+  /// slow account fetch, a cold start where Play Games has not finished its own
+  /// automatic sign-in, or no network all arrive as "not signed in". Letting
+  /// that demote the flag written by a real sign-in is what put the player back
+  /// in front of the prompt. It is also why this is given a deadline — the
+  /// underlying future has no timeout of its own and simply never completes if
+  /// the platform stays silent.
   static Future<void> restoreSignInState() async {
-    if (!supported) return;
+    if (!supported || _signedIn) {
+      // Already known signed in from storage — the cloud pull still belongs to
+      // this launch.
+      if (_signedIn) await CloudSaveService.load();
+      return;
+    }
+    bool live;
     try {
-      _signedIn = await GamesServices.isSignedIn;
+      live = await GamesServices.isSignedIn
+          .timeout(const Duration(seconds: 10), onTimeout: () => false);
     } catch (e) {
       debugPrint('Game services state unreadable, achievements off: $e');
       return;
     }
+    if (!live) return;
+    _setSignedIn(true);
     // Saved games are per-account, so the cloud is only reachable once there is
     // an account. This is the earliest honest moment to pull it.
-    if (_signedIn) await CloudSaveService.load();
+    await CloudSaveService.load();
   }
 
   /// What to call the games service in text the player reads.
@@ -159,25 +196,36 @@ class GameServices {
   /// platform's own dialog — so every caller must be a player action: the Sign
   /// In button on the onboarding screen, or Achievements. Nothing on the launch
   /// path may call this.
+  ///
+  /// The result of [GamesServices.signIn] is the answer, and the only one worth
+  /// having. Both platforms report success only once the player is genuinely
+  /// authenticated — Play Games checks `isAuthenticated` and loads the player
+  /// before returning, Game Center returns through its authenticate handler —
+  /// and both raise a [PlatformException] otherwise.
+  ///
+  /// Asking [GamesServices.isSignedIn] afterwards to confirm it, as this used
+  /// to, could only ever make the answer worse: it is a fresh event-channel
+  /// round trip that reports "no" for a slow player fetch or a dropped network,
+  /// so a sign-in the player had just completed came back false and Achievements
+  /// asked them to sign in again. There is no re-check here now.
+  ///
+  /// No pre-check either: [GamesServices.signIn] on an already-authenticated
+  /// player returns success without showing anything, so the probe bought
+  /// nothing and could hang.
   static Future<bool> ensureSignedIn() async {
     if (!supported) return false;
     if (_signedIn) return true;
     try {
-      // Cheap re-check first — signing in may have happened outside the game.
-      if (await GamesServices.isSignedIn) {
-        _signedIn = true;
-        return true;
-      }
       await GamesServices.signIn();
-      _signedIn = await GamesServices.isSignedIn;
-      // A first sign-in is also the first chance to pull a cloud save.
-      if (_signedIn) await CloudSaveService.load();
-      return _signedIn;
     } catch (e) {
       // Cancelled, no Play Services, no network. All the same to the caller.
       debugPrint('Game services sign-in failed: $e');
       return false;
     }
+    _setSignedIn(true);
+    // A first sign-in is also the first chance to pull a cloud save.
+    await CloudSaveService.load();
+    return true;
   }
 
   /// Open the platform's own achievements screen, signing in if needed.
@@ -193,6 +241,19 @@ class GameServices {
       return true;
     } catch (e) {
       debugPrint('Could not show achievements: $e');
+    }
+    // The remembered sign-in can outlive the account behind it — signing out of
+    // the Play Games app is done from the Play Games app, and says nothing to
+    // this one. A refusal here is the only notice given, so drop the flag and
+    // try once more, properly. The retry is a real sign-in, which is allowed:
+    // this is a tap on Achievements, not a launch.
+    _setSignedIn(false);
+    if (!await ensureSignedIn()) return false;
+    try {
+      await GamesServices.showAchievements();
+      return true;
+    } catch (e) {
+      debugPrint('Could not show achievements after re-authenticating: $e');
       return false;
     }
   }

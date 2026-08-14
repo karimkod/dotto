@@ -6,6 +6,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dotto/data/levels.dart';
 import 'package:dotto/services/game_services.dart';
@@ -25,6 +26,38 @@ void main() {
       // The Achievements row calls this on tap; a throw would be a crash on a
       // button press.
       expect(GameServices.ensureSignedIn(), completion(isFalse));
+    });
+
+    test('a sign-in is remembered across launches', () async {
+      // The bug this covers: sign in, come back, tap Achievements, get asked to
+      // sign in again. Nothing was written down, so every launch re-derived the
+      // answer from a platform probe that is allowed to say "no" for a slow
+      // network — and a "no" sent the player back to the prompt.
+      SharedPreferences.setMockInitialValues({
+        'sign_in_prompted': true,
+        'signed_in': true,
+      });
+      await GameServices.init();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('signed_in'), isTrue,
+          reason: 'init must not clear what a real sign-in wrote');
+      // Reading it back is all that can be checked here: `supported` is false
+      // under test, so the flag is deliberately not honoured — a remembered
+      // sign-in from another install must not claim an account that this
+      // platform has no way to reach.
+      expect(GameServices.signedIn, isFalse);
+    });
+
+    test('restoring state cannot undo a remembered sign-in', () async {
+      // restoreSignInState runs on the launch path and may only ever turn
+      // sign-in on. It used to assign the probe's answer straight onto the
+      // flag, so a cold start before Play Games had finished its own automatic
+      // sign-in silently signed the player out.
+      SharedPreferences.setMockInitialValues({'signed_in': true});
+      await GameServices.init();
+      await expectLater(GameServices.restoreSignInState(), completes);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('signed_in'), isTrue);
     });
 
     test('showing achievements now signs in first, and still reports back',
