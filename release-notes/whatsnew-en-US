@@ -1,7 +1,4 @@
 What's New:
-• Fixed sign-in flow — no more popups on launch
-• Push notifications now working
-• Custom notification icon
-• Firebase Analytics enabled
-• Better hint and notification experience
-• Bug fixes and performance improvements
+• Fixed achievements screen not opening after sign-in
+• Improved error messages
+• Bug fixes
