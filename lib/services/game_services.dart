@@ -15,6 +15,7 @@
 // achievement is a nice thing that happens, never a thing that can fail.
 
 import 'dart:async';
+import 'dart:convert' show base64Decode;
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -62,6 +63,22 @@ const int kHintSeekerTarget = 10;
 
 /// Levels finished in one sitting before "Speed Runner" unlocks.
 const int kSpeedRunnerTarget = 5;
+
+/// The signed-in player as the platform describes them: their gamer tag and
+/// their avatar, already decoded into something [Image.memory] will take.
+///
+/// Both fields are independently optional. Play Games hands back a display name
+/// for everyone but keeps the avatar behind the player's own privacy settings,
+/// so a profile with a name and no picture is ordinary rather than a failure.
+class PlayerProfile {
+  const PlayerProfile({this.name, this.icon});
+
+  /// The gamer tag, or null when the platform gave a blank one.
+  final String? name;
+
+  /// The icon-sized profile picture, or null when there is none to show.
+  final Uint8List? icon;
+}
 
 class GameServices {
   GameServices._();
@@ -184,31 +201,90 @@ class GameServices {
     await CloudSaveService.load();
   }
 
-  /// The player's gamer tag, or null when there is nobody to name.
+  /// The signed-in player's gamer tag and avatar, or null when there is nobody
+  /// to describe.
   ///
-  /// Never signs anybody in: this is decoration on a screen the player opened
-  /// to read their own numbers, so a profile screen that raised the platform's
-  /// account picker would be the same launch-time ambush [restoreSignInState]
-  /// exists to avoid.
+  /// Never signs anybody in: this is what a screen the player opened to look at
+  /// themselves is made of, so raising the platform's account picker here would
+  /// be the same ambush [restoreSignInState] exists to avoid. The profile screen
+  /// offers a Sign In button instead, and that tap is a player action.
   ///
-  /// Given a deadline for the same reason that call is. [Player.getPlayerName]
-  /// resolves off the player event channel, which simply stays silent when the
-  /// platform has nothing to say — the future would never complete, and the
-  /// name would never arrive nor be given up on.
-  static Future<String?> playerName() async {
+  /// Read straight off the player stream rather than through
+  /// [Player.getPlayerName] and [Player.getPlayerIconImage]. Those two are
+  /// wrappers around this same stream and each opens its own subscription, so
+  /// asking for a name and a picture separately is two platform round trips for
+  /// one record that arrives with both fields already on it.
+  ///
+  /// Given a deadline for the same reason [restoreSignInState] is: the stream
+  /// simply stays silent when the platform has nothing to say, so the future
+  /// would never complete and the profile would never arrive nor be given up on.
+  static Future<PlayerProfile?> playerProfile() async {
     if (!supported || !_signedIn) return null;
+    PlayerData? player;
     try {
-      final name = await Player.getPlayerName()
+      player = await GamesServices.player.first
           .timeout(const Duration(seconds: 5), onTimeout: () => null);
-      if (name == null || name.isEmpty) return null;
-      return name;
     } catch (e) {
       // Not authenticated after all, or no plugin host. Either way the screen
-      // falls back to its own title.
-      debugPrint('Player name unavailable: $e');
+      // falls back to its own title and a placeholder avatar.
+      debugPrint('Player profile unavailable: $e');
+      return null;
+    }
+    if (player == null) return null;
+    final name = player.displayName.trim();
+    return PlayerProfile(
+      name: name.isEmpty ? null : name,
+      icon: _decodeIcon(player.iconImage),
+    );
+  }
+
+  /// The avatar, from base64 to bytes.
+  ///
+  /// Forgiving on the way in because the encoding is the platform's to choose:
+  /// the plugin already strips newlines from what Android sends, and a data URI
+  /// prefix costs nothing to tolerate. A picture that will not decode is a
+  /// missing picture, never a broken screen.
+  static Uint8List? _decodeIcon(String? encoded) {
+    if (encoded == null || encoded.isEmpty) return null;
+    var data = encoded.replaceAll(RegExp(r'\s'), '');
+    if (data.startsWith('data:')) {
+      final comma = data.indexOf(',');
+      if (comma == -1) return null;
+      data = data.substring(comma + 1);
+    }
+    try {
+      return base64Decode(data);
+    } catch (e) {
+      debugPrint('Player icon undecodable: $e');
       return null;
     }
   }
+
+  /// How many achievements the player has unlocked, out of how many the
+  /// platform knows about. Null when it will not say.
+  ///
+  /// The platform is the authority here rather than this app: an achievement
+  /// unlocked on another device, or before a reinstall, is still unlocked, and
+  /// nothing local remembers that. Deliberately not force-refreshed — the
+  /// cached answer is what the player just saw on the achievements screen, and
+  /// a stale badge count is a far smaller thing than a screen that waits on the
+  /// network to draw a number.
+  static Future<(int unlocked, int total)?> achievementProgress() async {
+    if (!supported || !_signedIn) return null;
+    try {
+      final items = await Achievements.loadAchievements(ignoreImages: true)
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
+      if (items == null || items.isEmpty) return null;
+      return (items.where((a) => a.unlocked).length, items.length);
+    } catch (e) {
+      debugPrint('Achievements unreadable: $e');
+      return null;
+    }
+  }
+
+  /// How many achievements Dotto defines, for the screens that need a
+  /// denominator before the platform has given them one.
+  static int get achievementCount => _worldAchievements.length + 3;
 
   /// What to call the games service in text the player reads.
   static String get platformName {

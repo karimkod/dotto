@@ -1,16 +1,23 @@
-// The player's own numbers: how far up the path they are, what they have spent
-// getting there, and how the weekly challenges have gone.
+// The player, as Play Games (or Game Center) knows them, with Dotto's numbers
+// underneath.
 //
-// Read-only by design. Everything on it is already stored somewhere else —
-// ProgressStore, ChallengeService, FreeHintService — and this screen owns none
-// of it. It is the one place the profile tile in the top bar has ever led.
+// The identity at the top belongs to the platform: the gamer tag and the avatar
+// are fetched, never stored here, and there is no Dotto-side profile to edit.
+// The stats below belong to the app — ProgressStore and ChallengeService own
+// them, this screen only reads. The achievement count is the one number that
+// comes from the platform, because it is the only one that survives a reinstall
+// or was earned on another device.
+//
+// Signed out, the whole top half becomes a single offer to sign in, and the
+// stats stay: they are the player's own progress either way.
+
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../data/levels.dart';
 import '../progress/progress_store.dart';
 import '../services/challenge_service.dart';
-import '../services/free_hint_service.dart';
 import '../services/game_services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
@@ -23,35 +30,52 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  /// The gamer tag, once the platform has answered. Null until then, and null
-  /// forever when nobody is signed in — the title falls back either way, so
-  /// there is nothing to wait on before the first frame.
-  String? _name;
+  /// The gamer tag and avatar, once the platform has answered. Null until then,
+  /// and null forever when nobody is signed in.
+  PlayerProfile? _profile;
+
+  /// Unlocked and total achievements as the platform counts them. Null while it
+  /// is being asked, and when it declines to say.
+  (int, int)? _achievements;
+
+  /// Whether a sign-in is in flight, so the button can say so and cannot be
+  /// tapped twice into two platform dialogs.
+  bool _signingIn = false;
 
   @override
   void initState() {
     super.initState();
-    GameServices.playerName().then((name) {
-      if (mounted && name != null) setState(() => _name = name);
+    _load();
+  }
+
+  /// Ask the platform for everything it can tell us. Each answer lands on its
+  /// own — the avatar is a round trip, the achievement list is a longer one, and
+  /// there is no reason for the first to wait on the second.
+  void _load() {
+    GameServices.playerProfile().then((profile) {
+      if (mounted && profile != null) setState(() => _profile = profile);
+    });
+    GameServices.achievementProgress().then((counts) {
+      if (mounted && counts != null) setState(() => _achievements = counts);
     });
   }
 
-  /// The world the player is currently working through: the world of the next
-  /// level to play, or the last world once every level is done.
-  int get _currentWorld {
-    final levels = buildInitialLevels();
-    final next = levels.firstWhere(
-      (l) => l.isUnlocked,
-      orElse: () => levels.last,
-    );
-    return worldOf(next.number);
+  /// The Sign In button. A player action, so this is one of the few places
+  /// allowed to raise the platform's own account picker.
+  Future<void> _signIn() async {
+    if (_signingIn) return;
+    setState(() => _signingIn = true);
+    final ok = await GameServices.ensureSignedIn();
+    if (!mounted) return;
+    setState(() => _signingIn = false);
+    // Declining is not a failure state and is not reported as one. The screen
+    // simply stays as it was, with the offer still standing.
+    if (ok) _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
     final completed = ProgressStore.completed().length;
-    final inHand = ChallengeService.hintsInHand;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,23 +85,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  _RoundIcon(
-                    icon: Icons.arrow_back_rounded,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(child: _Header(name: _name)),
-                  const SizedBox(width: 46),
-                ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _RoundIcon(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
               ),
-              const SizedBox(height: 22),
-              _ProgressBar(completed: completed, total: kLevelCount),
-              const SizedBox(height: 22),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
+                      const SizedBox(height: 6),
+                      _Avatar(icon: _profile?.icon),
+                      const SizedBox(height: 14),
+                      if (GameServices.signedIn)
+                        _GamerTag(name: _profile?.name)
+                      else
+                        _SignInOffer(busy: _signingIn, onTap: _signIn),
+                      const SizedBox(height: 24),
+                      _ProgressBar(completed: completed, total: kLevelCount),
+                      const SizedBox(height: 20),
                       _StatRow(
                         left: _StatTile(
                           icon: Icons.flag_rounded,
@@ -86,28 +114,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: '$completed / $kLevelCount',
                         ),
                         right: _StatTile(
-                          icon: Icons.map_rounded,
-                          tint: AppColors.accent,
-                          label: 'World',
-                          value: '$_currentWorld',
-                          sub: 'of 7',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _StatRow(
-                        left: _StatTile(
-                          icon: Icons.lightbulb_rounded,
+                          icon: Icons.emoji_events_rounded,
                           tint: AppColors.star,
-                          label: 'Hints used',
-                          value: '${ProgressStore.hintsUsed()}',
-                          sub: 'all time',
-                        ),
-                        right: _StatTile(
-                          icon: Icons.local_fire_department_rounded,
-                          tint: AppColors.coral,
-                          label: 'Streak',
-                          value: '${ChallengeService.streakAt(now)}',
-                          sub: 'weeks in a row',
+                          label: 'Achievements',
+                          value: _achievementValue,
+                          sub: _achievementSub,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -120,15 +131,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           sub: 'completed',
                         ),
                         right: _StatTile(
-                          icon: Icons.auto_awesome_rounded,
+                          icon: Icons.lightbulb_rounded,
                           tint: AppColors.star,
-                          label: 'Hints ready',
-                          value: '$inHand',
-                          // When the hand is empty, the useful number is not
-                          // the zero — it is when it stops being zero.
-                          sub: inHand == 0
-                              ? _nextHintLabel(now)
-                              : 'of ${ChallengeService.maxHints}',
+                          label: 'Hints used',
+                          value: '${ProgressStore.hintsUsed()}',
+                          sub: 'all time',
                         ),
                       ),
                     ],
@@ -142,22 +149,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  static String _nextHintLabel(DateTime now) {
-    final left = FreeHintService.remainingLabel(now);
-    return left.isEmpty ? 'ready soon' : 'back in $left';
+  /// The unlocked count once the platform has given one. Until then the
+  /// denominator alone is still true and still worth reading, so the tile shows
+  /// the target rather than an empty box that might never fill.
+  String get _achievementValue {
+    final counts = _achievements;
+    if (counts == null) return '${GameServices.achievementCount}';
+    return '${counts.$1} / ${counts.$2}';
+  }
+
+  String get _achievementSub {
+    if (_achievements != null) return 'unlocked';
+    return GameServices.signedIn ? 'to unlock' : 'sign in to track';
   }
 }
 
-/// The screen title: the gamer tag when there is one, with the fallback title
-/// demoted to a caption underneath so the screen still says what it is.
-class _Header extends StatelessWidget {
-  const _Header({this.name});
+/// The profile picture, or the placeholder that stands in for one.
+///
+/// Same circle either way: a signed-out player should see the shape of what
+/// they are being offered, not a gap where it will go.
+class _Avatar extends StatelessWidget {
+  const _Avatar({this.icon});
+
+  final Uint8List? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 112,
+      height: 112,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.ink, width: 4),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.35),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: icon == null
+            ? const _AvatarFallback()
+            : SizedBox.expand(
+                child: Image.memory(
+                  icon!,
+                  fit: BoxFit.cover,
+                  // Bytes that decode to nothing useful are a missing picture,
+                  // which the placeholder already covers.
+                  errorBuilder: (_, _, _) => const _AvatarFallback(),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Icon(Icons.person_rounded, color: AppColors.accent, size: 58),
+      );
+}
+
+/// The gamer tag, with what it is written underneath.
+class _GamerTag extends StatelessWidget {
+  const _GamerTag({this.name});
 
   final String? name;
 
   @override
   Widget build(BuildContext context) {
-    final title = name ?? 'Your Progress';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -166,23 +232,86 @@ class _Header extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            title,
+            // The name is a round trip behind the first frame, and the platform
+            // may withhold it altogether.
+            name ?? 'Player',
             maxLines: 1,
-            style: AppTheme.title.copyWith(fontSize: 32),
+            style: AppTheme.title.copyWith(fontSize: 30),
           ),
         ),
-        if (name != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            'YOUR PROGRESS',
-            style: TextStyle(
-              color: AppColors.text.withValues(alpha: 0.5),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-            ),
+        const SizedBox(height: 2),
+        Text(
+          GameServices.platformName.toUpperCase(),
+          style: TextStyle(
+            color: AppColors.text.withValues(alpha: 0.5),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+/// What stands where the gamer tag goes when nobody is signed in.
+class _SignInOffer extends StatelessWidget {
+  const _SignInOffer({required this.busy, required this.onTap});
+
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Not signed in',
+          style: AppTheme.title.copyWith(fontSize: 26),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Sign in to ${GameServices.platformName} for your gamer tag,\n'
+          'avatar and achievements.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.text.withValues(alpha: 0.75),
+            fontSize: 13,
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
+        BouncyButton(
+          onTap: busy ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 13),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: busy ? 0.55 : 1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.ink, width: 3),
+            ),
+            child: busy
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation(AppColors.ink),
+                    ),
+                  )
+                : const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
+        ),
       ],
     );
   }
