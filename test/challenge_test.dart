@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dotto/models/challenge.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/services/challenge_service.dart';
+import 'package:dotto/services/free_hint_service.dart';
 
 void main() {
   final start = DateTime.utc(2026, 8, 10);
@@ -273,6 +274,49 @@ void main() {
       expect(ChallengeService.spendBonusHint(), isTrue);
       expect(ChallengeService.bonusHints, 0);
       expect(ChallengeService.spendBonusHint(), isFalse);
+    });
+  });
+
+  group('the hint cap', () {
+    // The daily hint is available in all of these: resetForTest leaves
+    // FreeHintService untouched and an unspent one is the default state. So
+    // two bonus hints is already a full hand of three.
+    setUp(FreeHintService.resetForTest);
+
+    test('holds the hand at three', () {
+      ChallengeService.resetForTest(bonusHints: 2);
+      expect(ChallengeService.hintsInHand, ChallengeService.maxHints);
+    });
+
+    test('stops a challenge paying out a fourth hint', () {
+      final c = Challenge.fromMap(doc())!;
+      ChallengeService.resetForTest(bonusHints: 2);
+      expect(ChallengeService.complete(c), ChallengeReward.none,
+          reason: 'the screen must not promise a hint that was not added');
+      expect(ChallengeService.bonusHints, 2);
+      expect(ChallengeService.isCompleted(c.id), isTrue,
+          reason: 'a full hand still counts as having played the week');
+    });
+
+    test('pays out again once there is room', () {
+      final c = Challenge.fromMap(doc())!;
+      ChallengeService.resetForTest(bonusHints: 1);
+      expect(ChallengeService.complete(c), ChallengeReward.hint);
+      expect(ChallengeService.bonusHints, 2);
+    });
+
+    test('drops the daily hint from the hand once bonuses fill it', () {
+      ChallengeService.resetForTest(bonusHints: ChallengeService.maxHints);
+      expect(ChallengeService.freeHintCounts, isFalse,
+          reason: 'spending it here would cost the one that comes back');
+      expect(ChallengeService.hintsInHand, ChallengeService.maxHints);
+    });
+
+    test('shows an old oversized save as three, and spends it down', () {
+      ChallengeService.resetForTest(bonusHints: 5);
+      expect(ChallengeService.hintsInHand, ChallengeService.maxHints);
+      expect(ChallengeService.spendBonusHint(), isTrue);
+      expect(ChallengeService.bonusHints, 4);
     });
   });
 

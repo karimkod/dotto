@@ -450,9 +450,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Hints the player can spend right now: the daily one if it has come back,
-  /// plus anything won from challenges.
-  int get _hintsInHand =>
-      (FreeHintService.available ? 1 : 0) + ChallengeService.bonusHints;
+  /// plus anything won from challenges, capped at [ChallengeService.maxHints].
+  int get _hintsInHand => ChallengeService.hintsInHand;
 
   /// "14h 32m" while the daily hint regenerates, empty when one is ready.
   String get _freeHintCountdown => FreeHintService.remainingLabel(
@@ -491,7 +490,10 @@ class _GameScreenState extends State<GameScreen>
   Future<bool> _payForHint() async {
     final id = _level!.id;
     final world = worldOf(id);
-    if (FreeHintService.spend()) {
+    // The daily hint is skipped while bonus hints alone fill the cap: it is
+    // not part of the hand then, and spending it would quietly cost the player
+    // the one hint that comes back on its own.
+    if (ChallengeService.freeHintCounts && FreeHintService.spend()) {
       // Start the countdown ticking so the button stops claiming a hint it no
       // longer has.
       setState(_startHintClock);

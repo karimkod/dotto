@@ -24,6 +24,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../analytics/analytics_service.dart';
 import '../models/challenge.dart';
+import 'free_hint_service.dart';
 
 class ChallengeService {
   ChallengeService._();
@@ -57,6 +58,34 @@ class ChallengeService {
 
   /// Spare hints won from challenges. Spent before the free hint.
   static int get bonusHints => _bonusHints;
+
+  /// The most hints a player can hold at once, daily and bonus together.
+  ///
+  /// A hint is only worth taking if the player had to decide to earn it. Let
+  /// them stockpile and the interesting levels get solved by a queue of hints
+  /// nobody remembers winning.
+  static const int maxHints = 3;
+
+  /// Whether the daily hint counts toward the hand, and so whether it may be
+  /// spent.
+  ///
+  /// Bonus hints alone can fill the cap. When they do, the daily one sits and
+  /// waits rather than pushing the total to four — and, because it is spent
+  /// first everywhere else, waiting is also what stops a capped player burning
+  /// their regenerating hint while three banked ones go untouched.
+  static bool get freeHintCounts => _bonusHints < maxHints;
+
+  /// Everything the player can spend right now, capped at [maxHints].
+  ///
+  /// Clamped rather than asserted: a save from before the cap existed, or one
+  /// restored from the cloud, can hold more than three. Those still get spent
+  /// down one at a time — the badge just never claims a number the rules no
+  /// longer allow.
+  static int get hintsInHand {
+    final held = (freeHintCounts && FreeHintService.available ? 1 : 0) +
+        _bonusHints;
+    return held > maxHints ? maxHints : held;
+  }
 
   static bool isCompleted(String id) => _completed.contains(id);
 
@@ -143,14 +172,26 @@ class ChallengeService {
 
   /// Record a finished challenge and pay out its reward. Returns the reward
   /// granted, so the caller can say so on the celebration screen.
+  ///
+  /// A hint reward is dropped when the player is already holding [maxHints].
+  /// The challenge still counts as completed — the streak is about playing,
+  /// not about having room for the prize — but the celebration screen is told
+  /// [ChallengeReward.none] rather than promised a hint that was never added.
   static ChallengeReward complete(Challenge challenge) {
     // Completing twice must not pay twice.
     if (!_completed.add(challenge.id)) return ChallengeReward.none;
 
-    if (challenge.reward == ChallengeReward.hint) _bonusHints++;
+    var reward = challenge.reward;
+    if (reward == ChallengeReward.hint) {
+      if (hintsInHand >= maxHints) {
+        reward = ChallengeReward.none;
+      } else {
+        _bonusHints++;
+      }
+    }
     _persistProgress();
     Analytics.challengeCompleted(challenge.id, challenge.title);
-    return challenge.reward;
+    return reward;
   }
 
   /// Spend a bonus hint. Returns false when there are none.
