@@ -168,6 +168,42 @@ void main() {
       expect(find.text('Not now'), findsOneWidget);
     });
 
+    testWidgets('"Enable Notifications" always leaves the dialog closed',
+        (tester) async {
+      // The bug this covers: permission granted, dialog stuck on its spinner
+      // forever. requestPermission awaited the topic subscription and the token
+      // fetch before returning, and those wait on the network rather than fail
+      // without it — so the answer the dialog needed had arrived long before
+      // the call it was awaiting came back.
+      //
+      // The hang itself needs a plugin host to reproduce; what is checked here
+      // is the contract that broke — the button resolves the dialog, and the
+      // spinner does not outlive it.
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => const NotificationPromptDialog(),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      expect(find.text('Stay in the loop!'), findsOneWidget);
+
+      await tester.tap(find.text('Enable Notifications'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Stay in the loop!'), findsNothing,
+          reason: 'the dialog must dismiss itself once the OS has answered');
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'a spinner left behind is the bug');
+    });
+
     testWidgets('"Not now" closes it and reports a refusal', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: NotificationPromptDialog()),

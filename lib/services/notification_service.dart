@@ -224,12 +224,35 @@ class NotificationService {
     if (!supported) return false;
     final was = _permissionGranted;
     _permissionGranted = await _checkPermission();
-    if (_permissionGranted && !was) {
-      await _applyTopicSubscriptions();
-      await _captureToken();
-    }
+    if (_permissionGranted && !was) unawaited(_afterPermissionGranted());
     return _permissionGranted;
   }
+
+  /// What follows permission being granted, and what nothing on screen is
+  /// waiting for.
+  ///
+  /// Never await this from anything a player is looking at. Every call in here
+  /// goes to Google's servers or to APNs: [FirebaseMessaging.subscribeToTopic]
+  /// needs a registration token before it can do anything, and on iOS a token
+  /// does not exist until APNs has handed one over. With no network those do
+  /// not fail, they wait — the plugin retries on its own schedule — so a future
+  /// that never completes rather than an error a `catch` could turn into a
+  /// result. That is what left the prompt spinning after permission had already
+  /// been granted.
+  ///
+  /// The deadlines below are the second half of that: unawaited work still
+  /// should not sit pending forever, and a subscription that has not gone
+  /// through in fifteen seconds is not going through on this attempt. Both are
+  /// re-applied on the next launch by [init].
+  static Future<void> _afterPermissionGranted() async {
+    await _applyTopicSubscriptions();
+    await _captureToken();
+    await syncReminders();
+  }
+
+  /// How long any single call out to FCM or APNs is given before it is treated
+  /// as not happening this time.
+  static const _remoteDeadline = Duration(seconds: 15);
 
   static Future<bool> _checkPermission() async {
     try {
@@ -246,6 +269,14 @@ class NotificationService {
 
   /// Ask the OS. Returns whether we may post.
   ///
+  /// Returns as soon as the player has answered the system dialog, and not one
+  /// step later. The answer is the whole of what a caller is waiting for —
+  /// subscribing to topics and fetching a token are consequences of it, not
+  /// part of it, and are left to run on their own in [_afterPermissionGranted].
+  /// Waiting for them meant the prompt kept spinning after permission had been
+  /// granted, on exactly the path where there was something to wait for: a
+  /// refusal had nothing to do afterwards and so always dismissed correctly.
+  ///
   /// Marks the player as prompted either way, and before the system dialog
   /// rather than after: someone who has seen the OS prompt has been asked,
   /// whatever they answered and whatever happens next. A crash mid-dialog
@@ -256,16 +287,12 @@ class NotificationService {
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
       _permissionGranted = _granted(settings);
-      if (_permissionGranted) {
-        await _applyTopicSubscriptions();
-        await _captureToken();
-        await syncReminders();
-      }
-      return _permissionGranted;
     } catch (e) {
       debugPrint('notifications: permission request failed: $e');
       return false;
     }
+    if (_permissionGranted) unawaited(_afterPermissionGranted());
+    return _permissionGranted;
   }
 
   /// Remember that the question has been put, without asking it.
@@ -277,8 +304,12 @@ class NotificationService {
   static Future<void> _captureToken() async {
     try {
       // On iOS this returns null until APNs has handed over a device token, so
-      // a null here is "not yet", not "failed".
-      final t = await FirebaseMessaging.instance.getToken();
+      // a null here is "not yet", not "failed". It can also simply not come
+      // back — an unreachable APNs, or a build without the push capability —
+      // hence the deadline.
+      final t = await FirebaseMessaging.instance
+          .getToken()
+          .timeout(_remoteDeadline);
       if (t == null) return;
       _token = t;
       unawaited(_prefs?.setString(_tokenKey, t).catchError((_) => false));
@@ -300,11 +331,8 @@ class NotificationService {
   static Future<void> _setTopic(String topic, bool on) async {
     try {
       final fm = FirebaseMessaging.instance;
-      if (on) {
-        await fm.subscribeToTopic(topic);
-      } else {
-        await fm.unsubscribeFromTopic(topic);
-      }
+      await (on ? fm.subscribeToTopic(topic) : fm.unsubscribeFromTopic(topic))
+          .timeout(_remoteDeadline);
     } catch (e) {
       debugPrint('notifications: topic $topic failed: $e');
     }
