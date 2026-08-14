@@ -263,20 +263,41 @@ class ChallengeService {
     };
   }
 
-  static String _toolName(Object tool) {
-    final n = (tool as dynamic).name as String;
+  /// [Enum], not [Object], and deliberately so: `.name` is not a member of the
+  /// enum at all but comes from `extension EnumName on Enum` in dart:core, and
+  /// extension members are resolved statically. Reaching one through `dynamic`
+  /// therefore cannot work — the receiver really has no `name` to find at
+  /// runtime, which is what it said:
+  ///
+  ///   NoSuchMethodError: Class 'ToolType' has no instance getter 'name'
+  ///
+  /// It threw every time the cache was written, and went unseen only because
+  /// the fetch above it was failing first and never got this far. Widening
+  /// these back to Object, or casting to dynamic to make one compile, brings it
+  /// straight back.
+  static String _toolName(Enum tool) {
+    final n = tool.name;
     if (n.startsWith('oneShot')) return 'oneShot';
     if (n.startsWith('arrow')) return 'arrow';
     return n; // shield, pause, teleporter
   }
 
-  static String? _toolDir(Object tool) {
-    final n = (tool as dynamic).name as String;
+  static String? _toolDir(Enum tool) {
+    final n = tool.name;
     for (final d in ['Up', 'Down', 'Left', 'Right']) {
       if (n.endsWith(d)) return d.toLowerCase();
     }
     return null;
   }
+
+  /// Tests only: the encoder the cache writes through.
+  ///
+  /// Exposed because nothing reached it. The cache is written only after a
+  /// successful fetch, so a throw in here was invisible from outside — it cost
+  /// the offline copy and logged one line, and the fetch had its own reason to
+  /// fail first for long enough that even that line never appeared.
+  @visibleForTesting
+  static Map<String, Object?> encodeLevelForTest(Challenge c) => _encodeLevel(c);
 
   /// Tests only.
   @visibleForTesting
