@@ -16,6 +16,13 @@
 // is finished, by [NotificationPromptDialog] — a request that arrives before
 // the player knows what the app is gets refused, and on both platforms a
 // refusal is close to permanent.
+//
+// After that first ask it comes back at every tenth level — 10, 20, 30 — and
+// only for someone who has never granted it. "Not now" at level 1 is usually
+// about that moment rather than about notifications, and a player who is still
+// here at level 20 has an answer to "what would I be notified about" that they
+// did not have at level 1. Once permission is granted the question is retired
+// for good.
 
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -54,7 +61,20 @@ class NotificationService {
   NotificationService._();
 
   // ----- preference keys -----
+  /// Legacy: a bool meaning "asked, once, ever". Still read on first launch
+  /// after the update so an existing player is not asked again immediately —
+  /// it maps to having been prompted at the level-1 milestone.
   static const _promptedKey = 'notification_prompted';
+
+  /// The milestone the last prompt was shown at, so the same one cannot come
+  /// round twice.
+  static const _promptedAtKey = 'notification_prompted_at';
+
+  /// That permission was granted at some point. Separate from the live check
+  /// because the live one goes false again if the player turns notifications
+  /// off in the OS settings, and that is a decision to respect rather than an
+  /// invitation to start asking again.
+  static const _everGrantedKey = 'notification_ever_granted';
   static const _challengesKey = 'notif_challenge_alerts';
   static const _hintsKey = 'notif_hint_reminders';
   static const _streaksKey = 'notif_streak_reminders';
@@ -75,6 +95,11 @@ class NotificationService {
   /// to tell them about a puzzle.
   static const _civilHour = 18;
 
+  /// The first level that earns a prompt, and the spacing of every one after
+  /// it: 1, then 10, 20, 30, …
+  static const firstMilestone = 1;
+  static const milestoneEvery = 10;
+
   static SharedPreferences? _prefs;
   static FlutterLocalNotificationsPlugin? _local;
   static bool _tzReady = false;
@@ -84,7 +109,8 @@ class NotificationService {
   static bool _challengeAlerts = true;
   static bool _hintReminders = true;
   static bool _streakReminders = true;
-  static bool _prompted = false;
+  static int _promptedAt = 0;
+  static bool _everGranted = false;
   static bool _permissionGranted = false;
   static String? _token;
 
@@ -100,19 +126,51 @@ class NotificationService {
   static bool get hintReminders => _hintReminders;
   static bool get streakReminders => _streakReminders;
 
-  /// Whether the player has already been asked. Asked once, ever — a prompt
-  /// that returns every launch is how an app gets muted at the OS level.
-  static bool get hasBeenPrompted => _prompted;
+  /// Whether the player has been asked at all yet.
+  static bool get hasBeenPrompted => _promptedAt > 0;
+
+  /// The milestone the last prompt was shown at; 0 if never.
+  static int get promptedAtMilestone => _promptedAt;
 
   /// Whether the OS is currently letting us post anything.
   static bool get permissionGranted => _permissionGranted;
+
+  /// Whether permission has ever been granted, on any launch. Once true the
+  /// prompt is finished for good.
+  static bool get everGranted => _everGranted;
 
   /// The FCM registration token, kept for future targeted sends. Null until
   /// permission is granted and the token arrives.
   static String? get token => _token;
 
-  /// Whether the prompt should be shown after a level win.
-  static bool get shouldPrompt => supported && !_prompted && !_permissionGranted;
+  /// The milestone a player with [levelsCompleted] levels behind them has
+  /// reached — 1, then 10, 20, 30, … — or 0 before the first one.
+  ///
+  /// Derived from the count rather than counted up as wins happen, so it
+  /// survives the ways a count can jump: a cloud save merged in, a reinstall,
+  /// levels finished on another device. Whatever the route to 34 levels, the
+  /// milestone is 30, and [shouldPromptAt] will not re-ask if 30 has already
+  /// been used.
+  ///
+  /// Pure, so the cadence can be tested without a plugin host.
+  static int milestoneFor(int levelsCompleted) {
+    if (levelsCompleted >= milestoneEvery) {
+      return (levelsCompleted ~/ milestoneEvery) * milestoneEvery;
+    }
+    return levelsCompleted >= firstMilestone ? firstMilestone : 0;
+  }
+
+  /// Whether the prompt is due after a win that brings the player to
+  /// [levelsCompleted] finished levels.
+  ///
+  /// Three ways to be not due: notifications cannot be delivered here at all,
+  /// permission is already ours, or this milestone has already been asked at.
+  /// A refusal is not one of them — it only means the next milestone is where
+  /// the question comes back.
+  static bool shouldPromptAt(int levelsCompleted) {
+    if (!supported || _permissionGranted || _everGranted) return false;
+    return milestoneFor(levelsCompleted) > _promptedAt;
+  }
 
   // ---------------------------------------------------------------- lifecycle
 
@@ -124,7 +182,12 @@ class NotificationService {
   static Future<void> init() async {
     try {
       final prefs = _prefs = await SharedPreferences.getInstance();
-      _prompted = prefs.getBool(_promptedKey) ?? false;
+      // The legacy bool is the fallback, not an alternative: a player who was
+      // asked under the old one-shot rule counts as asked at milestone 1, so
+      // the update does not put the prompt back up on their next win.
+      _promptedAt = prefs.getInt(_promptedAtKey) ??
+          ((prefs.getBool(_promptedKey) ?? false) ? firstMilestone : 0);
+      _everGranted = prefs.getBool(_everGrantedKey) ?? false;
       _challengeAlerts = prefs.getBool(_challengesKey) ?? true;
       _hintReminders = prefs.getBool(_hintsKey) ?? true;
       _streakReminders = prefs.getBool(_streaksKey) ?? true;
@@ -141,6 +204,7 @@ class NotificationService {
       // rather than remembered from the day permission was granted.
       _permissionGranted = await _checkPermission();
       if (_permissionGranted) {
+        _rememberGranted();
         await _applyTopicSubscriptions();
         await syncReminders();
       }
@@ -250,6 +314,7 @@ class NotificationService {
   /// through in fifteen seconds is not going through on this attempt. Both are
   /// re-applied on the next launch by [init].
   static Future<void> _afterPermissionGranted() async {
+    _rememberGranted();
     await _applyTopicSubscriptions();
     await _captureToken();
     await syncReminders();
@@ -282,12 +347,10 @@ class NotificationService {
   /// granted, on exactly the path where there was something to wait for: a
   /// refusal had nothing to do afterwards and so always dismissed correctly.
   ///
-  /// Marks the player as prompted either way, and before the system dialog
-  /// rather than after: someone who has seen the OS prompt has been asked,
-  /// whatever they answered and whatever happens next. A crash mid-dialog
-  /// should not mean being asked again.
+  /// The caller is expected to have recorded the milestone already —
+  /// [NotificationPromptDialog.maybeShow] does it before it opens, so a crash
+  /// mid-dialog cannot turn into being asked twice at the same milestone.
   static Future<bool> requestPermission() async {
-    markPrompted();
     if (!supported) return false;
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
@@ -300,10 +363,25 @@ class NotificationService {
     return _permissionGranted;
   }
 
-  /// Remember that the question has been put, without asking it.
-  static void markPrompted() {
-    _prompted = true;
+  /// Remember that the question has been put at [milestone], without asking it.
+  ///
+  /// Only ever moves forward. A stray call with an older milestone must not
+  /// reopen one that has already been used.
+  static void markPromptedAt(int milestone) {
+    if (milestone <= _promptedAt) return;
+    _promptedAt = milestone;
+    _write(_promptedAtKey, milestone);
+    // Kept in step for anything still reading the old key — an older build the
+    // player rolls back to, mainly.
     _write(_promptedKey, true);
+  }
+
+  /// Retire the prompt for good. Called the moment permission is seen to be
+  /// granted, from wherever that is noticed.
+  static void _rememberGranted() {
+    if (_everGranted) return;
+    _everGranted = true;
+    _write(_everGrantedKey, true);
   }
 
   static Future<void> _captureToken() async {
@@ -370,9 +448,11 @@ class NotificationService {
     final prefs = _prefs;
     if (prefs == null) return;
     unawaited(
-      (value is bool
-              ? prefs.setBool(key, value)
-              : prefs.setString(key, value as String))
+      switch (value) {
+        final bool b => prefs.setBool(key, b),
+        final int i => prefs.setInt(key, i),
+        _ => prefs.setString(key, value as String),
+      }
           .catchError((_) => false),
     );
   }
@@ -594,16 +674,18 @@ class NotificationService {
   /// Tests only.
   @visibleForTesting
   static void resetForTest({
-    bool prompted = false,
+    int promptedAt = 0,
     bool permissionGranted = false,
+    bool everGranted = false,
     bool challengeAlerts = true,
     bool hintReminders = true,
     bool streakReminders = true,
   }) {
     _prefs = null;
     _local = null;
-    _prompted = prompted;
+    _promptedAt = promptedAt;
     _permissionGranted = permissionGranted;
+    _everGranted = everGranted;
     _challengeAlerts = challengeAlerts;
     _hintReminders = hintReminders;
     _streakReminders = streakReminders;

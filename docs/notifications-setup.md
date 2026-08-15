@@ -20,10 +20,21 @@ app, which almost nobody visits. So the real decision is made by
 `NotificationPromptDialog`, shown **after the first level is won**, when the
 player has just been given something and knows what the app is.
 
-The pre-prompt appears once ever, whichever way it is answered.
-`markPrompted()` is called *before* the system dialog, not after: anything can
-interrupt a dialog, and none of it should turn "asked once" into "asked every
-launch".
+It comes back at **level 10, 20, 30, …** for anyone who has not granted
+permission yet — "not now" at level 1 is usually about that moment rather than
+about notifications, and by level 20 the player can actually answer "what would
+I be notified about". The moment permission is granted the prompt is retired for
+good, including across a later revoke in the OS settings: that is a decision to
+respect, not an invitation to start asking again.
+
+Each milestone is asked at once. `markPromptedAt(milestone)` is called *before*
+the system dialog, not after: anything can interrupt a dialog, and none of it
+should turn one ask into an ask on every win until the next milestone. The
+milestone is derived from the completed-level *count*
+(`NotificationService.milestoneFor`), so a count that jumps — a cloud save
+merged in, a reinstall — lands on the milestone it passed rather than skipping
+the question entirely. Pre-existing installs carry the old `notification_prompted`
+bool forward as "asked at milestone 1".
 
 Analytics: `notification_prompt_shown`, `notification_prompt_accepted`,
 `notification_prompt_denied`. Accepted/denied are reported against **the OS

@@ -7,7 +7,8 @@
 //
 // Shown after a first level is finished rather than at launch: at launch the
 // player has no idea what Dotto is, and "can we notify you" from a stranger is
-// a no. It appears once, ever, whichever way it is answered.
+// a no. After that it returns at level 10, 20, 30 — once per milestone, and
+// never again once permission has been granted.
 
 import 'package:flutter/material.dart';
 
@@ -19,16 +20,23 @@ import '../widgets/bouncy_button.dart';
 class NotificationPromptDialog extends StatefulWidget {
   const NotificationPromptDialog({super.key});
 
-  /// Show it, if it should be shown. Returns whether permission was granted.
+  /// Show it, if it is due at [levelsCompleted] finished levels. Returns
+  /// whether permission was granted.
   ///
   /// The gate lives here rather than at the call site so there is one answer to
   /// "should this appear", and a second call site later cannot get it wrong.
-  static Future<bool> maybeShow(BuildContext context) async {
-    if (!NotificationService.shouldPrompt) return false;
-    // Marked before the dialog rather than after. Anything can interrupt a
-    // dialog — a call, a force-quit, the app being backgrounded and killed —
-    // and none of it should turn "asked once" into "asked every time".
-    NotificationService.markPrompted();
+  static Future<bool> maybeShow(
+    BuildContext context, {
+    required int levelsCompleted,
+  }) async {
+    if (!NotificationService.shouldPromptAt(levelsCompleted)) return false;
+    // The milestone is banked before the dialog rather than after. Anything can
+    // interrupt a dialog — a call, a force-quit, the app being backgrounded and
+    // killed — and none of it should turn one ask into an ask on every win
+    // until the next milestone.
+    NotificationService.markPromptedAt(
+      NotificationService.milestoneFor(levelsCompleted),
+    );
     Analytics.notificationPromptShown();
     final granted = await showDialog<bool>(
       context: context,

@@ -115,33 +115,87 @@ void main() {
     });
   });
 
-  group('the player is asked once, ever', () {
+  group('the prompt milestones', () {
+    test('are level 1, then every tenth', () {
+      expect(NotificationService.milestoneFor(1), 1);
+      expect(NotificationService.milestoneFor(10), 10);
+      expect(NotificationService.milestoneFor(20), 20);
+      expect(NotificationService.milestoneFor(30), 30);
+    });
+
+    test('and nothing before the first level is finished', () {
+      expect(NotificationService.milestoneFor(0), 0);
+    });
+
+    test('with the levels in between belonging to the last one passed', () {
+      // 2..9 are all still the level-1 milestone, 11..19 all still level 10.
+      // That is what stops a win in between counting as a fresh ask.
+      expect(NotificationService.milestoneFor(2), 1);
+      expect(NotificationService.milestoneFor(9), 1);
+      expect(NotificationService.milestoneFor(11), 10);
+      expect(NotificationService.milestoneFor(19), 10);
+      expect(NotificationService.milestoneFor(34), 30);
+    });
+
+    test('so a count that jumps lands on the milestone it passed', () {
+      // A cloud save merged in can take someone from 5 levels to 34 without a
+      // win in between. The milestone is 30, not "no milestone".
+      NotificationService.resetForTest(promptedAt: 1);
+      expect(NotificationService.milestoneFor(34), 30);
+    });
+  });
+
+  group('the player is asked again until they say yes', () {
+    // `supported` is false under test, so `shouldPromptAt` is false throughout
+    // here; the cadence itself is checked through `milestoneFor` and
+    // `promptedAtMilestone`, which do not need a plugin host.
     test('not at all where notifications cannot be delivered', () {
       // Under test `supported` is false, which is also the web case.
       expect(NotificationService.supported, isFalse);
-      expect(NotificationService.shouldPrompt, isFalse);
+      expect(NotificationService.shouldPromptAt(1), isFalse);
+      expect(NotificationService.shouldPromptAt(10), isFalse);
     });
 
-    test('and not again once they have been asked', () {
-      NotificationService.resetForTest(prompted: true);
-      expect(NotificationService.hasBeenPrompted, isTrue);
-      expect(NotificationService.shouldPrompt, isFalse);
+    test('and never again once permission has been granted', () {
+      // The one terminal state. Every milestone after it is silent.
+      NotificationService.resetForTest(promptedAt: 1, everGranted: true);
+      expect(NotificationService.shouldPromptAt(10), isFalse);
+      expect(NotificationService.shouldPromptAt(100), isFalse);
     });
 
-    test('marking is what closes it, not the answer', () {
-      // Someone who declines is as asked as someone who accepts. Re-prompting
-      // the decliners is how an app gets muted at the OS level.
+    test('marking is per milestone, and only ever moves forward', () {
       NotificationService.resetForTest();
-      NotificationService.markPrompted();
+      NotificationService.markPromptedAt(1);
       expect(NotificationService.hasBeenPrompted, isTrue);
+      expect(NotificationService.promptedAtMilestone, 1);
+
+      NotificationService.markPromptedAt(10);
+      expect(NotificationService.promptedAtMilestone, 10);
+
+      // A stray older milestone must not reopen one already used.
+      NotificationService.markPromptedAt(1);
+      expect(NotificationService.promptedAtMilestone, 10);
+    });
+
+    test('a refusal only defers the question to the next milestone', () {
+      // Declining is not marked any differently from accepting — the milestone
+      // is banked either way, and the next one is what brings it back.
+      NotificationService.resetForTest();
+      NotificationService.markPromptedAt(NotificationService.milestoneFor(1));
+      expect(NotificationService.milestoneFor(5),
+          NotificationService.promptedAtMilestone,
+          reason: 'a win at level 5 is still the milestone already asked at');
+      expect(NotificationService.milestoneFor(10),
+          greaterThan(NotificationService.promptedAtMilestone));
     });
 
     testWidgets('maybeShow puts up nothing when it is not due', (tester) async {
-      NotificationService.resetForTest(prompted: true);
+      NotificationService.resetForTest(promptedAt: 1);
       await tester.pumpWidget(MaterialApp(
         home: Builder(
           builder: (context) => TextButton(
-            onPressed: () => NotificationPromptDialog.maybeShow(context),
+            onPressed: () =>
+                NotificationPromptDialog.maybeShow(context, levelsCompleted: 3),
             child: const Text('go'),
           ),
         ),

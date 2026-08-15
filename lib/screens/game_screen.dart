@@ -1707,22 +1707,29 @@ class _GameScreenState extends State<GameScreen>
     _maybeAskAboutNotifications();
   }
 
-  /// Ask about notifications, once, on the back of a win.
+  /// Ask about notifications on the back of a win, at the milestones that are
+  /// due.
   ///
   /// A win is the one moment the player has just been given something and is
   /// pleased about it, which is the only honest time to ask for a permission.
   /// It waits for the celebration to arrive first — a dialog on top of the win
   /// animation would cover the thing being celebrated.
   ///
-  /// [NotificationPromptDialog.maybeShow] decides whether it is due, so this is
-  /// safe to call on every win; only the first one gets a dialog.
+  /// [NotificationPromptDialog.maybeShow] decides whether it is due — level 1,
+  /// then every tenth, and nothing at all once permission has been granted —
+  /// so this is safe to call on every win.
   void _maybeAskAboutNotifications() {
     // The designer's own test runs are not a player finishing a level.
     if (widget.levelOverride != null) return;
-    if (!NotificationService.shouldPrompt) return;
+    // Read after [ProgressStore.markCompleted] in [_win], so the level just
+    // finished is part of the count.
+    final completed = ProgressStore.completed().length;
+    if (!NotificationService.shouldPromptAt(completed)) return;
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
-      unawaited(NotificationPromptDialog.maybeShow(context));
+      unawaited(
+        NotificationPromptDialog.maybeShow(context, levelsCompleted: completed),
+      );
     });
   }
 
