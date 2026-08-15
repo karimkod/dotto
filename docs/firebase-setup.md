@@ -36,21 +36,16 @@ listing and the AdMob app ids are tied to.
 Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
 ```
 
-Passing options explicitly means Firebase starts from the Dart values, so it
-does **not** depend on the Google Services Gradle plugin having processed
-`google-services.json`. That plugin is not installed, and consequently
-`google-services.json` is currently inert on Android — it is kept because it is
-the canonical record of the project, because `flutterfire configure` would
-regenerate it, and because dropping the explicit options later would make it
-load-bearing immediately.
+Passing options explicitly means the Dart side starts from the Dart values. It
+does not cover the native SDKs, which read `google-services.json` directly — so
+the Google Services Gradle plugin is installed as well, declared in
+`android/build.gradle.kts` and applied in `android/app/build.gradle.kts`. Both
+Gradle plugins the project uses are wired the same way:
 
-If you do add the plugin (needed for Crashlytics, Messaging, and anything else
-that reads the native config directly):
-
-1. `android/settings.gradle.kts`, in the `plugins` block:
-   `id("com.google.gms.google-services") version "4.4.2" apply false`
-2. `android/app/build.gradle.kts`, in its `plugins` block:
-   `id("com.google.gms.google-services")`
+| Plugin | Declared (`android/build.gradle.kts`) | Applied (`android/app/build.gradle.kts`) |
+|---|---|---|
+| `com.google.gms.google-services` | `version "4.4.2" apply false` | yes |
+| `com.google.firebase.crashlytics` | `version "3.0.6" apply false` | yes, after Google Services |
 
 On iOS, `GoogleService-Info.plist` must also be a member of the Runner target in
 Xcode. Being present on disk is not enough — the file has to be in "Copy Bundle

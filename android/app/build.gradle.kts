@@ -8,6 +8,10 @@ plugins {
     // native Firebase SDKs read at startup. Version declared in the root build
     // file. Applied after the Android plugin, which it extends.
     id("com.google.gms.google-services")
+    // Uploads the R8 mapping file and stamps each build with an id, so release
+    // stack traces come back deobfuscated. Must come after the Google Services
+    // plugin, which is what supplies the project it uploads to.
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }

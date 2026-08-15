@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 
 import 'ads/ad_manager.dart';
 import 'analytics/analytics_service.dart';
+import 'analytics/crash_reporting.dart';
 import 'app_routes.dart';
 import 'consent/consent_manager.dart';
 import 'progress/progress_store.dart';
@@ -20,7 +22,23 @@ import 'services/notification_service.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
 
-Future<void> main() async {
+void main() {
+  // Crash handling first, before a single line of startup can throw. Flutter
+  // loses an uncaught error down one of three routes and these are all three —
+  // framework errors, errors that reach the engine with no Dart handler left,
+  // and anything else raised inside the zone. See lib/analytics/crash_
+  // reporting.dart; the handlers are safe to install now and report only once
+  // Crashlytics has actually started, a few lines into _start.
+  FlutterError.onError = CrashReporting.onFlutterError;
+  PlatformDispatcher.instance.onError = CrashReporting.onPlatformError;
+  // The zone has to contain the binding as well as runApp: a binding created
+  // outside the zone that guards it is a mismatch Flutter warns about, and the
+  // guard would not cover initialisation — which is exactly the part of startup
+  // with no UI to fail visibly.
+  runZonedGuarded(_start, CrashReporting.onZoneError);
+}
+
+Future<void> _start() async {
   // Progress is read synchronously while the level list builds, so it has to be
   // in memory before the first frame — otherwise a returning player sees a
   // fully locked map for an instant.
@@ -38,6 +56,10 @@ Future<void> main() async {
   // eight seconds rather than letting a slow consent service delay the game.
   await ConsentManager.init();
   await firebaseReady;
+  // Attaches to the app Firebase just created, so it has to follow that await
+  // rather than sit beside it. Unawaited would race the rest of startup — the
+  // window this closes is precisely the one where a launch crash happens.
+  await CrashReporting.init();
   // Cached challenges load synchronously enough to decide the menu badge; the
   // network refresh behind it is unawaited.
   await ChallengeService.init();

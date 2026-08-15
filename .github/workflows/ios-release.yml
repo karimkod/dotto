@@ -225,6 +225,42 @@ jobs:
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
 
+      # Crashlytics symbolicates iOS crashes from dSYMs, and it can only get
+      # them from here. `uploadSymbols` in ExportOptions above sends them to
+      # Apple, which is a different destination entirely — App Store Connect
+      # does not forward them to Firebase.
+      #
+      # This is only about *native* frames: an error caught by the Dart handlers
+      # in lib/analytics/crash_reporting.dart arrives with a readable stack
+      # already, and the build is not run with --obfuscate. What needs symbols
+      # is a crash in the engine or in a plugin's native code.
+      #
+      # Deliberately last and deliberately non-fatal. The build is on TestFlight
+      # by the time this runs, so a Firebase outage or a moved pod path costs
+      # readable native stack traces for one release — it must not turn a
+      # delivered build into a failed workflow. The step still goes yellow and
+      # says why.
+      - name: Upload dSYMs to Crashlytics
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          UPLOAD=ios/Pods/FirebaseCrashlytics/upload-symbols
+          if [ ! -x "$UPLOAD" ]; then
+            echo "::warning::$UPLOAD not found — pod layout changed? Skipping."
+            exit 1
+          fi
+          # `flutter build ipa` archives first, and the archive is where the
+          # dSYMs live: Runner's, the engine's, and one per framework.
+          DSYMS=$(find build/ios/archive -type d -name '*.dSYM' -print)
+          if [ -z "$DSYMS" ]; then
+            echo "::warning::No dSYMs under build/ios/archive. DEBUG_INFORMATION_FORMAT should be dwarf-with-dsym on Release."
+            exit 1
+          fi
+          echo "$DSYMS" | while read -r dsym; do
+            echo "Uploading $dsym"
+            "$UPLOAD" -gsp ios/Runner/GoogleService-Info.plist -p ios "$dsym"
+          done
+
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
