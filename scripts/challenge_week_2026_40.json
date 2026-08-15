@@ -1,0 +1,33 @@
+{
+  "id": "week_2026_40",
+  "title": "Clockwork",
+  "description": "The turning arrow guards the only way down, and it points somewhere new each time you touch it. Touch it four times.",
+  "startDate": "2026-09-28T00:00:00.000Z",
+  "endDate": "2026-10-05T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [5, 2],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [],
+    "teleporters": [],
+    "rotatingArrows": [
+      { "direction": "left", "position": [2, 2] }
+    ],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "up", "position": [3, 1] },
+      { "type": "arrow", "direction": "up", "position": [3, 3] },
+      { "type": "arrow", "direction": "right", "position": [5, 4] }
+    ],
+    "pieces": [
+      { "type": "arrow", "direction": "down", "count": 1 },
+      { "type": "arrow", "direction": "right", "count": 1 },
+      { "type": "arrow", "direction": "left", "count": 1 }
+    ]
+  }
+}

@@ -45,10 +45,29 @@ class Challenge {
   /// beat this week.
   bool hasEndedAt(DateTime now) => !now.isBefore(endDate);
 
+  /// Published, but its week has not come round yet.
+  ///
+  /// Weeks are authored in batches and published all at once, so most of the
+  /// collection is normally in this state — which is why it needs a name.
+  bool hasNotStartedAt(DateTime now) => now.isBefore(startDate);
+
   /// Whole days left, floored, never negative.
   int daysRemainingAt(DateTime now) {
     final left = endDate.difference(now);
     return left.isNegative ? 0 : left.inDays;
+  }
+
+  /// Calendar days until it opens, never negative.
+  ///
+  /// Counted between dates rather than as elapsed time, because it is read out
+  /// as "today" and "tomorrow": a window opening at midnight on the 17th is two
+  /// sleeps away on the 15th, however few hours short of 48 that happens to be.
+  /// The half-day offset absorbs a daylight-saving shift in between.
+  int daysUntilAt(DateTime now) {
+    final opens = DateTime(startDate.year, startDate.month, startDate.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final days = (opens.difference(today).inHours + 12) ~/ 24;
+    return days < 0 ? 0 : days;
   }
 
   /// Build from a Firestore document, or null if it cannot be trusted.
@@ -107,11 +126,31 @@ class Challenge {
   static int? _int(Object? v) =>
       v is num ? v.toInt() : (v is String ? int.tryParse(v) : null);
 
-  /// A `[row, col]` pair, checked against the board.
+  /// A cell, written either as a `[row, col]` pair or as a `{"r": …, "c": …}`
+  /// map, checked against the board.
+  ///
+  /// The map form is not a convenience. Firestore refuses to store an array
+  /// inside an array — `400 Nested arrays are not allowed` — and `walls`,
+  /// `gaps`, `destroyers` and `teleporters` are all lists of pairs, so as bare
+  /// `[row, col]` they could not be written at all and had to be left empty.
+  /// A map *is* storable inside an array, so the same cell written as
+  /// `{"r": 1, "c": 2}` goes through and the static terrain comes back.
+  ///
+  /// `[row, col]` is still read everywhere, and is still what `start`, `goal`
+  /// and each `position` use: those sit directly inside a map rather than
+  /// inside an array, so Firestore never objected to them.
   static Pos? _pos(Object? v, int size) {
-    if (v is! List || v.length < 2) return null;
-    final r = _int(v[0]);
-    final c = _int(v[1]);
+    int? r;
+    int? c;
+    if (v is List && v.length >= 2) {
+      r = _int(v[0]);
+      c = _int(v[1]);
+    } else if (v is Map) {
+      // `row`/`col` as well as `r`/`c`: the document is written by hand, and
+      // both spellings are the obvious one to reach for.
+      r = _int(v['r'] ?? v['row']);
+      c = _int(v['c'] ?? v['col']);
+    }
     if (r == null || c == null) return null;
     if (r < 0 || c < 0 || r >= size || c >= size) return null;
     return Pos(r, c);
@@ -195,12 +234,22 @@ class Challenge {
       if (at != null && d != null) rotating.add(RotatingArrow(at.r, at.c, d));
     }
 
-    // Teleporters arrive as pairs of cells: [[r,c],[r,c]].
+    // Teleporters arrive as pairs of cells: `[[r,c],[r,c]]`, or — since that
+    // shape is doubly nested and so doubly unstorable — as
+    // `{"a": {"r":…,"c":…}, "b": {…}}`. See [_pos].
     final teleporters = <TeleporterPair>[];
     for (final e in (map['teleporters'] as List?) ?? const []) {
-      if (e is! List || e.length < 2) continue;
-      final a = _pos(e[0], size);
-      final b = _pos(e[1], size);
+      final Pos? a;
+      final Pos? b;
+      if (e is List && e.length >= 2) {
+        a = _pos(e[0], size);
+        b = _pos(e[1], size);
+      } else if (e is Map) {
+        a = _pos(e['a'], size);
+        b = _pos(e['b'], size);
+      } else {
+        continue;
+      }
       if (a != null && b != null) teleporters.add(TeleporterPair(a, b));
     }
 

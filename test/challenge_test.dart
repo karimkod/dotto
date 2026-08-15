@@ -122,6 +122,129 @@ void main() {
         doc(level: {'rows': 5, 'cols': 5, 'start': [0, 0], 'goal': [5, 0]}));
   });
 
+  group('positions written as maps', () {
+    // Firestore will not store an array inside an array, so every list of
+    // `[row, col]` pairs — walls, gaps, destroyers, teleporters — had to be
+    // empty and the static terrain was unavailable. A map inside an array is
+    // storable, so the same cell is now also read as `{"r": …, "c": …}`. Both
+    // shapes have to keep working: the JSON on disk and the offline cache use
+    // one, the published document the other.
+
+    test('walls, gaps and destroyers read as {r, c}', () {
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'walls': [
+          {'r': 1, 'c': 1},
+          {'r': 2, 'c': 2},
+        ],
+        'gaps': [
+          {'r': 3, 'c': 3},
+        ],
+        'destroyers': [
+          {'r': 3, 'c': 1},
+        ],
+      };
+      final c = Challenge.fromMap(doc(level: level));
+      expect(c, isNotNull);
+      expect(c!.level.walls, hasLength(2));
+      expect(c.level.walls.first.r, 1);
+      expect(c.level.walls.first.c, 1);
+      expect(c.level.gaps, hasLength(1));
+      expect(c.level.destroyers, hasLength(1));
+    });
+
+    test('row and col are read as well as r and c', () {
+      // The document is written by hand; both spellings are the obvious one.
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'walls': [
+          {'row': 1, 'col': 2},
+        ],
+      };
+      final walls = Challenge.fromMap(doc(level: level))!.level.walls;
+      expect(walls, hasLength(1));
+      expect(walls.first.r, 1);
+      expect(walls.first.c, 2);
+    });
+
+    test('the two shapes mix inside one list', () {
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'walls': [
+          [1, 1],
+          {'r': 2, 'c': 2},
+        ],
+      };
+      expect(Challenge.fromMap(doc(level: level))!.level.walls, hasLength(2));
+    });
+
+    test('a map position off the board is dropped like a pair would be', () {
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'walls': [
+          {'r': 1, 'c': 1},
+          {'r': 99, 'c': 0},
+          {'r': 2}, // half a coordinate is no coordinate
+          {'r': 'two', 'c': 'two'},
+        ],
+      };
+      expect(Challenge.fromMap(doc(level: level))!.level.walls, hasLength(1));
+    });
+
+    test('a teleporter pair reads as {a, b} as well as [[r,c],[r,c]]', () {
+      // Doubly nested, so the pair needs a map of its own around it too.
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'teleporters': [
+          {
+            'a': {'r': 0, 'c': 4},
+            'b': {'r': 4, 'c': 0},
+          },
+          [
+            [1, 0],
+            [1, 4]
+          ],
+        ],
+      };
+      final pairs = Challenge.fromMap(doc(level: level))!.level.teleporters;
+      expect(pairs, hasLength(2));
+      expect(pairs.first.a.r, 0);
+      expect(pairs.first.a.c, 4);
+      expect(pairs.first.b.r, 4);
+      expect(pairs.first.b.c, 0);
+    });
+
+    test('half a teleporter pair is no teleporter', () {
+      final level = {
+        'rows': 5,
+        'cols': 5,
+        'start': [0, 0],
+        'goal': [4, 4],
+        'teleporters': [
+          {
+            'a': {'r': 0, 'c': 4},
+          },
+        ],
+      };
+      expect(Challenge.fromMap(doc(level: level))!.level.teleporters, isEmpty);
+    });
+  });
+
   group('bad entries are skipped without losing the good ones', () {
     test('a wall off the board does not take the level with it', () {
       final level = {
@@ -170,6 +293,69 @@ void main() {
     test('counts days remaining, never below zero', () {
       expect(c.daysRemainingAt(DateTime.utc(2026, 8, 15)), 2);
       expect(c.daysRemainingAt(DateTime.utc(2026, 9, 1)), 0);
+    });
+
+    test('knows it has not started yet', () {
+      expect(c.hasNotStartedAt(DateTime.utc(2026, 8, 9)), isTrue);
+      expect(c.hasNotStartedAt(start), isFalse, reason: 'the start is inclusive');
+      expect(c.hasNotStartedAt(DateTime.utc(2026, 8, 12)), isFalse);
+    });
+
+    test('counts the days until it opens by the calendar', () {
+      // "tomorrow" is a date, not 24 hours: a window opening at midnight on the
+      // 10th is tomorrow all through the 9th, however late in the day it is.
+      expect(c.daysUntilAt(DateTime.utc(2026, 8, 9, 23)), 1);
+      expect(c.daysUntilAt(DateTime.utc(2026, 8, 8, 1)), 2);
+      expect(c.daysUntilAt(DateTime.utc(2026, 8, 10, 0, 1)), 0);
+      expect(c.daysUntilAt(DateTime.utc(2026, 9, 1)), 0,
+          reason: 'never negative once it has been and gone');
+    });
+  });
+
+  group('a published week that has not arrived', () {
+    // The bug this exists for: weeks are authored and published in batches, so
+    // most of the collection is normally scheduled rather than live. The screen
+    // had only "this week" and "past", so ten of eleven real documents rendered
+    // as nothing at all and the publish looked like it had failed.
+    Challenge week(String id, int offsetDays) => Challenge(
+          id: id,
+          title: id,
+          description: '',
+          startDate: DateTime.utc(2026, 8, 17).add(Duration(days: offsetDays)),
+          endDate: DateTime.utc(2026, 8, 24).add(Duration(days: offsetDays)),
+          reward: ChallengeReward.none,
+          level: Challenge.fromMap(doc())!.level,
+        );
+
+    // Newest first, as the service holds them.
+    final scheduled = [week('w36', 14), week('w35', 7), week('w34', 0)];
+    final now = DateTime.utc(2026, 8, 15);
+
+    test('is listed as upcoming, soonest first', () {
+      ChallengeService.resetForTest(challenges: scheduled);
+      expect(ChallengeService.upcomingAt(now).map((c) => c.id),
+          ['w34', 'w35', 'w36']);
+    });
+
+    test('is neither live nor past', () {
+      ChallengeService.resetForTest(challenges: scheduled);
+      expect(ChallengeService.currentAt(now), isNull);
+      expect(ChallengeService.pastAt(now), isEmpty);
+    });
+
+    test('drops out of the list the moment its week opens', () {
+      ChallengeService.resetForTest(challenges: scheduled);
+      final opened = DateTime.utc(2026, 8, 17);
+      expect(ChallengeService.upcomingAt(opened).map((c) => c.id),
+          ['w35', 'w36']);
+      expect(ChallengeService.currentAt(opened)?.id, 'w34');
+    });
+
+    test('does not count toward the streak', () {
+      // Nothing scheduled has been playable, so completing nothing is not a
+      // broken run.
+      ChallengeService.resetForTest(challenges: scheduled);
+      expect(ChallengeService.streakAt(now), 0);
     });
   });
 

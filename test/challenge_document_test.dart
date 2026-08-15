@@ -22,6 +22,57 @@ void main() {
   final file = File('scripts/challenge_week_2026_33.json');
   final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
 
+  group('every published document', () {
+    // docs/challenges-setup.md promises that a challenge JSON under scripts/
+    // gets checked. It only held for the one file named above until the weeks
+    // 34-43 batch was authored, which is exactly when it stopped being true —
+    // so the promise is kept here by sweeping the directory instead.
+    final files = Directory('scripts')
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.uri.pathSegments.last.startsWith('challenge_week_'))
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+    test('there are documents to check', () => expect(files, isNotEmpty));
+
+    for (final f in files) {
+      final name = f.uri.pathSegments.last;
+      final doc = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+
+      test('$name parses and can be beaten', () {
+        final c = Challenge.fromMap(doc);
+        expect(c, isNotNull,
+            reason: 'the app would drop $name and show no challenge');
+        // The one failure the parser cannot catch, and the worst of them: an
+        // unsolvable board renders fine and wastes the whole week.
+        expect(isSolvable(c!.level), isTrue,
+            reason: '$name cannot be won by any placement');
+      });
+    }
+
+    test('the windows run consecutively, newest last', () {
+      final windows = [
+        for (final f in files)
+          Challenge.fromMap(
+              jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)!
+      ];
+      for (final c in windows) {
+        expect(c.endDate.isAfter(c.startDate), isTrue, reason: c.id);
+      }
+      // Weeks 34 onward were authored as one unbroken run, so each window has
+      // to start where the last ended or a week goes by with nothing live.
+      // week_2026_33 was published earlier on a Wednesday cadence and overlaps
+      // week_2026_34 by two days, so the chain is checked from 34.
+      final chained = windows.where((c) => c.id.compareTo('week_2026_34') >= 0)
+          .toList();
+      for (var i = 1; i < chained.length; i++) {
+        expect(chained[i].startDate, chained[i - 1].endDate,
+            reason: '${chained[i].id} does not abut ${chained[i - 1].id}');
+      }
+    });
+  });
+
   test('the document parses at all', () {
     // fromMap returns null for anything it cannot trust, so this doubles as
     // the check that every field name matches what the app reads.
@@ -102,6 +153,52 @@ void main() {
       expect(pieces[2], containsPair('direction', isNull));
       expect(pieces[3], containsPair('type', 'pause'));
       expect(pieces[4], containsPair('type', 'teleporter'));
+    });
+
+    test('static terrain survives the round trip', () {
+      // The encoder writes cells as `{r, c}` now, matching what Firestore can
+      // actually store. Week 33 has no terrain at all, so the round trip below
+      // would pass just as well with the encoder writing nonsense here.
+      final original = Challenge(
+        id: 'week_terrain',
+        title: 'Terrain',
+        description: '',
+        startDate: DateTime.utc(2026, 1, 1),
+        endDate: DateTime.utc(2026, 1, 8),
+        reward: ChallengeReward.none,
+        level: const LevelData(
+          id: -1,
+          size: 5,
+          title: 'Terrain',
+          tip: '',
+          start: StartSpec(0, 0, Direction.right),
+          exit: Pos(4, 4),
+          toolkit: [],
+          walls: [Pos(1, 1), Pos(2, 2)],
+          gaps: [Pos(3, 3)],
+          destroyers: [Pos(3, 1)],
+          teleporters: [TeleporterPair(Pos(0, 4), Pos(4, 0))],
+        ),
+      );
+
+      final cached = jsonDecode(jsonEncode(
+        ChallengeService.encodeLevelForTest(original),
+      )) as Map<String, dynamic>;
+      final reparsed = Challenge.fromMap({
+        'id': original.id,
+        'startDate': original.startDate.millisecondsSinceEpoch,
+        'endDate': original.endDate.millisecondsSinceEpoch,
+        'level': cached,
+      })!.level;
+
+      expect(reparsed.walls, hasLength(2));
+      expect(reparsed.walls.first.r, 1);
+      expect(reparsed.walls.first.c, 1);
+      expect(reparsed.gaps, hasLength(1));
+      expect(reparsed.destroyers, hasLength(1));
+      expect(reparsed.teleporters, hasLength(1));
+      expect(reparsed.teleporters.first.a.c, 4);
+      expect(reparsed.teleporters.first.b.r, 4);
     });
 
     test('the published document reads back the same after a round trip', () {

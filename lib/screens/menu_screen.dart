@@ -46,6 +46,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     super.initState();
     _levels = buildInitialLevels();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+    // The challenge fetch is started unawaited at launch, so the badge below is
+    // decided from an empty list on a cold start and nothing here would ask
+    // again. Waiting on it costs one rebuild and is the difference between the
+    // badge appearing and the player never learning there is a challenge.
+    ChallengeService.pending.then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override

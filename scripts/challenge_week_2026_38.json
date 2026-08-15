@@ -1,0 +1,31 @@
+{
+  "id": "week_2026_38",
+  "title": "Night Patrol",
+  "description": "Four rows will carry you west. A guard walks the second column, and only one of them is safe.",
+  "startDate": "2026-09-14T00:00:00.000Z",
+  "endDate": "2026-09-21T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [5, 0],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [2, 2], "horizontal": false, "dir": 1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "down", "position": [0, 5] },
+      { "type": "arrow", "direction": "up", "position": [5, 3] }
+    ],
+    "pieces": [
+      { "type": "arrow", "direction": "left", "count": 1 },
+      { "type": "arrow", "direction": "down", "count": 1 }
+    ]
+  }
+}

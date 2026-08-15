@@ -1,0 +1,31 @@
+{
+  "id": "week_2026_39",
+  "title": "Hold Still",
+  "description": "One shaft down, two guarded floors to cross, and no way to steer around either. The only thing you can change is when you arrive.",
+  "startDate": "2026-09-21T00:00:00.000Z",
+  "endDate": "2026-09-28T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 7,
+    "cols": 7,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [6, 6],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [2, 5], "horizontal": true, "dir": -1 },
+      { "position": [4, 6], "horizontal": true, "dir": -1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "down", "position": [0, 1] }
+    ],
+    "pieces": [
+      { "type": "arrow", "direction": "right", "count": 1 },
+      { "type": "pause", "count": 2 }
+    ]
+  }
+}

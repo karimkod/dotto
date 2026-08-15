@@ -1,8 +1,14 @@
-// The challenges list: this week's, then everything that has been.
+// The challenges list: this week's, what is coming, then everything that has
+// been.
 //
 // Styled like the rest of the game — cream field, white cards, thick ink
 // outlines — rather than as a feed. Challenges are boards, so they should look
 // like the boards do.
+//
+// "Coming up" is not decoration. Weeks are authored and published in batches,
+// so most of the collection is normally scheduled rather than live: with only
+// live and past sections, ten of the eleven published documents rendered as
+// nothing at all, and the screen looked like the publish had failed.
 
 import 'package:flutter/material.dart';
 
@@ -57,6 +63,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final current = ChallengeService.currentAt(now);
+    final upcoming = ChallengeService.upcomingAt(now);
     final past = ChallengeService.pastAt(now);
     final streak = ChallengeService.streakAt(now);
 
@@ -106,7 +113,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               ],
               const SizedBox(height: 20),
               Expanded(
-                child: current == null && past.isEmpty
+                child: current == null && upcoming.isEmpty && past.isEmpty
                     ? const _Empty()
                     : ListView(
                         children: [
@@ -115,17 +122,28 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             _ChallengeCard(
                               challenge: current,
                               now: now,
-                              isCurrent: true,
+                              when: _When.current,
                               onPlay: () => _play(current),
                             ),
                             const SizedBox(height: 24),
                           ],
+                          if (upcoming.isNotEmpty) const _Heading('Coming up'),
+                          for (final c in upcoming) ...[
+                            _ChallengeCard(
+                              challenge: c,
+                              now: now,
+                              when: _When.upcoming,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (upcoming.isNotEmpty && past.isNotEmpty)
+                            const SizedBox(height: 12),
                           if (past.isNotEmpty) const _Heading('Past'),
                           for (final c in past) ...[
                             _ChallengeCard(
                               challenge: c,
                               now: now,
-                              isCurrent: false,
+                              when: _When.past,
                               onPlay: () => _play(c),
                             ),
                             const SizedBox(height: 12),
@@ -160,18 +178,25 @@ class _Heading extends StatelessWidget {
       );
 }
 
+/// Where a challenge sits relative to today, which is the only thing that
+/// changes about its card.
+enum _When { current, upcoming, past }
+
 class _ChallengeCard extends StatelessWidget {
   const _ChallengeCard({
     required this.challenge,
     required this.now,
-    required this.isCurrent,
-    required this.onPlay,
+    required this.when,
+    this.onPlay,
   });
 
   final Challenge challenge;
   final DateTime now;
-  final bool isCurrent;
-  final VoidCallback onPlay;
+  final _When when;
+
+  /// Null for a challenge whose week has not come round: the board exists and
+  /// is already on the device, but opening it early would spend the week.
+  final VoidCallback? onPlay;
 
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -187,12 +212,11 @@ class _ChallengeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final done = ChallengeService.isCompleted(challenge.id);
-    final days = challenge.daysRemainingAt(now);
+    final isCurrent = when == _When.current;
+    final isUpcoming = when == _When.upcoming;
+    final onPlay = this.onPlay;
 
-    return BouncyButton(
-      onTap: onPlay,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
+    final card = Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.card,
@@ -221,6 +245,11 @@ class _ChallengeCard extends StatelessWidget {
                 if (done)
                   const Icon(Icons.check_circle_rounded,
                       color: Color(0xFF4CAF50), size: 26)
+                else if (isUpcoming)
+                  // A lock, not a play button: the card is here to say the
+                  // week is coming, and tapping it does nothing.
+                  Icon(Icons.lock_clock_rounded,
+                      color: AppColors.text.withValues(alpha: 0.4), size: 26)
                 else
                   const Icon(Icons.play_circle_fill_rounded,
                       color: AppColors.coral, size: 26),
@@ -260,7 +289,7 @@ class _ChallengeCard extends StatelessWidget {
             if (isCurrent && !done) ...[
               const SizedBox(height: 8),
               Text(
-                days == 0 ? 'Ends today' : '$days day${days == 1 ? '' : 's'} left',
+                _endsIn(),
                 style: const TextStyle(
                   color: AppColors.coral,
                   fontSize: 13,
@@ -268,10 +297,43 @@ class _ChallengeCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (isUpcoming) ...[
+              const SizedBox(height: 8),
+              Text(
+                _startsIn(),
+                style: TextStyle(
+                  color: AppColors.text.withValues(alpha: 0.55),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ],
         ),
-      ),
+      );
+
+    // Nothing to tap on a week that has not arrived, so it gets no bounce and
+    // no press feedback — a button that does nothing is worse than no button.
+    if (onPlay == null) return Opacity(opacity: 0.7, child: card);
+    return BouncyButton(
+      onTap: onPlay,
+      borderRadius: BorderRadius.circular(18),
+      child: card,
     );
+  }
+
+  String _endsIn() {
+    final days = challenge.daysRemainingAt(now);
+    return days == 0 ? 'Ends today' : '$days day${days == 1 ? '' : 's'} left';
+  }
+
+  String _startsIn() {
+    final days = challenge.daysUntilAt(now);
+    return switch (days) {
+      0 => 'Starts today',
+      1 => 'Starts tomorrow',
+      _ => 'Starts in $days days',
+    };
   }
 }
 

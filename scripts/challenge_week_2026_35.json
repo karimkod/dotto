@@ -1,0 +1,33 @@
+{
+  "id": "week_2026_35",
+  "title": "Live Wire",
+  "description": "The pinned arrows drop you into a corridor with a guard walking straight at you. There is no room to dodge.",
+  "startDate": "2026-08-24T00:00:00.000Z",
+  "endDate": "2026-08-31T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [5, 0],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [2, 2], "horizontal": true, "dir": -1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "down", "position": [0, 5] },
+      { "type": "arrow", "direction": "left", "position": [2, 5] },
+      { "type": "arrow", "direction": "right", "position": [4, 0] }
+    ],
+    "pieces": [
+      { "type": "shield", "count": 1 },
+      { "type": "arrow", "direction": "down", "count": 1 },
+      { "type": "arrow", "direction": "left", "count": 1 }
+    ]
+  }
+}

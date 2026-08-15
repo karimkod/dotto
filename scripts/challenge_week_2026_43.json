@@ -1,0 +1,37 @@
+{
+  "id": "week_2026_43",
+  "title": "Grand Tour",
+  "description": "A turning arrow guards the only shaft down, and the row you must cross and recross four times has a guard walking it. Nothing you hold is spare.",
+  "startDate": "2026-10-19T00:00:00.000Z",
+  "endDate": "2026-10-26T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 7,
+    "cols": 7,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [6, 2],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [2, 2], "horizontal": true, "dir": -1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [
+      { "direction": "left", "position": [2, 2] }
+    ],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "up", "position": [4, 1] },
+      { "type": "arrow", "direction": "up", "position": [4, 3] },
+      { "type": "arrow", "direction": "up", "position": [6, 1] },
+      { "type": "arrow", "direction": "up", "position": [6, 3] }
+    ],
+    "pieces": [
+      { "type": "shield", "count": 1 },
+      { "type": "arrow", "direction": "down", "count": 1 },
+      { "type": "arrow", "direction": "right", "count": 1 },
+      { "type": "arrow", "direction": "left", "count": 1 }
+    ]
+  }
+}

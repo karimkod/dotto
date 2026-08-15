@@ -44,6 +44,16 @@ class ChallengeService {
   static List<Challenge> _challenges = const [];
   static Set<String> _completed = {};
   static int _bonusHints = 0;
+  static Future<void>? _pending;
+
+  /// The launch fetch, for a screen built before it lands.
+  ///
+  /// [init] starts the refresh unawaited, so the menu decides its badge from
+  /// an empty list and then has no reason to build again — on a cold start the
+  /// badge would appear only when something else happened to rebuild the
+  /// screen. Completes immediately when there is nothing in flight, and never
+  /// with an error: [refresh] swallows its own.
+  static Future<void> get pending => _pending ?? Future.value();
 
   /// Firestore is mobile-only here, for the same reason as the rest of the
   /// Firebase work: no web config, and no plugin host under test.
@@ -108,6 +118,16 @@ class ChallengeService {
   static List<Challenge> pastAt(DateTime now) =>
       [for (final c in _challenges) if (c.hasEndedAt(now)) c];
 
+  /// Challenges published ahead of their week, soonest first.
+  ///
+  /// Weeks are authored and published in batches, so on any given day most of
+  /// the collection is in this state — ten of the eleven documents, when the
+  /// screen was first pointed at a real one. Everything else here is
+  /// newest-first, which is the wrong end for something that has not happened:
+  /// next week should read before the week after it.
+  static List<Challenge> upcomingAt(DateTime now) =>
+      [for (final c in _challenges.reversed) if (c.hasNotStartedAt(now)) c];
+
   /// Consecutive completed challenges, counting back from the most recent one
   /// that has ended.
   ///
@@ -142,7 +162,7 @@ class ChallengeService {
     final fetchedAt = _prefs?.getInt(_fetchedAtKey) ?? 0;
     final age = DateTime.now().millisecondsSinceEpoch - fetchedAt;
     if (_challenges.isEmpty || age > _cacheTtl.inMilliseconds) {
-      unawaited(refresh());
+      unawaited(_pending = refresh());
     }
   }
 
@@ -170,6 +190,12 @@ class ChallengeService {
           debugPrint('Challenge ${doc.id} could not be parsed; skipping');
         }
       }
+      // docs/challenges-setup.md tells anyone whose challenge did not appear to
+      // check the log first. Until this line there was nothing in it to check:
+      // a successful fetch was silent, so "no challenges" looked identical
+      // whether the query returned nothing or the parser dropped everything.
+      debugPrint('Challenges: ${snap.docs.length} fetched, '
+          '${parsed.length} parsed');
       _challenges = parsed;
       await _writeCache();
     } catch (e) {
@@ -265,8 +291,12 @@ class ChallengeService {
   /// the same parser the network path uses. One parser, one set of rules.
   static Map<String, Object?> _encodeLevel(Challenge c) {
     final l = c.level;
-    List<List<int>> pos(Iterable<dynamic> items) =>
-        [for (final p in items) [p.r as int, p.c as int]];
+    // `{r, c}` rather than `[r, c]`: the same shape the published document now
+    // uses, because Firestore will not store an array inside an array. The
+    // cache has no such limit, but writing one shape everywhere means the
+    // offline copy exercises the parser exactly as the network path does.
+    List<Map<String, int>> pos(Iterable<dynamic> items) =>
+        [for (final p in items) {'r': p.r as int, 'c': p.c as int}];
     return {
       'rows': l.size,
       'cols': l.size,
@@ -295,10 +325,10 @@ class ChallengeService {
       ],
       'teleporters': [
         for (final t in l.teleporters)
-          [
-            [t.a.r, t.a.c],
-            [t.b.r, t.b.c]
-          ]
+          {
+            'a': {'r': t.a.r, 'c': t.a.c},
+            'b': {'r': t.b.r, 'c': t.b.c},
+          }
       ],
       'patrols': [
         for (final m in l.movers)

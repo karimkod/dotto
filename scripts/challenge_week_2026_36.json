@@ -1,0 +1,34 @@
+{
+  "id": "week_2026_36",
+  "title": "Detour",
+  "description": "A picket of pinned arrows throws you back up the board. There is one row it does not cover.",
+  "startDate": "2026-08-31T00:00:00.000Z",
+  "endDate": "2026-09-07T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [5, 0],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "down", "position": [0, 5] },
+      { "type": "arrow", "direction": "up", "position": [1, 2] },
+      { "type": "arrow", "direction": "up", "position": [2, 2] },
+      { "type": "arrow", "direction": "up", "position": [4, 2] },
+      { "type": "arrow", "direction": "up", "position": [5, 2] },
+      { "type": "arrow", "direction": "right", "position": [4, 0] },
+      { "type": "arrow", "direction": "right", "position": [2, 1] }
+    ],
+    "pieces": [
+      { "type": "arrow", "direction": "left", "count": 2 },
+      { "type": "arrow", "direction": "down", "count": 1 }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "week_2026_37",
+  "title": "Warp Line",
+  "description": "The top row is a closed circuit. A pair of portals is the only way out of it.",
+  "startDate": "2026-09-07T00:00:00.000Z",
+  "endDate": "2026-09-14T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [5, 5],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "left", "position": [0, 5] },
+      { "type": "arrow", "direction": "up", "position": [1, 3] },
+      { "type": "arrow", "direction": "up", "position": [2, 3] },
+      { "type": "arrow", "direction": "up", "position": [3, 3] },
+      { "type": "arrow", "direction": "up", "position": [4, 3] },
+      { "type": "arrow", "direction": "up", "position": [5, 3] },
+      { "type": "arrow", "direction": "up", "position": [5, 4] }
+    ],
+    "pieces": [
+      { "type": "teleporter", "count": 2 },
+      { "type": "arrow", "direction": "down", "count": 1 }
+    ]
+  }
+}

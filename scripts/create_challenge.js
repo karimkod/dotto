@@ -100,6 +100,33 @@ function toFields(obj) {
   );
 }
 
+/// A cell as `{r, c}` rather than `[r, c]`.
+///
+/// Firestore rejects an array directly inside an array — `400 Nested arrays are
+/// not allowed` — and `walls`, `gaps`, `destroyers` and `teleporters` are all
+/// lists of pairs, which is why they had to be left empty. A map inside an
+/// array is fine, so the pairs are converted here on the way out: the document
+/// on disk keeps the readable `[row, col]` shape the solver and the test suite
+/// read, and the app accepts both.
+function cell(p) {
+  return Array.isArray(p) ? { r: p[0], c: p[1] } : p;
+}
+
+/** The document, with every position that sits inside an array made storable. */
+function storable(doc) {
+  if (!doc.level) return doc;
+  const level = { ...doc.level };
+  for (const key of ['walls', 'gaps', 'destroyers']) {
+    if (Array.isArray(level[key])) level[key] = level[key].map(cell);
+  }
+  if (Array.isArray(level.teleporters)) {
+    // Doubly nested, so it needs a map of its own around the pair.
+    level.teleporters = level.teleporters.map((t) =>
+      Array.isArray(t) ? { a: cell(t[0]), b: cell(t[1]) } : t);
+  }
+  return { ...doc, level };
+}
+
 async function main() {
   const file = process.argv[2] || 'scripts/challenge_week_2026_33.json';
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -117,7 +144,7 @@ async function main() {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ fields: toFields(doc) }),
+    body: JSON.stringify({ fields: toFields(storable(doc)) }),
   });
 
   if (!res.ok) {

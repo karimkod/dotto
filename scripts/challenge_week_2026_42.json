@@ -1,0 +1,31 @@
+{
+  "id": "week_2026_42",
+  "title": "One and Done",
+  "description": "The single-use arrow fires once and vanishes. Send yourself down for the shield, then straight back through the cell it used to occupy.",
+  "startDate": "2026-10-12T00:00:00.000Z",
+  "endDate": "2026-10-19T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 6,
+    "cols": 6,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [0, 5],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [0, 2], "horizontal": true, "dir": 1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "shield", "position": [3, 2] }
+    ],
+    "pieces": [
+      { "type": "oneShot", "direction": "down", "count": 1 },
+      { "type": "arrow", "direction": "left", "count": 1 },
+      { "type": "arrow", "direction": "up", "count": 1 }
+    ]
+  }
+}

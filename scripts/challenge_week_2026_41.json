@@ -1,0 +1,32 @@
+{
+  "id": "week_2026_41",
+  "title": "Crossfire",
+  "description": "The top row is a closed circuit. Every way down crosses two guarded floors, and your shield is good for exactly one hit.",
+  "startDate": "2026-10-05T00:00:00.000Z",
+  "endDate": "2026-10-12T00:00:00.000Z",
+  "reward": "hint",
+  "level": {
+    "rows": 7,
+    "cols": 7,
+    "start": [0, 0],
+    "startDir": "right",
+    "goal": [6, 6],
+    "walls": [],
+    "gaps": [],
+    "destroyers": [],
+    "patrols": [
+      { "position": [2, 2], "horizontal": true, "dir": -1 },
+      { "position": [4, 2], "horizontal": true, "dir": -1 }
+    ],
+    "teleporters": [],
+    "rotatingArrows": [],
+    "forcedPieces": [
+      { "type": "arrow", "direction": "left", "position": [0, 6] }
+    ],
+    "pieces": [
+      { "type": "shield", "count": 1 },
+      { "type": "arrow", "direction": "down", "count": 1 },
+      { "type": "arrow", "direction": "right", "count": 1 }
+    ]
+  }
+}
