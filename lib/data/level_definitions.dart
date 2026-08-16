@@ -1143,15 +1143,15 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 52 — Detour: the dot climbs column 5 straight into a mine, and a wall seals
-  // off the rest of the board. The portal is the only way out — drop the
+  // 52 — Mine Bypass: the dot climbs column 5 straight into a mine, and a wall
+  // seals off the rest of the board. The portal is the only way out — drop the
   // entrance below the mine, the exit in the open left region — then an arrow
   // runs the dot along the top to the exit, which is sealed from below so the
   // turn is required.
   52: LevelData(
     id: 52,
     size: 6,
-    title: 'Detour',
+    title: 'Mine Bypass',
     tip: 'The mine blocks the climb. Portal past it, then arrow along the top.',
     start: StartSpec(5, 5, Direction.up),
     exit: Pos(0, 0),

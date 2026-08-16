@@ -66,19 +66,19 @@ List<Level> buildInitialLevels() {
   Difficulty difficultyFor(int number) {
     // World 1.
     if (number <= 4) return Difficulty.easy;
-    if (number <= 7) return Difficulty.medium;
-    if (number <= 15) return Difficulty.hard; // 8–15 (incl. exams 11–15)
+    if (number <= 9) return Difficulty.medium; // 5–9 (8–9 are gentle detours)
+    if (number <= 15) return Difficulty.hard; // 10–15 (incl. exams 11–15)
     // World 2 (16–20).
     if (number <= 16) return Difficulty.easy;
     if (number <= 17) return Difficulty.medium;
     if (number <= 20) return Difficulty.hard;
     // World 3 (21–30).
-    if (number <= 23) return Difficulty.easy; // learn shields (21–23)
-    if (number <= 27) return Difficulty.medium; // path clearing (24–27)
+    if (number <= 22) return Difficulty.easy; // learn shields (21–22)
+    if (number <= 27) return Difficulty.medium; // shield puzzles + clearing (23–27)
     if (number <= 30) return Difficulty.hard; // challenge + finale (28–30)
     // World 4 (31–50).
-    if (number <= 34) return Difficulty.easy; // moving destroyers intro (31–34)
-    if (number <= 44) return Difficulty.medium; // chains + timing (35–44)
+    if (number <= 33) return Difficulty.easy; // moving destroyers intro (31–33)
+    if (number <= 44) return Difficulty.medium; // chains + timing (34–44)
     if (number <= 50) return Difficulty.hard; // 45–46 timing, 47–50 exams
     // World 5 (51–60): teleporters, ramping again from the start.
     if (number <= 52) return Difficulty.easy; // learn the portal (51–52)
@@ -88,7 +88,10 @@ List<Level> buildInitialLevels() {
     if (number <= 63) return Difficulty.medium; // gentler re-entry (61–63)
     if (number <= 70) return Difficulty.hard; // 64–70 the trials proper
     // World 6 (71–91): rotating arrows, teaching the new piece from scratch.
-    if (number <= 74) return Difficulty.easy; // learn the dial (71–74)
+    // 73 breaks the run: patrols, mines and a portal on top of the dial, so it
+    // is flagged medium even though the levels either side of it stay easy.
+    if (number == 73) return Difficulty.medium;
+    if (number <= 74) return Difficulty.easy; // learn the dial (71–72, 74)
     if (number <= 82) return Difficulty.medium; // combine mechanics (75–82)
     if (number <= 91) return Difficulty.hard; // 83–91 the clockwork exams
     // World 7 (92–110): one-shot arrows, teaching the new piece from scratch.
