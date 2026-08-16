@@ -409,7 +409,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// How long a player can sit doing nothing before the hint button starts
   /// asking for attention.
-  static const _idleBeforeWiggle = Duration(seconds: 30);
+  static const _idleBeforeWiggle = Duration(seconds: 10);
 
   /// The next placement to give away: the first one in the recorded solution
   /// the player has not made, and still has the piece for.

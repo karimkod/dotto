@@ -176,7 +176,7 @@ void main() {
     expect(tilt(), lessThan(0.001), reason: 'it should sit still at first');
 
     // Past the idle threshold, with no placement in between.
-    await tester.pump(const Duration(seconds: 31));
+    await tester.pump(const Duration(seconds: 11));
     await tester.pump(const Duration(milliseconds: 120));
     expect(tilt(), greaterThan(0.001),
         reason: 'a stuck player should get a nudge');
