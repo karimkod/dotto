@@ -18,10 +18,15 @@ import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key, required this.onDone});
+  const SignInScreen({super.key, required this.onDone, this.signIn});
 
   /// Called once the player has answered, either way.
   final VoidCallback onDone;
+
+  /// How to sign in. Defaults to [GameServices.ensureSignedIn], and injectable
+  /// only so a test can hold an attempt open: that is the state this screen has
+  /// to stay usable in, and there is no other way to put it in it.
+  final Future<bool> Function()? signIn;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -31,6 +36,16 @@ class _SignInScreenState extends State<SignInScreen>
     with SingleTickerProviderStateMixin {
   bool _busy = false;
   bool _signedIn = false;
+
+  /// Whether the player has been sent on, so it happens once.
+  ///
+  /// Both answers can now be given during one attempt, because "Maybe later"
+  /// stays live while a sign-in is in flight. So a skip and a sign-in that lands
+  /// just after it can both reach [SignInScreen.onDone], and `mounted` does not
+  /// separate them: onDone replaces the route, and the replaced route is not
+  /// disposed until its transition finishes. Calling onDone twice pushes the menu
+  /// twice.
+  bool _answered = false;
 
   /// The tick that confirms it worked. Short — it is an acknowledgement, not a
   /// celebration.
@@ -51,6 +66,13 @@ class _SignInScreenState extends State<SignInScreen>
     super.dispose();
   }
 
+  /// Sends the player on, at most once.
+  void _finish() {
+    if (_answered) return;
+    _answered = true;
+    widget.onDone();
+  }
+
   Future<void> _signIn() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -59,8 +81,11 @@ class _SignInScreenState extends State<SignInScreen>
     // force-quit mid-prompt should not mean being asked again next launch.
     GameServices.markSignInPrompted();
 
-    final ok = await GameServices.ensureSignedIn();
-    if (!mounted) return;
+    final ok = await (widget.signIn ?? GameServices.ensureSignedIn)();
+    // `_answered` as well as `mounted`: they may have given up and skipped while
+    // this was still running, and that answer stands. Reporting this one too
+    // would put two outcomes in the funnel for one screen.
+    if (!mounted || _answered) return;
 
     if (!ok) {
       // Declined, cancelled, or unavailable. Straight on without comment.
@@ -68,7 +93,7 @@ class _SignInScreenState extends State<SignInScreen>
       // ever did not, a button left spinning is a dead end.
       setState(() => _busy = false);
       Analytics.onboardingSignInFailed();
-      widget.onDone();
+      _finish();
       return;
     }
     Analytics.onboardingSignInAccepted();
@@ -78,13 +103,14 @@ class _SignInScreenState extends State<SignInScreen>
     });
     await _tick.forward();
     await Future.delayed(const Duration(milliseconds: 350));
-    if (mounted) widget.onDone();
+    if (mounted) _finish();
   }
 
   void _skip() {
+    if (_answered) return;
     Analytics.onboardingSignInSkipped();
     GameServices.markSignInPrompted();
-    widget.onDone();
+    _finish();
   }
 
   @override
@@ -169,8 +195,15 @@ class _SignInScreenState extends State<SignInScreen>
                     ),
                   ),
                   const SizedBox(height: 14),
+                  // Live during an attempt, unlike the Sign In button above.
+                  // This is the only way off a screen that cannot be popped, so
+                  // disabling it while waiting on the platform made a sign-in
+                  // that never answered into a trap with no exit but a
+                  // force-quit. GameServices.ensureSignedIn now has a deadline
+                  // too, but 90 seconds of a dead spinner is still a screen
+                  // worth being able to leave.
                   TextButton(
-                    onPressed: _busy ? null : _skip,
+                    onPressed: _skip,
                     child: Text(
                       'Maybe later',
                       style: TextStyle(

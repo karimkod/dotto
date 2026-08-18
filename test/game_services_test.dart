@@ -28,6 +28,32 @@ void main() {
       expect(GameServices.ensureSignedIn(), completion(isFalse));
     });
 
+    test('a sign-in cannot wait forever', () async {
+      // GamesServices.signIn hands its result to GameKit's authenticate handler
+      // and answers nothing until that handler fires. Where there is no account
+      // to authenticate against it is not called at all, so the future stays
+      // pending for the life of the process: seen on a simulator with no Apple
+      // Account, and reachable on a device with Game Center off under Screen
+      // Time. It was the one platform call in this file with no deadline, and
+      // the onboarding spinner was what waited on it.
+      //
+      // The wait itself cannot be exercised here: `supported` is false under
+      // test, so ensureSignedIn returns before reaching the platform. The
+      // deadline's existence and its bounds are what can be pinned.
+      expect(GameServices.signInDeadline, lessThan(const Duration(minutes: 5)),
+          reason: 'a deadline that long is not a deadline');
+      expect(
+          GameServices.signInDeadline, greaterThan(const Duration(seconds: 30)),
+          reason: "the player may be typing a password into Game Center's own "
+              'sheet, and cutting that short fails a sign-in that was working');
+
+      // The constant existing says nothing about it being applied, and applying
+      // it is the whole fix.
+      final src = File('lib/services/game_services.dart').readAsStringSync();
+      expect(src, contains('GamesServices.signIn().timeout('),
+          reason: 'an unbounded signIn is the hang this guards against');
+    });
+
     test('a sign-in is remembered across launches', () async {
       // The bug this covers: sign in, come back, tap Achievements, get asked to
       // sign in again. Nothing was written down, so every launch re-derived the

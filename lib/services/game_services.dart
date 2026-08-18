@@ -292,6 +292,24 @@ class GameServices {
     return Platform.isAndroid ? 'Play Games' : 'Game Center';
   }
 
+  /// How long to wait for a sign-in before giving up on it.
+  ///
+  /// Deliberately generous, because the clock covers the player as much as the
+  /// platform: Game Center's sheet can ask for an Apple Account password, and a
+  /// short deadline would fail a sign-in that was about to succeed.
+  ///
+  /// It exists at all because [GamesServices.signIn] is not guaranteed to
+  /// complete. The iOS side hands its result to GameKit's authenticate handler
+  /// and answers nothing until that handler fires, and where there is no account
+  /// to authenticate against, GameKit calls it with neither a view controller nor
+  /// an error: the future then stays pending for the life of the process. A
+  /// simulator with no Apple Account does this, and so does Game Center switched
+  /// off under Screen Time. Every other platform call in this file already had a
+  /// deadline for the same reason; this one did not, and what waited on it was
+  /// the spinner on the onboarding screen, with both of that screen's buttons
+  /// disabled behind it.
+  static const _signInDeadline = Duration(seconds: 90);
+
   /// Make sure there is an account, asking for one if there is not.
   ///
   /// The only place [GamesServices.signIn] is called from, and it may show the
@@ -314,13 +332,21 @@ class GameServices {
   /// No pre-check either: [GamesServices.signIn] on an already-authenticated
   /// player returns success without showing anything, so the probe bought
   /// nothing and could hang.
+  ///
+  /// Bounded by [_signInDeadline], like every other platform call here.
   static Future<bool> ensureSignedIn() async {
     if (!supported) return false;
     if (_signedIn) return true;
     try {
-      await GamesServices.signIn();
+      // The deadline abandons the call rather than cancelling it: the platform
+      // side carries on, and a sign-in that lands after it is simply not
+      // credited. That is recoverable rather than wrong: a later ensureSignedIn
+      // finds the authenticate handler already installed and an authenticated
+      // player behind it, and returns success at once.
+      await GamesServices.signIn().timeout(_signInDeadline);
     } catch (e) {
-      // Cancelled, no Play Services, no network. All the same to the caller.
+      // Cancelled, no Play Services, no network, or nothing answered at all.
+      // All the same to the caller.
       debugPrint('Game services sign-in failed: $e');
       return false;
     }
@@ -447,4 +473,11 @@ class GameServices {
   /// Tests only: whether Android is switched on yet.
   @visibleForTesting
   static bool get androidReady => _androidReady;
+
+  /// Tests only: the sign-in deadline. Exposed so its existence can be asserted
+  /// rather than trusted, since the state it guards against cannot be reached
+  /// from a test: `supported` is false under `flutter test`, so [ensureSignedIn]
+  /// returns before it would ever wait on the platform.
+  @visibleForTesting
+  static Duration get signInDeadline => _signInDeadline;
 }

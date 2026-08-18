@@ -2,6 +2,8 @@
 // the property that matters is that both answers lead out of it. A screen that
 // could be entered and not left would be worse than not asking at all.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +64,42 @@ void main() {
     expect(find.textContaining('error'), findsNothing);
     expect(GameServices.needsSignInPrompt, isFalse,
         reason: 'being asked counts, whatever the platform answered');
+  });
+
+  testWidgets('an attempt that never answers can still be left',
+      (tester) async {
+    // The dead end this covers: "Maybe later" was disabled for the duration of
+    // an attempt, and GamesServices.signIn is not guaranteed to answer. GameKit
+    // calls its authenticate handler with neither a view controller nor an error
+    // where there is no account to authenticate against, so the future stays
+    // pending for the life of the process. With the screen unpoppable and both
+    // buttons dead, force-quitting was the only way out of onboarding.
+    final done = <int>[];
+    final attempt = Completer<bool>();
+    await tester.pumpWidget(MaterialApp(
+      home: SignInScreen(
+        onDone: () => done.add(1),
+        signIn: () => attempt.future,
+      ),
+    ));
+
+    await tester.tap(find.text('Sign In'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget,
+        reason: 'the attempt is in flight');
+    expect(done, isEmpty);
+
+    await tester.tap(find.text('Maybe later'));
+    await tester.pump();
+    expect(done, hasLength(1), reason: 'the only exit has to stay open');
+
+    // And the abandoned attempt must not then act on a screen already left.
+    // onDone replaces the route, so this widget outlives the skip by a
+    // transition, and a second call would push the menu twice.
+    attempt.complete(true);
+    await tester.pump(const Duration(seconds: 1));
+    expect(done, hasLength(1),
+        reason: 'answered once, whatever the platform says afterwards');
   });
 
   testWidgets('it cannot be dismissed without answering', (tester) async {
