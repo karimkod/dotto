@@ -59,10 +59,14 @@ class ConsentManager {
   /// Devices that should be treated as if they were in the EEA, so the form can
   /// be exercised from outside it.
   ///
-  /// Empty by design: the id is printed by the SDK on first run — look for
-  /// "Use ConsentDebugSettings.testIdentifiers" in logcat or the Xcode console
-  /// — and is specific to a device and install. Debug builds only; these
-  /// settings are ignored in release, so a stray id here cannot affect players.
+  /// The id is printed by the SDK on first run — look for "Use
+  /// ConsentDebugSettings.testIdentifiers" in logcat or the Xcode console — and
+  /// is specific to a device and install. Add yours here to make the debug
+  /// geography below actually take effect on hardware: emulators and simulators
+  /// are treated as test devices automatically, real devices are not.
+  ///
+  /// Debug builds only. [ConsentDebugSettings] is ignored in release, so a
+  /// stray id here cannot change what a player sees.
   static const List<String> _testDeviceIds = <String>[];
 
   /// Ask UMP what this user needs, and load the answer.
@@ -78,8 +82,15 @@ class ConsentManager {
     }
     if (!_supported) return;
 
+    // Debug builds always claim to be in the EEA, so the form can be walked
+    // through from anywhere — the flow is otherwise untestable outside Europe,
+    // where UMP simply answers "not required" and shows nothing. Attached
+    // unconditionally in debug rather than only when [_testDeviceIds] is
+    // filled: on an emulator or simulator that alone is enough, and a developer
+    // should not have to find their device id before the form will appear.
+    // Release builds get null, so this cannot follow a build to the store.
     final params = ConsentRequestParameters(
-      consentDebugSettings: kDebugMode && _testDeviceIds.isNotEmpty
+      consentDebugSettings: kDebugMode
           ? ConsentDebugSettings(
               debugGeography: DebugGeography.debugGeographyEea,
               testIdentifiers: _testDeviceIds,
@@ -133,27 +144,42 @@ class ConsentManager {
   ///
   /// Resolves when the form is dismissed — or immediately, if none was needed.
   ///
+  /// Returns whether UMP got as far as an answer: true when the form was shown
+  /// and dismissed, or when there was nothing to show, and false when the SDK
+  /// errored, threw, or never came back. The caller uses that to decide whether
+  /// the pre-prompt counts as done — a first launch where UMP could not be
+  /// reached must be able to try again next time rather than remembering a step
+  /// that did not happen.
+  ///
   /// [duringOnboarding] gates the funnel events. Settings → Ad preferences
   /// calls this too, and a returning player changing their mind is not part of
   /// the first-launch funnel — counting it there would inflate a step that is
   /// supposed to measure new players only.
-  static Future<void> showFormIfRequired({
+  static Future<bool> showFormIfRequired({
     bool duringOnboarding = false,
   }) async {
-    if (!_supported) return;
+    // Nothing to show and nothing that can fail: on web and under `flutter
+    // test` there is no form to come back to, so this is a success.
+    if (!_supported) return true;
     if (duringOnboarding) Analytics.onboardingUmpShown();
+    var ok = true;
     final done = Completer<void>();
     try {
       await ConsentForm.loadAndShowConsentFormIfRequired((error) {
-        if (error != null) debugPrint('Consent form error: ${error.message}');
+        if (error != null) {
+          debugPrint('Consent form error: ${error.message}');
+          ok = false;
+        }
         if (!done.isCompleted) done.complete();
       });
     } catch (e) {
       debugPrint('Consent form failed: $e');
+      ok = false;
       if (!done.isCompleted) done.complete();
     }
     await done.future.timeout(const Duration(seconds: 60), onTimeout: () {
       debugPrint('Consent form never dismissed; carrying on');
+      ok = false;
     });
     try {
       _canRequestAds = await ConsentInformation.instance.canRequestAds();
@@ -161,9 +187,15 @@ class ConsentManager {
       _canRequestAds = true;
     }
     if (duringOnboarding) Analytics.onboardingUmpCompleted();
+    return ok;
   }
 
   /// Remember that the pre-prompt has been shown.
+  ///
+  /// Called only once UMP has actually answered — see [showFormIfRequired]. A
+  /// first launch that could not reach the SDK deliberately leaves this unset,
+  /// so the whole introduction runs again next time instead of the player being
+  /// silently dropped past a form they never saw.
   static Future<void> markPrePromptSeen() async {
     _prePromptSeen = true;
     final prefs = _prefs;
@@ -194,10 +226,15 @@ class ConsentManager {
 
   /// Apple's tracking prompt. iOS only, and only ever meaningful once.
   ///
-  /// After the UMP form, not beside it: two consent dialogs at once reads as a
-  /// wall of permissions, and Apple's own guidance is to explain before asking.
-  /// UMP's answer does not decide this one — Apple requires the prompt before
-  /// the IDFA may be read at all, whatever was agreed for GDPR.
+  /// Between the pre-prompt and the UMP form, rather than after it: ATT decides
+  /// whether the IDFA can be read at all, and UMP reads that answer when it
+  /// builds the form — asking Apple second means the form is put together
+  /// against a tracking state that is about to change. Still never beside the
+  /// form: two dialogs at once reads as a wall of permissions, which is why the
+  /// explainer comes before both.
+  ///
+  /// UMP's answer does not decide this one either way — Apple requires the
+  /// prompt before the IDFA may be read, whatever was agreed for GDPR.
   static Future<void> requestTrackingAuthorization() async {
     if (kIsWeb) return;
     if (Platform.environment.containsKey('FLUTTER_TEST')) return;
@@ -207,8 +244,8 @@ class ConsentManager {
       // Only `notDetermined` can be asked. Every other state is settled, and
       // asking again just returns the same answer without showing anything.
       if (status == TrackingStatus.notDetermined) {
-        // A beat after the form dismisses, so the system sheet does not arrive
-        // on top of a disappearing route.
+        // A beat after the tap that started all this, so the system sheet does
+        // not arrive on top of a button still finishing its own animation.
         await Future.delayed(const Duration(milliseconds: 250));
         Analytics.onboardingAttShown();
         final result =

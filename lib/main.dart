@@ -81,19 +81,35 @@ Future<void> _start() async {
   // Sign-in is player-initiated only: the onboarding offer, or Achievements.
   // Launching straight into the platform's sign-in dialog is exactly what this
   // must not do.
-  unawaited(GameServices.restoreSignInState());
+  //
+  // Kept rather than thrown away with unawaited(): the platform probe is a
+  // round trip through Play Games or Game Center and routinely outlasts the
+  // 1800ms opening, so the routing after the splash used to read a _signedIn
+  // that had not been written yet and offer sign-in to a player who was already
+  // signed in. Nothing before the first frame waits on it — only the one
+  // decision that depends on it does, in [_DottoAppState._afterConsent].
+  final signInRestored = GameServices.restoreSignInState();
   // Ads only once UMP says they are allowed. On a first EEA launch that is
   // false until the form has been answered, and the consent screen starts them.
   if (ConsentManager.canRequestAds) unawaited(AdManager.init());
 
-  runApp(DottoApp(showPrePrompt: ConsentManager.needsPrePrompt));
+  runApp(DottoApp(
+    showPrePrompt: ConsentManager.needsPrePrompt,
+    signInRestored: signInRestored,
+  ));
 }
 
 class DottoApp extends StatefulWidget {
-  const DottoApp({super.key, this.showPrePrompt = false});
+  const DottoApp({super.key, this.showPrePrompt = false, this.signInRestored});
 
   /// Whether to open on the pre-prompt rather than the menu.
   final bool showPrePrompt;
+
+  /// The launch-time read of the platform's sign-in state, still in flight.
+  ///
+  /// Null in tests and anywhere the probe was never started, which is treated
+  /// as "already settled" rather than as something to wait for.
+  final Future<void>? signInRestored;
 
   @override
   State<DottoApp> createState() => _DottoAppState();
@@ -134,12 +150,20 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   }
 
   Future<void> _onContinue(BuildContext context) async {
-    // Order matters and is Apple's as much as Google's: explain, then Google's
-    // form, then Apple's prompt. Two system dialogs at once reads as a wall of
-    // permissions.
-    await ConsentManager.markPrePromptSeen();
-    await ConsentManager.showFormIfRequired(duringOnboarding: true);
+    // Order matters and is Apple's as much as Google's: explain, then Apple's
+    // prompt, then Google's form. ATT first because it decides whether the IDFA
+    // exists, and UMP builds its form around the answer — asked the other way
+    // round the form is assembled against a tracking state that changes a
+    // second later. Never both at once: two system dialogs back to back with no
+    // explanation is a wall of permissions, which is what this screen is for.
     await ConsentManager.requestTrackingAuthorization();
+    final answered =
+        await ConsentManager.showFormIfRequired(duringOnboarding: true);
+    // Only a UMP that actually answered counts as an introduction made. If the
+    // SDK could not be reached this launch, the flag stays unset and the whole
+    // thing runs again next time — better a repeated explainer than a player
+    // who is never shown the form at all.
+    if (answered) await ConsentManager.markPrePromptSeen();
     if (ConsentManager.canRequestAds) unawaited(AdManager.init());
     if (!context.mounted) return;
     _prePrompt = false;
@@ -151,6 +175,11 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   /// What the splash opens into. Onboarding is a chain, and each step decides
   /// only whether it is needed — so a returning player falls straight through
   /// to the menu without any of it running.
+  ///
+  /// The chain has one fixed link: consent is the only thing that can come
+  /// first. Every route onwards goes through [_afterConsent], and the sign-in
+  /// offer lives inside that — so there is no path where the platform's account
+  /// screen appears before the player has been asked about their data.
   Widget _afterSplash(BuildContext context) => _prePrompt
       ? ConsentScreen(onContinue: () => _onContinue(context))
       : _afterConsent(context);
@@ -160,12 +189,18 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   /// Deliberately not conditional on the consent screen having shown — outside
   /// the EEA there is no form, and a first launch there should still get the
   /// offer.
-  Widget _afterConsent(BuildContext context) => GameServices.needsSignInPrompt
-      ? SignInScreen(
-          onDone: () =>
-              Navigator.of(context).pushReplacement(_fadeTo((_) => _menu())),
-        )
-      : _menu();
+  ///
+  /// Gated on the launch-time sign-in probe, because `needsSignInPrompt` is a
+  /// plain getter over state that call is still writing.
+  Widget _afterConsent(BuildContext context) => _SignInGate(
+        restored: widget.signInRestored,
+        builder: (context) => GameServices.needsSignInPrompt
+            ? SignInScreen(
+                onDone: () => Navigator.of(context)
+                    .pushReplacement(_fadeTo((_) => _menu())),
+              )
+            : _menu(),
+      );
 
   /// The menu, and the end of the funnel.
   ///
@@ -200,4 +235,57 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
       home: SplashScreen(next: _afterSplash),
     );
   }
+}
+
+/// Holds the last step of onboarding until the launch-time sign-in probe has
+/// answered.
+///
+/// The decision it guards — offer sign-in, or go straight to the menu — is read
+/// from a getter over state that [GameServices.restoreSignInState] writes when
+/// the platform gets back to it, which is usually after the splash has already
+/// finished. Building on that too early is not a cosmetic race: a player who is
+/// signed in gets offered sign-in again, and the offer is a screen they were
+/// promised they would only ever see once.
+///
+/// The splash is left alone. It runs its full opening regardless, and this only
+/// covers whatever is left of the probe when the animation is done — normally
+/// nothing, since the two have been running side by side since launch.
+class _SignInGate extends StatefulWidget {
+  const _SignInGate({required this.restored, required this.builder});
+
+  /// The probe, or null when there is none to wait for.
+  final Future<void>? restored;
+
+  /// What to build once it has settled.
+  final WidgetBuilder builder;
+
+  @override
+  State<_SignInGate> createState() => _SignInGateState();
+}
+
+class _SignInGateState extends State<_SignInGate> {
+  late bool _ready = widget.restored == null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_ready) return;
+    // Bounded, and generously: the probe already carries its own ten-second
+    // deadline and pulls the cloud save behind it, neither of which the player
+    // should be made to watch. Past this the routing goes ahead on what is
+    // known — the same answer the unawaited version gave, just no sooner.
+    widget.restored!
+        .timeout(const Duration(milliseconds: 2500))
+        .catchError((_) {})
+        .whenComplete(() {
+      if (mounted) setState(() => _ready = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => _ready
+      ? widget.builder(context)
+      // The splash's own backdrop, so a wait short enough to be a single frame
+      // is invisible and a longer one reads as the opening holding a moment.
+      : const Scaffold(backgroundColor: AppColors.background);
 }

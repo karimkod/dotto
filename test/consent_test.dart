@@ -122,7 +122,8 @@ void main() {
 
   test('the ATT purpose string is still declared', () {
     // Unchanged by the move to UMP — Apple rejects a build that prompts
-    // without one, and the prompt still fires after the form.
+    // without one, and the prompt still fires, now just before the form
+    // rather than after it.
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
     expect(plist, contains('NSUserTrackingUsageDescription'));
   });
