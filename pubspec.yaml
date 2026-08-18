@@ -83,6 +83,22 @@ flutter:
   # it will never load. Worth revisiting if web download size starts to matter.
   assets:
     - assets/sfx/
+    # Nunito and Poppins as plain assets rather than a `fonts:` family, because
+    # that is the form google_fonts looks for: it scans the asset manifest for a
+    # file whose name ends in `<Family>-<Variant>`, and serves that instead of
+    # downloading. So the filenames are load-bearing and must stay exactly as
+    # google_fonts spells them (Regular / Medium / SemiBold / Bold / ExtraBold /
+    # Black, plus an `Italic` suffix). Fetched from the same gstatic URLs the
+    # package itself uses, verified against the sha256 in its font manifest.
+    #
+    # The set below is every variant the app can ask for: Material 3's text
+    # theme resolves to Nunito 400 and 500, lib/ overrides it to 600/700/800/
+    # 900, and Poppins is only ever the 800 wordmark (italic in AppTheme.title,
+    # upright in the game's big score). Runtime fetching is off in main.dart, so
+    # giving a TextStyle a weight with no file here does not degrade quietly:
+    # google_fonts throws, and that throw is reported as a crash. Adding a weight
+    # means adding the file, and test/fonts_assets_test.dart fails until it is.
+    - assets/fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

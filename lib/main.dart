@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:google_fonts/google_fonts.dart';
 
 import 'ads/ad_manager.dart';
 import 'analytics/analytics_service.dart';
@@ -43,6 +47,22 @@ Future<void> _start() async {
   // in memory before the first frame — otherwise a returning player sees a
   // fully locked map for an instant.
   WidgetsFlutterBinding.ensureInitialized();
+  // Every Nunito and Poppins variant the app asks for is bundled (see the asset
+  // list in pubspec.yaml), so google_fonts resolves them from the manifest and
+  // never reaches for the network. Left on, a first launch behind a captive
+  // portal or with no connection threw `Failed to load font with url` from
+  // google_fonts' fetch, and because the package attaches no error handler to
+  // that load future, the throw escaped to runZonedGuarded above and was filed
+  // as a fatal crash. The text itself had already painted in the fallback face,
+  // so the report described nothing the player could see.
+  //
+  // Turning fetching off removes that path rather than silencing it: an
+  // unbundled variant now throws immediately instead of after a failed request,
+  // by the same route and with the same result. So the bundled set has to stay
+  // in step with the weights the app asks for, which is what
+  // test/fonts_assets_test.dart pins.
+  GoogleFonts.config.allowRuntimeFetching = false;
+  _registerFontLicenses();
   await ProgressStore.init();
   await SettingsStore.init();
   // Started here, awaited below. Everything Firebase-backed needs this to have
@@ -97,6 +117,24 @@ Future<void> _start() async {
     showPrePrompt: ConsentManager.needsPrePrompt,
     signInRestored: signInRestored,
   ));
+}
+
+/// Adds the bundled fonts' SIL Open Font License text to the licence page.
+///
+/// google_fonts registers nothing on our behalf, and it has no reason to: until
+/// this change the files were fetched at runtime rather than shipped. Now that
+/// the .ttf files are in the bundle, the OFL travels with them, so the notice
+/// has to be declared here. The callback is lazy, so the files are only read if
+/// a player actually opens the licence list.
+void _registerFontLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    for (final family in const ['nunito', 'poppins']) {
+      yield LicenseEntryWithLineBreaks(
+        ['google_fonts', family],
+        await rootBundle.loadString('assets/fonts/OFL-$family.txt'),
+      );
+    }
+  });
 }
 
 class DottoApp extends StatefulWidget {

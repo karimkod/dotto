@@ -246,20 +246,44 @@ jobs:
           set -uo pipefail
           UPLOAD=ios/Pods/FirebaseCrashlytics/upload-symbols
           if [ ! -x "$UPLOAD" ]; then
-            echo "::warning::$UPLOAD not found — pod layout changed? Skipping."
+            echo "::warning::$UPLOAD not found, pod layout changed? Skipping."
             exit 1
           fi
           # `flutter build ipa` archives first, and the archive is where the
           # dSYMs live: Runner's, the engine's, and one per framework.
-          DSYMS=$(find build/ios/archive -type d -name '*.dSYM' -print)
-          if [ -z "$DSYMS" ]; then
+          ARCHIVE=$(find build/ios/archive -maxdepth 1 -name '*.xcarchive' 2>/dev/null | head -1)
+          if [ -z "$ARCHIVE" ] || [ ! -d "$ARCHIVE/dSYMs" ]; then
             echo "::warning::No dSYMs under build/ios/archive. DEBUG_INFORMATION_FORMAT should be dwarf-with-dsym on Release."
             exit 1
           fi
-          echo "$DSYMS" | while read -r dsym; do
-            echo "Uploading $dsym"
-            "$UPLOAD" -gsp ios/Runner/GoogleService-Info.plist -p ios "$dsym"
-          done
+          # Zipped and handed over in one call rather than looped one dSYM at a
+          # time. upload-symbols takes an archive of them quite happily, and a
+          # single invocation means a single exit code to trust: the previous
+          # `find | while read` loop reported only the last upload's status, so
+          # every earlier failure was invisible and the step went green anyway.
+          ( cd "$ARCHIVE" && zip -qr "$RUNNER_TEMP/dSYMs.zip" dSYMs )
+          COUNT=$(find "$ARCHIVE/dSYMs" -maxdepth 1 -name '*.dSYM' | wc -l | tr -d ' ')
+          echo "Bundled $COUNT dSYMs into $(du -h "$RUNNER_TEMP/dSYMs.zip" | cut -f1)"
+          "$UPLOAD" -gsp ios/Runner/GoogleService-Info.plist -p ios "$RUNNER_TEMP/dSYMs.zip"
+
+      # Kept for 90 days because a dSYM that Crashlytics accepts but never
+      # associates is otherwise unrecoverable: the runner is wiped, Apple's copy
+      # cannot be pulled back out now that bitcode is gone, and a local rebuild
+      # produces different UUIDs. That happened to 1.5.2 (19), whose symbols
+      # uploaded cleanly and still showed as missing in the console, with no copy
+      # left anywhere to re-submit. With this, the fix is downloading the
+      # artifact and dropping the zip into the console's uploader.
+      #
+      # `always()` so it also runs when the upload step above failed, which is
+      # precisely the case that needs it.
+      - name: Retain dSYMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsyms-${{ steps.version.outputs.VERSION_NAME }}+${{ steps.version.outputs.BUILD_NUMBER }}
+          path: ${{ runner.temp }}/dSYMs.zip
+          retention-days: 90
+          if-no-files-found: warn
 
   create-release:
     name: Create GitHub Release
