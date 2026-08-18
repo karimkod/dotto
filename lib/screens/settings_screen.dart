@@ -11,8 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../analytics/analytics_service.dart';
 import '../consent/consent_manager.dart';
 import '../services/game_services.dart';
+import '../services/music_service.dart';
 import '../services/notification_service.dart';
 import '../settings/haptics.dart';
 import '../settings/settings_store.dart';
@@ -43,6 +45,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _sound = SettingsStore.soundOn;
+  late bool _music = MusicService.isEnabled;
   late bool _haptics = SettingsStore.hapticsOn;
   String _version = '';
 
@@ -162,6 +165,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (v) {
                         setState(() => _sound = v);
                         SettingsStore.setSound(v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    SettingsToggleRow(
+                      icon: Icons.music_note_rounded,
+                      label: 'Music',
+                      value: _music,
+                      onChanged: (v) {
+                        setState(() => _music = v);
+                        // Fades out or back in on the spot. Independent of
+                        // Sound on purpose: a player who wants the game's
+                        // feedback but not a backing track — or the other way
+                        // round — has asked for two different things.
+                        MusicService.setEnabled(v);
+                        Analytics.musicToggled(v);
                       },
                     ),
                     const SizedBox(height: 12),

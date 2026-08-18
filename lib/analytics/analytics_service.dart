@@ -162,6 +162,12 @@ class Analytics {
 
   static void levelDesignerOpened() => _log('level_designer_opened');
 
+  /// The music setting changed. Recorded as a string rather than a bool:
+  /// Firebase takes String and num parameters only, and a bool would be
+  /// dropped by the SDK without a word.
+  static void musicToggled(bool on) =>
+      _log('music_toggled', {'enabled': on ? 'on' : 'off'});
+
   // ----- onboarding funnel -----
   //
   // A first launch only. Every step marks the funnel as running, and

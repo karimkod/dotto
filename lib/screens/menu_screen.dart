@@ -13,6 +13,7 @@ import '../widgets/play_button.dart';
 import '../widgets/top_bar.dart';
 import '../services/challenge_service.dart';
 import '../services/game_services.dart';
+import '../services/music_service.dart';
 import 'challenges_screen.dart';
 import 'game_screen.dart';
 import 'level_designer_screen.dart';
@@ -45,6 +46,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   void initState() {
     super.initState();
     _levels = buildInitialLevels();
+    // The first screen where music belongs. Everything before it — splash,
+    // consent, the sign-in offer — is onboarding, and scoring a permission
+    // prompt is not what this track is for. Idempotent, so coming back to the
+    // menu from a level does not restart it.
+    MusicService.play();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
     // The challenge fetch is started unawaited at launch, so the badge below is
     // decided from an empty list on a cold start and nothing here would ask

@@ -11,6 +11,7 @@ import '../services/challenge_service.dart';
 import '../services/cloud_save_service.dart';
 import '../services/free_hint_service.dart';
 import '../services/game_services.dart';
+import '../services/music_service.dart';
 import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
@@ -232,6 +233,10 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    // Already playing when the player came through the menu; this covers the
+    // ways into a level that do not, such as a challenge opened from a tapped
+    // notification.
+    MusicService.play();
     _dotCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),

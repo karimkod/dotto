@@ -22,6 +22,7 @@ import 'services/challenge_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/free_hint_service.dart';
 import 'services/game_services.dart';
+import 'services/music_service.dart';
 import 'services/notification_service.dart';
 import 'settings/settings_store.dart';
 import 'theme/app_theme.dart';
@@ -65,6 +66,9 @@ Future<void> _start() async {
   _registerFontLicenses();
   await ProgressStore.init();
   await SettingsStore.init();
+  // Reads the music preference and starts decoding the track behind it, so the
+  // splash covers the load and the menu opens straight into the fade-in.
+  await MusicService.init();
   // Started here, awaited below. Everything Firebase-backed needs this to have
   // finished first — Firestore for the challenges, Messaging for the
   // notification state — and it used to run after them, so the first challenge
@@ -185,6 +189,14 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     // from the background gets no further warning. The per-event saves already
     // cover the common path; this catches whatever the last one missed.
     if (state == AppLifecycleState.paused) CloudSaveService.save();
+    // Music follows the app out and back. A full-screen ad arrives here too —
+    // it covers the app, so the platform reports a pause — which is what keeps
+    // the track from playing underneath a rewarded video.
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      MusicService.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      MusicService.resume();
+    }
   }
 
   Future<void> _onContinue(BuildContext context) async {

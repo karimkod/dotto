@@ -83,6 +83,11 @@ flutter:
   # it will never load. Worth revisiting if web download size starts to matter.
   assets:
     - assets/sfx/
+    # The looping background track. Cut from the promo render to a whole number
+    # of chord cycles with a wrap-around crossfade, so it repeats without a
+    # seam — see lib/services/music_service.dart for why the cut is where it is,
+    # and why this is an MP3 rather than the smaller OGG.
+    - assets/audio/
     # Nunito and Poppins as plain assets rather than a `fonts:` family, because
     # that is the form google_fonts looks for: it scans the asset manifest for a
     # file whose name ends in `<Family>-<Variant>`, and serves that instead of
