@@ -2191,7 +2191,7 @@ class _GameScreenState extends State<GameScreen>
                             opacity: telOpacity.clamp(0.0, 1.0),
                             child: Transform.scale(
                               scale: _dotScale.value * telScale,
-                              child: _Dot(
+                              child: GameDot(
                                 size: d,
                                 paused: _dot.pause > 0,
                                 glow: glow,
@@ -2725,90 +2725,6 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The animated dot, with a subtle pulsing glow ([glow] in 0..1). When
-/// [shielded] it wears a glowing cyan protective aura.
-class _Dot extends StatelessWidget {
-  const _Dot({
-    required this.size,
-    required this.paused,
-    this.glow = 0.5,
-    this.shielded = false,
-  });
-
-  final double size;
-  final bool paused;
-  final double glow;
-  final bool shielded;
-
-  static const _shield = Color(0xFF38BDF8);
-
-  @override
-  Widget build(BuildContext context) {
-    final base = paused ? 0.12 : 0.40;
-    final span = paused ? 0.10 : 0.30;
-    final alpha = base + span * glow;
-    final blur = (paused ? 5.0 : 9.0) + 7.0 * glow;
-    final dot = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          center: Alignment(-0.3, -0.35),
-          colors: [Color(0xFFFFD89B), AppColors.accent],
-          stops: [0.0, 0.85],
-        ),
-        border: Border.all(color: AppColors.ink, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: alpha),
-            blurRadius: blur,
-            spreadRadius: 1 + 1.5 * glow,
-          ),
-        ],
-      ),
-    );
-
-    if (!shielded) return dot;
-
-    // Protective cyan bubble around the dot, breathing with the glow pulse.
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            left: -size * 0.30,
-            right: -size * 0.30,
-            top: -size * 0.30,
-            bottom: -size * 0.30,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _shield.withValues(alpha: 0.12 + 0.06 * glow),
-                border: Border.all(
-                  color: _shield.withValues(alpha: 0.85),
-                  width: 2.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _shield.withValues(alpha: 0.35 + 0.25 * glow),
-                    blurRadius: 10 + 8 * glow,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          dot,
         ],
       ),
     );

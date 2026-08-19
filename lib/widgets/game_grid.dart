@@ -369,6 +369,40 @@ class _PortalGlyphPainter extends CustomPainter {
       old.color != color || old.entrance != entrance;
 }
 
+/// The goal marker: a pennant on a staff, centred in a cell of side [cell].
+///
+/// Drawn rather than typed, for the reason [paintArrowIcon] already gives — and
+/// for one more the arrow did not have to worry about. The goal used to be the
+/// character ⚑ (U+2691), which is absent from the engine's bundled face on web,
+/// so the exit rendered as an empty tofu box in the browser build. Geometry has
+/// no such gap: it draws identically everywhere.
+void paintFlagIcon(Canvas canvas, Offset center, double cell, Color color) {
+  final h = cell * 0.40; // staff height
+  final staffW = cell * 0.055;
+  // Offset left of centre so the staff plus the pennant flying off it balance
+  // about the cell's middle rather than hanging off its right.
+  final x = center.dx - cell * 0.11;
+  final top = center.dy - h / 2;
+  final paint = Paint()..color = color;
+
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      Rect.fromLTWH(x - staffW / 2, top, staffW, h),
+      Radius.circular(staffW / 2),
+    ),
+    paint,
+  );
+  // Pennant: a triangle flying right from the top of the staff.
+  canvas.drawPath(
+    Path()
+      ..moveTo(x, top + staffW * 0.4)
+      ..lineTo(x + cell * 0.26, top + h * 0.28)
+      ..lineTo(x, top + h * 0.52)
+      ..close(),
+    paint,
+  );
+}
+
 /// A spiky sea-mine destroyer icon, drawn centered in a cell of side [cell].
 /// [tick] (0..1, looping) drives a subtle size pulse.
 void paintMineIcon(Canvas canvas, Offset center, double cell, double tick) {
@@ -531,6 +565,93 @@ class DragGhost extends StatelessWidget {
             PlacedType.pause => PauseGlyph(size: size * 0.7, color: color),
           },
         ),
+      ),
+    );
+  }
+}
+
+/// The dot itself, with a subtle pulsing glow ([glow] in 0..1). When [shielded]
+/// it wears a glowing cyan protective aura.
+///
+/// Lives here rather than in the game screen because the board is not the only
+/// place the ball has to appear — the promo/feature graphic renders the same
+/// ball on the same board, and a second copy of it would drift.
+class GameDot extends StatelessWidget {
+  const GameDot({
+    super.key,
+    required this.size,
+    required this.paused,
+    this.glow = 0.5,
+    this.shielded = false,
+  });
+
+  final double size;
+  final bool paused;
+  final double glow;
+  final bool shielded;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = paused ? 0.12 : 0.40;
+    final span = paused ? 0.10 : 0.30;
+    final alpha = base + span * glow;
+    final blur = (paused ? 5.0 : 9.0) + 7.0 * glow;
+    final dot = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          center: Alignment(-0.3, -0.35),
+          colors: [Color(0xFFFFD89B), AppColors.accent],
+          stops: [0.0, 0.85],
+        ),
+        border: Border.all(color: AppColors.ink, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: alpha),
+            blurRadius: blur,
+            spreadRadius: 1 + 1.5 * glow,
+          ),
+        ],
+      ),
+    );
+
+    if (!shielded) return dot;
+
+    // Protective cyan bubble around the dot, breathing with the glow pulse.
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: -size * 0.30,
+            right: -size * 0.30,
+            top: -size * 0.30,
+            bottom: -size * 0.30,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kShieldColor.withValues(alpha: 0.12 + 0.06 * glow),
+                border: Border.all(
+                  color: kShieldColor.withValues(alpha: 0.85),
+                  width: 2.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: kShieldColor.withValues(alpha: 0.35 + 0.25 * glow),
+                    blurRadius: 10 + 8 * glow,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          dot,
+        ],
       ),
     );
   }
@@ -876,8 +997,8 @@ class GameGridPainter extends CustomPainter {
 
     Color fill = AppColors.card;
     Color border = AppColors.ink.withValues(alpha: 0.85);
-    String? glyph;
-    Color glyphColor = AppColors.ink;
+    bool startArrow = false;
+    bool flag = false;
     bool dashedBorder = false;
     bool mine = false;
 
@@ -886,13 +1007,11 @@ class GameGridPainter extends CustomPainter {
         // The start cell is a permanent redirector, so it shows its direction.
         fill = _C.start;
         border = const Color(0xFF5BA45F);
-        glyph = level.start.dir.glyph;
-        glyphColor = Colors.white;
+        startArrow = true;
       case CellType.exit:
         fill = _C.exit;
         border = const Color(0xFFE0B73C);
-        glyph = '⚑';
-        glyphColor = Colors.white;
+        flag = true;
       case CellType.wall:
         fill = _C.wall;
         border = const Color(0xFF5C6B73);
@@ -921,8 +1040,13 @@ class GameGridPainter extends CustomPainter {
       canvas.drawRRect(rrect, borderPaint);
     }
 
-    if (glyph != null) {
-      _drawGlyph(canvas, center, glyph, glyphColor, geo.cell * 0.42);
+    if (startArrow) {
+      // The same arrow geometry every other arrow in the game is drawn with.
+      paintArrowIcon(
+          canvas, center, geo.cell * kArrowSpan, Colors.white, level.start.dir);
+    }
+    if (flag) {
+      paintFlagIcon(canvas, center, geo.cell, Colors.white);
     }
     if (mine) {
       paintMineIcon(canvas, center, geo.cell, glowTick);
@@ -1296,23 +1420,6 @@ class GameGridPainter extends CustomPainter {
       case PlacedType.shield:
         return (_C.shieldFill, _C.shield, ''); // icon drawn separately
     }
-  }
-
-  void _drawGlyph(
-      Canvas canvas, Offset center, String s, Color color, double fontSize) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: s,
-        style: TextStyle(
-          color: color,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w900,
-          height: 1,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
   /// Stroke a rounded rect as a dashed outline — used by gap cells and by fixed
