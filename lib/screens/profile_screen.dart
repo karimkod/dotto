@@ -29,6 +29,29 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+/// How far the platform has got with the question "who is this player".
+///
+/// Three states rather than two, because the screen used to have no way to say
+/// the third one. A null profile left it drawing the signed-in layout with
+/// nothing in it — the word "Player" over a placeholder avatar — which is
+/// indistinguishable from a gamer tag that simply has not arrived, offers
+/// nothing to do about it, and stays that way for as long as the screen is
+/// open.
+enum _Identity {
+  /// Asked, and not answered yet.
+  loading,
+
+  /// Answered with a player.
+  loaded,
+
+  /// Answered with nobody, for a player this app believes is signed in.
+  ///
+  /// A platform that could not be reached, or a session that has outlived the
+  /// flag remembering it. Which one is not knowable from here and does not
+  /// change what to offer: asking again is the whole remedy either way.
+  unavailable,
+}
+
 class _ProfileScreenState extends State<ProfileScreen> {
   /// The gamer tag and avatar, once the platform has answered. Null until then,
   /// and null forever when nobody is signed in.
@@ -37,6 +60,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Unlocked and total achievements as the platform counts them. Null while it
   /// is being asked, and when it declines to say.
   (int, int)? _achievements;
+
+  /// How the identity fetch is going. Only consulted while signed in — signed
+  /// out there is nobody to fetch, and the offer stands in its place.
+  _Identity _identity = _Identity.loading;
 
   /// Whether a sign-in is in flight, so the button can say so and cannot be
   /// tapped twice into two platform dialogs.
@@ -51,14 +78,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Ask the platform for everything it can tell us. Each answer lands on its
   /// own — the avatar is a round trip, the achievement list is a longer one, and
   /// there is no reason for the first to wait on the second.
+  ///
+  /// The profile answer is recorded whether or not it arrived. A null is a real
+  /// answer — "the platform has nobody to describe" — and the screen has to be
+  /// able to draw it, which is what it could not do before.
   void _load() {
+    _identity = _Identity.loading;
     GameServices.playerProfile().then((profile) {
-      if (mounted && profile != null) setState(() => _profile = profile);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _identity = profile == null ? _Identity.unavailable : _Identity.loaded;
+      });
     });
     GameServices.achievementProgress().then((counts) {
       if (mounted && counts != null) setState(() => _achievements = counts);
     });
   }
+
+  /// Ask again, from the button the unavailable state offers.
+  ///
+  /// Worth offering rather than futile: [GameServices.playerProfile] signs in
+  /// again on its way through, so a retry is a real second attempt at the
+  /// session rather than a second read of the same dead one.
+  void _retry() => setState(_load);
 
   /// The Sign In button. A player action, so this is one of the few places
   /// allowed to raise the platform's own account picker.
@@ -67,10 +110,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _signingIn = true);
     final ok = await GameServices.ensureSignedIn();
     if (!mounted) return;
-    setState(() => _signingIn = false);
     // Declining is not a failure state and is not reported as one. The screen
     // simply stays as it was, with the offer still standing.
-    if (ok) _load();
+    setState(() {
+      _signingIn = false;
+      if (ok) _load();
+    });
   }
 
   @override
@@ -99,10 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 6),
                       _Avatar(icon: _profile?.icon),
                       const SizedBox(height: 14),
-                      if (GameServices.signedIn)
-                        _GamerTag(name: _profile?.name)
-                      else
-                        _SignInOffer(busy: _signingIn, onTap: _signIn),
+                      _identityBlock(),
                       const SizedBox(height: 24),
                       _ProgressBar(completed: completed, total: kLevelCount),
                       const SizedBox(height: 20),
@@ -147,6 +189,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// What sits under the avatar: the gamer tag, the offer to sign in, or an
+  /// admission that the platform did not answer.
+  ///
+  /// Signed out is decided first and on its own. Whether an identity fetch is
+  /// in flight is beside the point for a player with no account — there is
+  /// nothing to fetch, and the offer is the only useful thing to show.
+  Widget _identityBlock() {
+    if (!GameServices.signedIn) {
+      return _SignInOffer(busy: _signingIn, onTap: _signIn);
+    }
+    return switch (_identity) {
+      _Identity.loading => const _IdentityLoading(),
+      _Identity.loaded => _GamerTag(name: _profile?.name),
+      _Identity.unavailable => _IdentityUnavailable(onTap: _retry),
+    };
   }
 
   /// The unlocked count once the platform has given one. Until then the
@@ -240,16 +299,167 @@ class _GamerTag extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          GameServices.platformName.toUpperCase(),
-          style: TextStyle(
-            color: AppColors.text.withValues(alpha: 0.5),
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
+        const _PlatformLabel(),
+      ],
+    );
+  }
+}
+
+/// Which service the name above came from. Shared so the loading state can keep
+/// it in place while the name itself is still on its way.
+class _PlatformLabel extends StatelessWidget {
+  const _PlatformLabel();
+
+  @override
+  Widget build(BuildContext context) => Text(
+        GameServices.platformName.toUpperCase(),
+        style: TextStyle(
+          color: AppColors.text.withValues(alpha: 0.5),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.4,
+        ),
+      );
+}
+
+/// The gamer tag's place while the platform is still being asked.
+///
+/// Built to [_GamerTag]'s shape — a line where the name goes, the platform's
+/// name under it — so nothing below shifts when the answer lands.
+class _IdentityLoading extends StatelessWidget {
+  const _IdentityLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 38,
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation(
+                  AppColors.accent.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
           ),
         ),
+        const SizedBox(height: 2),
+        const _PlatformLabel(),
       ],
+    );
+  }
+}
+
+/// What stands where the gamer tag goes when the platform had nothing to say
+/// about a player it is supposed to know.
+///
+/// Says so plainly and offers the retry, rather than the nameless "Player" over
+/// a placeholder avatar this replaced — which looked like a loaded profile
+/// belonging to nobody and gave the player nothing to do about it.
+///
+/// The last line is the important one: everything below on this screen is read
+/// from local progress and is entirely unaffected, and a player who has just
+/// been told their profile is unavailable should not have to wonder.
+class _IdentityUnavailable extends StatelessWidget {
+  const _IdentityUnavailable({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => _IdentityMessage(
+        title: 'Profile unavailable',
+        body: "Couldn't reach ${GameServices.platformName} for your gamer tag\n"
+            'and avatar. Your progress below is unaffected.',
+        action: _PillButton(label: 'Try Again', onTap: onTap),
+      );
+}
+
+/// The shape both of the screen's non-identities take: a heading, a line
+/// explaining it, and one thing to do about it.
+class _IdentityMessage extends StatelessWidget {
+  const _IdentityMessage({
+    required this.title,
+    required this.body,
+    required this.action,
+  });
+
+  final String title;
+  final String body;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title, style: AppTheme.title.copyWith(fontSize: 26)),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.text.withValues(alpha: 0.75),
+            fontSize: 13,
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
+        action,
+      ],
+    );
+  }
+}
+
+/// The screen's one button shape: accent fill, ink border, and a spinner in
+/// place of its label while what it started is still going.
+class _PillButton extends StatelessWidget {
+  const _PillButton({
+    required this.label,
+    required this.onTap,
+    this.busy = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return BouncyButton(
+      onTap: busy ? null : onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 13),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: busy ? 0.55 : 1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.ink, width: 3),
+        ),
+        child: busy
+            ? const SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation(AppColors.ink),
+                ),
+              )
+            : Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+      ),
     );
   }
 }
@@ -262,59 +472,12 @@ class _SignInOffer extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Not signed in',
-          style: AppTheme.title.copyWith(fontSize: 26),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Sign in to ${GameServices.platformName} for your gamer tag,\n'
-          'avatar and achievements.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.text.withValues(alpha: 0.75),
-            fontSize: 13,
-            height: 1.4,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 14),
-        BouncyButton(
-          onTap: busy ? null : onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 13),
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: busy ? 0.55 : 1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.ink, width: 3),
-            ),
-            child: busy
-                ? const SizedBox(
-                    width: 19,
-                    height: 19,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation(AppColors.ink),
-                    ),
-                  )
-                : const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _IdentityMessage(
+        title: 'Not signed in',
+        body: 'Sign in to ${GameServices.platformName} for your gamer tag,\n'
+            'avatar and achievements.',
+        action: _PillButton(label: 'Sign In', busy: busy, onTap: onTap),
+      );
 }
 
 /// The campaign in one line: how much of the path is behind them.

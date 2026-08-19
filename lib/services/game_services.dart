@@ -185,10 +185,28 @@ class GameServices {
   /// underlying future has no timeout of its own and simply never completes if
   /// the platform stays silent.
   static Future<void> restoreSignInState() async {
-    if (!supported || _signedIn) {
-      // Already known signed in from storage — the cloud pull still belongs to
-      // this launch.
-      if (_signedIn) await CloudSaveService.load();
+    if (!supported) return;
+    if (_signedIn) {
+      // Known signed in from storage, which turns out not to be enough on its
+      // own. On iOS it is [GamesServices.signIn] that installs GameKit's
+      // authenticate handler, and nothing else does — so a launch that only
+      // read the flag left GKLocalPlayer unauthenticated for the life of the
+      // process. Everything behind it went quietly dark: the player stream
+      // answered nil, so the profile screen showed a nameless "Player" over a
+      // placeholder avatar; reported achievements failed; saved games would
+      // not load. All of it silent, and all of it on every launch after the
+      // one the player actually signed in on.
+      //
+      // This is not the ambush [ensureSignedIn]'s callers guard against. That
+      // rule protects a player who has not chosen this from meeting an account
+      // picker they did not ask for, and this branch only runs for a player who
+      // already chose it: both platforms take an already-authenticated player
+      // silently — GameKit with its welcome banner, Play Games with nothing at
+      // all.
+      await _signInNow(deadline: _reauthDeadline);
+      // Saved games are read through that authentication, so the cloud pull
+      // has to come after it rather than beside it.
+      await CloudSaveService.load();
       return;
     }
     bool live;
@@ -225,6 +243,27 @@ class GameServices {
   /// would never complete and the profile would never arrive nor be given up on.
   static Future<PlayerProfile?> playerProfile() async {
     if (!supported || !_signedIn) return null;
+    final first = await _readPlayer();
+    if (first != null) return first;
+    // Nobody came back for a player this app believes is signed in. That is the
+    // stale-session case [showAchievements] already recovers from, arriving by
+    // a different door: the remembered sign-in can outlive the platform session
+    // behind it — an account signed out from the Play Games app, a Game Center
+    // session this process never authenticated, an Android cold start where
+    // Play Games has not finished its own sign-in. Indistinguishable from here,
+    // and all answered the same way: sign in properly, then ask again.
+    //
+    // Allowed to raise the platform's own dialog because reaching this line
+    // means the player opened the profile screen, and that is a player action.
+    // Bounded by the full [_signInDeadline] rather than the launch one for the
+    // same reason: a dialog the player has to answer is on the player's clock.
+    if (!await _signInNow()) return null;
+    return _readPlayer();
+  }
+
+  /// One read of the player stream. Null when the platform has nobody to
+  /// describe, or nothing to say.
+  static Future<PlayerProfile?> _readPlayer() async {
     PlayerData? player;
     try {
       player = await GamesServices.player.first
@@ -315,6 +354,41 @@ class GameServices {
   /// disabled behind it.
   static const _signInDeadline = Duration(seconds: 90);
 
+  /// How long to wait for the silent re-authentication on the launch path.
+  ///
+  /// Much shorter than [_signInDeadline], because none of what makes that one
+  /// generous applies: there is no dialog and no password to type, only a
+  /// session being re-established for an account that already exists. What
+  /// waits on this is the cloud pull and the last step of onboarding, so a
+  /// platform that has gone quiet should cost a few seconds of opening rather
+  /// than a minute and a half of it.
+  static const _reauthDeadline = Duration(seconds: 15);
+
+  /// One sign-in attempt against the platform, whatever [_signedIn] says.
+  ///
+  /// [ensureSignedIn] answers true from the remembered flag alone. That is the
+  /// right answer to "does this player have an account" and the wrong one to
+  /// "is this process talking to the platform" — the second is what a stale
+  /// session breaks, and it is the question this asks.
+  ///
+  /// Deliberately writes nothing. Callers decide what a success means for
+  /// [_signedIn], and none of them may treat a failure as a sign-out: a launch
+  /// that could not reach the platform is not a player who signed out, and the
+  /// flag is the record of a sign-in that really happened. Dropping it on a bad
+  /// network would put the one-shot onboarding offer back in front of a player
+  /// who has already answered it.
+  static Future<bool> _signInNow({Duration? deadline}) async {
+    try {
+      await GamesServices.signIn().timeout(deadline ?? _signInDeadline);
+    } catch (e) {
+      // Cancelled, no Play Services, no network, or nothing answered at all.
+      // All the same to the caller.
+      debugPrint('Game services sign-in failed: $e');
+      return false;
+    }
+    return true;
+  }
+
   /// Make sure there is an account, asking for one if there is not.
   ///
   /// The only place [GamesServices.signIn] is called from, and it may show the
@@ -342,19 +416,12 @@ class GameServices {
   static Future<bool> ensureSignedIn() async {
     if (!supported) return false;
     if (_signedIn) return true;
-    try {
-      // The deadline abandons the call rather than cancelling it: the platform
-      // side carries on, and a sign-in that lands after it is simply not
-      // credited. That is recoverable rather than wrong: a later ensureSignedIn
-      // finds the authenticate handler already installed and an authenticated
-      // player behind it, and returns success at once.
-      await GamesServices.signIn().timeout(_signInDeadline);
-    } catch (e) {
-      // Cancelled, no Play Services, no network, or nothing answered at all.
-      // All the same to the caller.
-      debugPrint('Game services sign-in failed: $e');
-      return false;
-    }
+    // The deadline inside abandons the call rather than cancelling it: the
+    // platform side carries on, and a sign-in that lands after it is simply not
+    // credited. That is recoverable rather than wrong: a later ensureSignedIn
+    // finds the authenticate handler already installed and an authenticated
+    // player behind it, and returns success at once.
+    if (!await _signInNow()) return false;
     _setSignedIn(true);
     // A first sign-in is also the first chance to pull a cloud save.
     await CloudSaveService.load();
@@ -485,4 +552,10 @@ class GameServices {
   /// returns before it would ever wait on the platform.
   @visibleForTesting
   static Duration get signInDeadline => _signInDeadline;
+
+  /// Tests only: the launch-path re-authentication deadline. Unreachable from a
+  /// test for the same reason [signInDeadline] is, and pinned for the same
+  /// reason — what waits on this one is the opening of the app.
+  @visibleForTesting
+  static Duration get reauthDeadline => _reauthDeadline;
 }

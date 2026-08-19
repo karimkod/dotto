@@ -86,6 +86,73 @@ void main() {
       expect(prefs.getBool('signed_in'), isTrue);
     });
 
+    test('a remembered sign-in is re-established, not just believed', () async {
+      // The bug: on iOS, GamesServices.signIn is the only thing that installs
+      // GameKit's authenticate handler. restoreSignInState used to return early
+      // whenever the remembered flag was set, so every launch after the one the
+      // player signed in on left GKLocalPlayer unauthenticated for the life of
+      // the process — the player stream answered nil, and the profile screen,
+      // reported achievements and saved games all failed silently behind it.
+      //
+      // Unreachable from a test: `supported` is false here, so the branch
+      // returns before touching the platform. What can be pinned is that the
+      // remembered-sign-in path leads to a real platform call rather than an
+      // early return.
+      final src = File('lib/services/game_services.dart').readAsStringSync();
+      final restore = src.substring(src.indexOf('static Future<void> '
+          'restoreSignInState()'));
+      expect(restore.substring(0, restore.indexOf('static Future<Player')),
+          contains('_signInNow('),
+          reason: 'a launch that only reads the flag never authenticates, and '
+              'everything behind the platform session stays dark');
+    });
+
+    test('the launch re-authentication is bounded, and tighter than a sign-in',
+        () {
+      // What waits on this one is the cloud pull and the last step of
+      // onboarding, and there is no dialog and no password behind it — so the
+      // 90 seconds that make sense for a player typing into Game Center's sheet
+      // would be a minute and a half of opening time here.
+      expect(GameServices.reauthDeadline, lessThan(GameServices.signInDeadline),
+          reason: 'a silent re-auth must not cost what an interactive one may');
+      expect(GameServices.reauthDeadline, greaterThan(const Duration(seconds: 5)),
+          reason: 'too short and it fails a session that was coming back');
+    });
+
+    test('a remembered sign-in survives a re-authentication that fails',
+        () async {
+      // The never-demote rule, at the one new place that could break it. A
+      // launch that could not reach the platform is not a player who signed
+      // out, and dropping the flag would put the one-shot onboarding offer back
+      // in front of someone who has already answered it.
+      SharedPreferences.setMockInitialValues({'signed_in': true});
+      await GameServices.init();
+      await expectLater(GameServices.restoreSignInState(), completes);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('signed_in'), isTrue);
+    });
+
+    test('an unanswered profile is retried rather than given up on', () async {
+      // The remembered sign-in can outlive the platform session behind it — an
+      // account signed out from the Play Games app, a Game Center session this
+      // process never authenticated, an Android cold start that has not
+      // finished. playerProfile used to return the first null straight to the
+      // screen, which drew a nameless "Player" and stayed that way.
+      //
+      // showAchievements has recovered from the same thing for a while; this
+      // asserts the profile path now does too.
+      final src = File('lib/services/game_services.dart').readAsStringSync();
+      final profile = src.substring(
+          src.indexOf('static Future<PlayerProfile?> playerProfile()'));
+      final body = profile.substring(0, profile.indexOf('static Future<Player'
+          'Profile?> _readPlayer()'));
+      expect(body, contains('_signInNow('),
+          reason: 'a null profile for a signed-in player is a stale session, '
+              'and asking the same dead session again would answer the same');
+      expect('_readPlayer('.allMatches(body).length, greaterThanOrEqualTo(2),
+          reason: 'signing in again is only worth it if the answer is re-read');
+    });
+
     test('showing achievements now signs in first, and still reports back',
         () async {
       // showAchievements no longer needs the caller to have signed in — it
@@ -115,8 +182,9 @@ void main() {
     });
 
     test('restoring sign-in state is a no-op rather than a crash', () async {
-      // main() fires this before runApp. It reads the state and never signs in
-      // — nothing on the launch path may raise the platform's sign-in dialog.
+      // main() fires this before runApp. With nothing remembered it reads the
+      // state and never signs in: a player who has not chosen this may not meet
+      // the platform's account picker on the launch path.
       await expectLater(GameServices.restoreSignInState(), completes);
       expect(GameServices.signedIn, isFalse);
     });
