@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Rendered promo media — outputs of the tooling in lib/screens/promo_*, not
+# sources. The badges inside are fetched by the tooling too.
+/promo/

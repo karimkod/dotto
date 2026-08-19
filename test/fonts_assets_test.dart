@@ -52,11 +52,15 @@ String _libSources() => Directory('lib')
     .join('\n');
 
 /// `GoogleFonts.poppins(` and `GoogleFonts.nunitoTextTheme(` both name a family;
-/// `GoogleFonts.config` is not a call and does not match.
+/// `GoogleFonts.config` is not a call and does not match, and
+/// `GoogleFonts.pendingFonts()` names no family either — it awaits whatever
+/// the surrounding screen already asked for (the promo tooling calls it, and
+/// so does this file).
 Set<String> _familiesUsed(String src) => RegExp(r'GoogleFonts\.([a-z][A-Za-z0-9]*)\(')
     .allMatches(src)
-    .map((m) {
-      final name = m.group(1)!;
+    .map((m) => m.group(1)!)
+    .where((name) => name != 'pendingFonts')
+    .map((name) {
       final base =
           name.endsWith('TextTheme') ? name.substring(0, name.length - 9) : name;
       return base[0].toUpperCase() + base.substring(1);
