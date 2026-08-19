@@ -1,4 +1,3 @@
 What's New:
-• Faster, smoother app start
-• Consent and sign-in now arrive in the right order on first launch
-• A clearer challenges screen
+• Improved startup on slow connections
+• Bug fixes
