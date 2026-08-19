@@ -200,6 +200,10 @@ class MusicService {
 
   static Future<void> _load() async {
     try {
+      // The plugin's default audio context, deliberately: this is the one
+      // player in the app that asks Android for audio focus, so it is the one
+      // that yields to a phone call. The sound effects opt out of focus
+      // entirely — see lib/audio/sfx_io.dart for why sharing it does not work.
       final player = AudioPlayer(playerId: 'music');
       // Native looping, so the seam is not at the mercy of a Dart timer.
       await player.setReleaseMode(ReleaseMode.loop);

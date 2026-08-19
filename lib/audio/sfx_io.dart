@@ -20,6 +20,29 @@ import 'package:audioplayers/audioplayers.dart';
 /// subsystem stands down under test.
 final bool _muted = Platform.environment.containsKey('FLUTTER_TEST');
 
+/// The audio context every effect player is built with, and the reason the
+/// background music survives a level.
+///
+/// Android hands out audio focus per player, not per app: a player that asks
+/// for AUDIOFOCUS_GAIN takes it from whoever held it last, and the loser is
+/// told so even when it belongs to the same process. audioplayers treats that
+/// as final — a non-transient loss pauses the player and clears its playing
+/// flag, so nothing ever brings it back. With the plugin's default context
+/// that is exactly what happened here: the first tick of a level took focus
+/// from the music and the track never returned, which read as the music
+/// stopping the moment the player entered a level.
+///
+/// So effects ask for no focus at all and simply mix. The music player keeps
+/// the default GAIN, which is what should hold focus anyway — it is the thing
+/// that ought to yield to a phone call, and now it is the only player asking.
+///
+/// Android-only in effect: audioFocus has no counterpart elsewhere, and the
+/// iOS half is the plugin's own default, so the session is left as it was.
+final AudioContext _context = AudioContext(
+  android: const AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
+  iOS: AudioContextIOS(),
+);
+
 final Map<String, AudioPlayer> _players = {};
 final Set<String> _loading = {};
 
@@ -38,6 +61,9 @@ Future<void> _create(String name) async {
   try {
     final player = AudioPlayer(playerId: 'sfx_$name')
       ..setReleaseMode(ReleaseMode.stop);
+    // Before the source, not after: changing the context on a loaded player
+    // resets it and re-prepares what it was holding.
+    await player.setAudioContext(_context);
     // lowLatency keeps the source resident (SoundPool on Android) instead of
     // rebuilding a media player per shot.
     await player.setPlayerMode(PlayerMode.lowLatency);
