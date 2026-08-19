@@ -94,7 +94,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.coral.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -165,17 +167,17 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 4),
-        child: Text(
-          text.toUpperCase(),
-          style: TextStyle(
-            color: AppColors.text.withValues(alpha: 0.55),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 10, left: 4),
+    child: Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: AppColors.text.withValues(alpha: 0.55),
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+      ),
+    ),
+  );
 }
 
 /// Where a challenge sits relative to today, which is the only thing that
@@ -199,8 +201,18 @@ class _ChallengeCard extends StatelessWidget {
   final VoidCallback? onPlay;
 
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   String _range() {
@@ -217,100 +229,109 @@ class _ChallengeCard extends StatelessWidget {
     final onPlay = this.onPlay;
 
     final card = Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(18),
-          // The live one wears the accent so it reads first.
-          border: Border.all(
-            color: isCurrent ? AppColors.accent : AppColors.ink,
-            width: 3,
-          ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        // The live one wears the accent so it reads first.
+        border: Border.all(
+          color: isCurrent ? AppColors.accent : AppColors.ink,
+          width: 3,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    challenge.title,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  challenge.title,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
                   ),
-                ),
-                if (done)
-                  const Icon(Icons.check_circle_rounded,
-                      color: Color(0xFF4CAF50), size: 26)
-                else if (isUpcoming)
-                  // A lock, not a play button: the card is here to say the
-                  // week is coming, and tapping it does nothing.
-                  Icon(Icons.lock_clock_rounded,
-                      color: AppColors.text.withValues(alpha: 0.4), size: 26)
-                else
-                  const Icon(Icons.play_circle_fill_rounded,
-                      color: AppColors.coral, size: 26),
-              ],
-            ),
-            if (challenge.description.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                challenge.description,
-                style: TextStyle(
-                  color: AppColors.text.withValues(alpha: 0.75),
-                  fontSize: 14,
-                  height: 1.35,
                 ),
               ),
-            ],
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Text(
-                  _range(),
-                  style: TextStyle(
-                    color: AppColors.text.withValues(alpha: 0.55),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                if (challenge.reward == ChallengeReward.hint)
-                  _Pill(
-                    // Says what it gives, not that a reward exists.
-                    label: done ? '💡 claimed' : '💡 +1 hint',
-                    faded: done,
-                  ),
-              ],
-            ),
-            if (isCurrent && !done) ...[
-              const SizedBox(height: 8),
-              Text(
-                _endsIn(),
-                style: const TextStyle(
+              if (done)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF4CAF50),
+                  size: 26,
+                )
+              else if (isUpcoming)
+                // A lock, not a play button: the card is here to say the
+                // week is coming, and tapping it does nothing.
+                Icon(
+                  Icons.lock_clock_rounded,
+                  color: AppColors.text.withValues(alpha: 0.4),
+                  size: 26,
+                )
+              else
+                const Icon(
+                  Icons.play_circle_fill_rounded,
                   color: AppColors.coral,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  size: 26,
                 ),
-              ),
             ],
-            if (isUpcoming) ...[
-              const SizedBox(height: 8),
+          ),
+          if (challenge.description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              challenge.description,
+              style: TextStyle(
+                color: AppColors.text.withValues(alpha: 0.75),
+                fontSize: 14,
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
               Text(
-                _startsIn(),
+                _range(),
                 style: TextStyle(
                   color: AppColors.text.withValues(alpha: 0.55),
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
+              if (challenge.reward == ChallengeReward.hint)
+                _Pill(
+                  // Says what it gives, not that a reward exists.
+                  label: done ? '💡 claimed' : '💡 +1 hint',
+                  faded: done,
+                ),
             ],
+          ),
+          if (isCurrent && !done) ...[
+            const SizedBox(height: 8),
+            Text(
+              _endsIn(),
+              style: const TextStyle(
+                color: AppColors.coral,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ],
-        ),
-      );
+          if (isUpcoming) ...[
+            const SizedBox(height: 8),
+            Text(
+              _startsIn(),
+              style: TextStyle(
+                color: AppColors.text.withValues(alpha: 0.55),
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
 
     // Nothing to tap on a week that has not arrived, so it gets no bounce and
     // no press feedback — a button that does nothing is worse than no button.
@@ -344,20 +365,20 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: faded ? 0.18 : 0.35),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: AppColors.ink.withValues(alpha: faded ? 0.6 : 1),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: AppColors.accent.withValues(alpha: faded ? 0.18 : 0.35),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: AppColors.ink.withValues(alpha: faded ? 0.6 : 1),
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }
 
 class _Empty extends StatelessWidget {
@@ -365,28 +386,28 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🗓️', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 16),
-            Text('Challenges coming soon!', style: AppTheme.title),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                'A new board to beat every week. Check back shortly.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.text.withValues(alpha: 0.6),
-                  fontSize: 15,
-                  height: 1.4,
-                ),
-              ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('🗓️', style: TextStyle(fontSize: 48)),
+        const SizedBox(height: 16),
+        Text('Challenges coming soon!', style: AppTheme.title),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            'A new board to beat every week. Check back shortly.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.text.withValues(alpha: 0.6),
+              fontSize: 15,
+              height: 1.4,
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _RoundIcon extends StatelessWidget {
@@ -396,17 +417,17 @@ class _RoundIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => BouncyButton(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.ink, width: 3),
-          ),
-          child: Icon(icon, color: AppColors.ink, size: 22),
-        ),
-      );
+        border: Border.all(color: AppColors.ink, width: 3),
+      ),
+      child: Icon(icon, color: AppColors.ink, size: 22),
+    ),
+  );
 }
