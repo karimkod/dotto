@@ -16,11 +16,19 @@
 // back to true so the game still serves ads outside the EEA rather than going
 // dark on a network error — UMP itself returns "not required" for most of the
 // world, so a failure there is far more likely to be transport than refusal.
+//
+// Which is also why [init] waits for a network before it asks. That fallback is
+// safe but blunt: a launch with no connection at all takes it in full, and an
+// EEA player whose phone came up before their wifi did would be filed as "no
+// form, ads allowed" on a question that was never actually put. A minute spent
+// waiting for a transport to appear turns most of those launches back into real
+// answers, and costs nothing on the ordinary launch that already has one.
 
 import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,6 +92,79 @@ class ConsentManager {
   /// stray id here cannot change what a player sees.
   static const List<String> _testDeviceIds = <String>[];
 
+  /// How long [init] will wait for a network before giving up on UMP.
+  ///
+  /// A minute is long for a launch, but the alternative is worse: the only
+  /// thing on the other side of this wait is a question about the player's
+  /// data, and answering it wrongly by default lasts until the next launch.
+  /// Nothing pays it except a launch that genuinely has no transport at all,
+  /// and such a launch has nothing else to get on with either — Firebase, the
+  /// challenge refresh and the ad load are all in the same position.
+  static const _connectivityTimeout = Duration(minutes: 1);
+
+  /// Whether any of the transports the platform reported could carry a request.
+  static bool _online(List<ConnectivityResult> results) =>
+      results.any((r) => r != ConnectivityResult.none);
+
+  /// Resolve once the device has a network, or [timeout] passes without one.
+  ///
+  /// Returns whether a network turned up. Returns true immediately when there
+  /// already is one, which is the case on essentially every launch — the wait
+  /// is only entered when the platform reports no transport whatsoever.
+  ///
+  /// A connectivity check that itself fails resolves true rather than false:
+  /// not being able to tell is not the same as being offline, and the cost of
+  /// guessing wrong here is a minute of splash over a working connection. UMP's
+  /// own timeout is the backstop for the other direction.
+  ///
+  /// Note the limit of what this can know: the platform reports a transport,
+  /// not reachability. Wifi behind a captive portal counts as online here, and
+  /// UMP will fail against it the way it always did.
+  @visibleForTesting
+  static Future<bool> waitForInternet({
+    Duration timeout = _connectivityTimeout,
+  }) async {
+    final connectivity = Connectivity();
+    try {
+      if (_online(await connectivity.checkConnectivity())) return true;
+    } catch (e) {
+      debugPrint('Connectivity check failed: $e');
+      return true;
+    }
+
+    // Listened to explicitly rather than through `firstWhere().timeout()`, so
+    // the subscription is actually cancelled when the timer wins — a future
+    // timing out does not close the stream behind it, and this one would then
+    // outlive the wait it belongs to.
+    final found = Completer<bool>();
+    StreamSubscription<List<ConnectivityResult>>? sub;
+    try {
+      sub = connectivity.onConnectivityChanged.listen(
+        (results) {
+          if (_online(results) && !found.isCompleted) found.complete(true);
+        },
+        onError: (Object e) {
+          debugPrint('Connectivity stream failed: $e');
+          if (!found.isCompleted) found.complete(true);
+        },
+      );
+    } catch (e) {
+      debugPrint('Connectivity stream unavailable: $e');
+      return true;
+    }
+    final timer = Timer(timeout, () {
+      if (!found.isCompleted) found.complete(false);
+    });
+
+    final online = await found.future;
+    timer.cancel();
+    await sub.cancel();
+    if (!online) {
+      debugPrint('No connection after ${timeout.inSeconds}s; carrying on');
+    }
+    return online;
+  }
+
   /// Ask UMP what this user needs, and load the answer.
   ///
   /// Safe to call at launch: it is a network round trip, but nothing blocks on
@@ -96,6 +177,19 @@ class ConsentManager {
       // No storage. The pre-prompt may be shown twice; harmless.
     }
     if (!_supported) return;
+
+    // UMP is a network round trip and nothing else, so asking it over no
+    // connection is not a request that might fail — it is one that cannot
+    // succeed. Wait for a transport first; see [waitForInternet].
+    if (!await waitForInternet()) {
+      // A full minute with nothing to send over. Take the same fallback the
+      // error callback below takes rather than spend another eight seconds
+      // proving it: ads allowed, nothing settled — so [consentSettled] stays
+      // false, the sign-in offer is held, and the whole introduction runs
+      // again next launch, which is exactly the unreachable-UMP path.
+      _canRequestAds = true;
+      return;
+    }
 
     // Debug builds always claim to be in the EEA, so the form can be walked
     // through from anywhere — the flow is otherwise untestable outside Europe,
