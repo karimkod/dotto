@@ -50,6 +50,25 @@ void main() {
     });
   });
 
+  group('the sign-in offer waits for the consent question', () {
+    // The offer is one-shot, so the router holds it on [consentSettled]: a
+    // launch where UMP was never reached must not put the platform's account
+    // screen ahead of a consent screen the player is still owed.
+    test('unsettled while UMP has never been reached', () {
+      expect(ConsentManager.consentSettled, isFalse);
+    });
+
+    test('settled once UMP answered this launch, form or no form', () {
+      ConsentManager.setForTest(answered: true);
+      expect(ConsentManager.consentSettled, isTrue);
+    });
+
+    test('settled once the pre-prompt was seen on any earlier launch', () {
+      ConsentManager.setForTest(prePromptSeen: true);
+      expect(ConsentManager.consentSettled, isTrue);
+    });
+  });
+
   group('the consent mechanism is UMP, not ours', () {
     /// Source with comments stripped — otherwise a comment explaining that
     /// something was removed reads as the thing still being there.

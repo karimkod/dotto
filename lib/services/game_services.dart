@@ -127,6 +127,11 @@ class GameServices {
 
   /// Whether onboarding should offer to sign in. False once asked, once signed
   /// in, or where there is no games platform to sign in to.
+  ///
+  /// The router holds the offer further, until the consent question is
+  /// settled — see `ConsentManager.consentSettled` and main.dart's
+  /// `_afterConsent` — so this getter answering true is necessary but not
+  /// sufficient for the screen to appear.
   static bool get needsSignInPrompt => supported && !_prompted && !_signedIn;
 
   /// Load the "already asked" and "already signed in" flags. Call before the

@@ -26,13 +26,19 @@ the player answers the form. Tests assert their absence.
 ## The flow
 
 1. `ConsentManager.init()` — `requestConsentInfoUpdate()`, then read
-   `isConsentFormAvailable()` and `canRequestAds()`. Blocking but capped at
-   eight seconds.
+   `isConsentFormAvailable()` and `canRequestAds()`. Capped at eight seconds,
+   and run inside boot behind the splash: the splash holds its handoff until
+   boot settles, so UMP's answer is in before the app decides which screen to
+   open. A slow consent service costs opening time, never the ordering.
 2. If a form is available and the pre-prompt has not been seen: show the
    pre-prompt.
-3. **Continue** → `loadAndShowConsentFormIfRequired()` → the real form.
-4. iOS: the ATT prompt, after the form.
-5. `AdManager.init()`, once `canRequestAds` is true.
+3. **Continue** → iOS asks ATT first (UMP builds the form around that
+   answer) → `loadAndShowConsentFormIfRequired()` → the real form.
+4. `AdManager.init()`, once `canRequestAds` is true.
+5. Only then may onboarding offer sign-in: the router holds the offer until
+   `consentSettled` — UMP answered this launch, or the pre-prompt was seen on
+   an earlier one — so a launch where UMP was unreachable cannot put the
+   platform's account screen ahead of the consent screen.
 
 Firebase can start at any point — UMP emits the consent signals itself, so
 there is no default state for the app to set first. That is the main ordering
@@ -81,9 +87,17 @@ ads allowed" keeps the game working where consent was never needed. It does mean
 an EEA user on a broken connection could see an ad before the form — Google's own
 reference flow makes the same trade.
 
+A launch where UMP never answered also withholds the sign-in offer
+(`consentSettled` stays false), so the onboarding order survives the failure:
+the next launch, answering from UMP's cache, runs consent first and the offer
+after it.
+
 ## ATT
 
-iOS only, once, after the UMP form. Independent of what UMP returned: Apple
+iOS only, once, between the pre-prompt and the UMP form — ATT decides whether
+the IDFA exists, and UMP reads that answer as it builds the form, so asking
+Apple second would assemble the form against a tracking state about to change.
+Independent of what UMP returned: Apple
 requires the prompt before the IDFA may be read at all, whatever was agreed for
 GDPR. Only `notDetermined` can be prompted; every other state is settled, which
 is why Ad preferences does not re-prompt — changing it means going to iOS

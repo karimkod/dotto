@@ -38,8 +38,23 @@ class ConsentManager {
   static bool _prePromptSeen = false;
   static bool _canRequestAds = false;
 
+  /// Whether UMP answered on this launch. Set only by the success callback in
+  /// [init] — a failure or a timeout is precisely UMP *not* answering.
+  static bool _answered = false;
+
   /// Whether ads may be requested at all. False until UMP has been asked.
   static bool get canRequestAds => _canRequestAds;
+
+  /// Whether the consent question is settled enough for onboarding to move
+  /// past it: the pre-prompt has been seen on some earlier launch, or UMP
+  /// answered on this one — form or no form.
+  ///
+  /// False means UMP has not been reached yet and the introduction is still
+  /// owed. The router holds the sign-in offer on this, so a launch where the
+  /// consent service was unreachable cannot spend the one-shot offer ahead of
+  /// a consent screen the player has never seen — the next launch, with UMP's
+  /// cached answer, runs the two in the designed order instead.
+  static bool get consentSettled => _prePromptSeen || _answered;
 
   /// Whether to open on the pre-prompt.
   ///
@@ -103,6 +118,10 @@ class ConsentManager {
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
         () async {
+          // Answered, whatever the reads below make of it: the callback firing
+          // at all is UMP getting back to us, which is what settles the
+          // question this launch.
+          _answered = true;
           try {
             _formAvailable =
                 await ConsentInformation.instance.isConsentFormAvailable();
@@ -271,6 +290,7 @@ class ConsentManager {
     _prePromptSeen = false;
     _formAvailable = false;
     _canRequestAds = false;
+    _answered = false;
     _prefs = null;
   }
 
@@ -280,9 +300,11 @@ class ConsentManager {
     bool prePromptSeen = false,
     bool formAvailable = false,
     bool canRequestAds = false,
+    bool answered = false,
   }) {
     _prePromptSeen = prePromptSeen;
     _formAvailable = formAvailable;
     _canRequestAds = canRequestAds;
+    _answered = answered;
   }
 }

@@ -3,6 +3,7 @@
 // route that never replaces itself, would leave the player looking at a dot
 // forever with nothing to tap.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,53 @@ void main() {
     expect(find.text('after'), findsOneWidget);
     expect(find.text('DOTTO'), findsNothing,
         reason: 'the splash replaces itself rather than stacking');
+  });
+
+  testWidgets('the handoff waits for the work it covers', (tester) async {
+    // Boot runs behind the opening, and the next screen reads its stores
+    // synchronously — so an animation that finishes first must hold rather
+    // than hand over to a screen whose data is not there yet.
+    final boot = Completer<void>();
+    await tester.pumpWidget(MaterialApp(
+      home: SplashScreen(
+        holdFor: boot.future,
+        next: (_) => const Scaffold(body: Center(child: Text('after'))),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('after'), findsNothing,
+        reason: 'boot has not settled, so there is nothing safe to build yet');
+    expect(find.text('DOTTO'), findsOneWidget,
+        reason: 'the opening keeps the screen rather than going blank');
+
+    boot.complete();
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('after'), findsOneWidget);
+  });
+
+  testWidgets('a failed boot still hands over', (tester) async {
+    // The splash's one job is to get out of the way. Boot reports its own
+    // errors; the opening must not turn one into a screen nobody can leave.
+    final boot = Completer<void>();
+    // Swallowed here as well as in the splash: whether the error lands before
+    // or after the handoff starts listening depends on frame timing, and an
+    // error the splash has not subscribed to yet would fail the test as
+    // unhandled instead of exercising the catch.
+    unawaited(boot.future.catchError((_) {}));
+    await tester.pumpWidget(MaterialApp(
+      home: SplashScreen(
+        holdFor: boot.future,
+        next: (_) => const Scaffold(body: Center(child: Text('after'))),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 1800));
+
+    boot.completeError(StateError('boot died'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('after'), findsOneWidget);
   });
 
   testWidgets('there is no way back to it', (tester) async {

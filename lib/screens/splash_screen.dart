@@ -1,9 +1,10 @@
 // The opening: the dot arrives, the name follows, then the game.
 //
-// It exists to cover a real gap rather than to be an animation. Launch already
-// waits on storage, consent and the challenge cache before the first frame, and
-// the native launch theme only paints a flat colour — so this is the stretch a
-// player would otherwise spend looking at nothing.
+// It exists to cover a real gap rather than to be an animation. Everything
+// launch needs — storage, consent, the challenge cache — loads behind it (see
+// [SplashScreen.holdFor]), and the native launch theme only paints a flat
+// colour — so this is the stretch a player would otherwise spend looking at
+// nothing, now spent looking at the game arriving instead.
 //
 // The dot is drawn rather than loaded, in the same terms as the board: a filled
 // circle in the game's accent, a thick ink outline, and a warm halo behind it.
@@ -15,11 +16,20 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key, required this.next});
+  const SplashScreen({super.key, required this.next, this.holdFor});
 
   /// What to show once the opening is done. Built lazily, so the decision is
   /// made when it is needed rather than before the animation starts.
   final WidgetBuilder next;
+
+  /// The work the opening is covering, or null when there is none.
+  ///
+  /// The handoff waits for it: the animation may finish first, but [next] is
+  /// not built until this settles — which is what lets the screens behind the
+  /// splash read their stores synchronously. The animation does not wait in
+  /// return; the halo keeps breathing over a long hold, so a slow boot reads
+  /// as the opening taking a moment rather than as a hang.
+  final Future<void>? holdFor;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -59,8 +69,23 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _ctrl.forward();
     _ctrl.addStatusListener((s) {
-      if (s == AnimationStatus.completed) _go();
+      if (s == AnimationStatus.completed) _handOver();
     });
+  }
+
+  /// The animation is done; leave as soon as the covered work is too.
+  Future<void> _handOver() async {
+    final hold = widget.holdFor;
+    if (hold != null) {
+      // Never let a failed boot strand the player here: the splash's one job
+      // is to get out of the way, and whoever owns the future reports its
+      // errors.
+      try {
+        await hold;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    _go();
   }
 
   void _go() {

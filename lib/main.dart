@@ -44,9 +44,6 @@ void main() {
 }
 
 Future<void> _start() async {
-  // Progress is read synchronously while the level list builds, so it has to be
-  // in memory before the first frame — otherwise a returning player sees a
-  // fully locked map for an instant.
   WidgetsFlutterBinding.ensureInitialized();
   // Every Nunito and Poppins variant the app asks for is bundled (see the asset
   // list in pubspec.yaml), so google_fonts resolves them from the manifest and
@@ -64,63 +61,99 @@ Future<void> _start() async {
   // test/fonts_assets_test.dart pins.
   GoogleFonts.config.allowRuntimeFetching = false;
   _registerFontLicenses();
-  await ProgressStore.init();
-  await SettingsStore.init();
-  // Reads the music preference and starts decoding the track behind it, so the
-  // splash covers the load and the menu opens straight into the fade-in.
-  await MusicService.init();
-  // Started here, awaited below. Everything Firebase-backed needs this to have
-  // finished first — Firestore for the challenges, Messaging for the
-  // notification state — and it used to run after them, so the first challenge
-  // refresh of every launch failed with `[core/no-app]` and fell back to cache.
-  // Kicked off rather than awaited on the spot so it overlaps with the consent
-  // wait below instead of being added to it.
-  final firebaseReady = Analytics.init();
-  // Blocking, but bounded: it decides which screen opens, and it caps itself at
-  // eight seconds rather than letting a slow consent service delay the game.
-  await ConsentManager.init();
-  await firebaseReady;
-  // Attaches to the app Firebase just created, so it has to follow that await
-  // rather than sit beside it. Unawaited would race the rest of startup — the
-  // window this closes is precisely the one where a launch crash happens.
-  await CrashReporting.init();
-  // Cached challenges load synchronously enough to decide the menu badge; the
-  // network refresh behind it is unawaited.
-  await ChallengeService.init();
-  await FreeHintService.init();
-  // Loads the "already offered sign-in" flag, which decides whether onboarding
-  // has one more step.
-  await GameServices.init();
+  // Everything else loads behind the splash, which holds its handoff until
+  // [_boot] settles — so the first frame is the opening rather than a stalled
+  // launch colour, and every screen after the splash can still read its
+  // stores synchronously.
+  runApp(DottoApp(boot: _boot()));
+}
 
-  // Firebase itself started above. Starting it before the consent form is
-  // deliberate and unchanged: UMP emits the Consent Mode signals itself, so
-  // there is no default state for this app to set first.
-  //
-  // Reads preferences and reconnects whatever permission already exists. It
-  // does NOT ask for permission — that happens after a first level is won, by
-  // which point the player knows what they are being offered. Unawaited: no
-  // screen depends on it, and it must not stand between launch and the game.
-  unawaited(NotificationService.init());
-  // Reads whether an account is already signed in — it never asks for one.
-  // Sign-in is player-initiated only: the onboarding offer, or Achievements.
-  // Launching straight into the platform's sign-in dialog is exactly what this
-  // must not do.
-  //
-  // Kept rather than thrown away with unawaited(): the platform probe is a
-  // round trip through Play Games or Game Center and routinely outlasts the
-  // 1800ms opening, so the routing after the splash used to read a _signedIn
-  // that had not been written yet and offer sign-in to a player who was already
-  // signed in. Nothing before the first frame waits on it — only the one
-  // decision that depends on it does, in [_DottoAppState._afterConsent].
-  final signInRestored = GameServices.restoreSignInState();
-  // Ads only once UMP says they are allowed. On a first EEA launch that is
-  // false until the form has been answered, and the consent screen starts them.
-  if (ConsentManager.canRequestAds) unawaited(AdManager.init());
+/// The launch-time read of the platform's sign-in state, still in flight.
+///
+/// Written by [_boot], read by [_DottoAppState._afterConsent] through the
+/// sign-in gate. Null in tests and anywhere boot never ran, which is treated
+/// as "already settled" rather than as something to wait for.
+Future<void>? _signInRestored;
 
-  runApp(DottoApp(
-    showPrePrompt: ConsentManager.needsPrePrompt,
-    signInRestored: signInRestored,
-  ));
+/// Everything launch needs, in dependency order, behind the splash.
+///
+/// The splash holds its handoff until this settles, which is what lets the
+/// screens after it read progress, settings and the challenge cache
+/// synchronously — the guarantee that used to come from finishing all of this
+/// before runApp, kept without the stalled native launch screen.
+///
+/// Never allowed to throw: a boot that dies must still hand the player the
+/// game, with whatever defaults the failed step left behind, rather than
+/// strand them on the opening. The error is reported, not swallowed.
+Future<void> _boot() async {
+  try {
+    // Progress is read synchronously while the level list builds, so it has
+    // to be in memory before the splash hands over — otherwise a returning
+    // player sees a fully locked map for an instant.
+    await ProgressStore.init();
+    await SettingsStore.init();
+    // Reads the music preference and starts decoding the track behind it, so
+    // the splash covers the load and the menu opens straight into the fade-in.
+    await MusicService.init();
+    // Started here, awaited below. Everything Firebase-backed needs this to
+    // have finished first — Firestore for the challenges, Messaging for the
+    // notification state — and it used to run after them, so the first
+    // challenge refresh of every launch failed with `[core/no-app]` and fell
+    // back to cache. Kicked off rather than awaited on the spot so it
+    // overlaps with the consent wait below instead of being added to it.
+    final firebaseReady = Analytics.init();
+    // Still bounded at eight seconds, but now covered: the splash holds until
+    // boot settles, so a slow consent service costs opening time rather than
+    // a frozen launch screen — and its answer is in before
+    // [_DottoAppState._afterSplash] decides which screen to open, which is
+    // the race that used to cost the pre-prompt its first-launch slot.
+    await ConsentManager.init();
+    await firebaseReady;
+    // Attaches to the app Firebase just created, so it has to follow that
+    // await rather than sit beside it. Unawaited would race the rest of boot
+    // — the window this closes is precisely the one where a launch crash
+    // happens.
+    await CrashReporting.init();
+    // Cached challenges load synchronously enough to decide the menu badge;
+    // the network refresh behind it is unawaited.
+    await ChallengeService.init();
+    await FreeHintService.init();
+    // Loads the "already offered sign-in" flag, which decides whether
+    // onboarding has one more step.
+    await GameServices.init();
+
+    // Firebase itself started above. Starting it before the consent form is
+    // deliberate and unchanged: UMP emits the Consent Mode signals itself, so
+    // there is no default state for this app to set first.
+    //
+    // Reads preferences and reconnects whatever permission already exists. It
+    // does NOT ask for permission — that happens after a first level is won,
+    // by which point the player knows what they are being offered. Unawaited:
+    // no screen depends on it, and it must not stand between launch and the
+    // game.
+    unawaited(NotificationService.init());
+    // Reads whether an account is already signed in — it never asks for one.
+    // Sign-in is player-initiated only: the onboarding offer, or Achievements.
+    // Launching straight into the platform's sign-in dialog is exactly what
+    // this must not do.
+    //
+    // Kept rather than thrown away with unawaited(): the platform probe is a
+    // round trip through Play Games or Game Center that routinely outlasts
+    // whatever is left of the opening, so the routing after the splash used
+    // to read a _signedIn that had not been written yet and offer sign-in to
+    // a player who was already signed in. Boot does not wait on it — only the
+    // one decision that depends on it does, in
+    // [_DottoAppState._afterConsent].
+    _signInRestored = GameServices.restoreSignInState();
+    // Ads only once UMP says they are allowed. On a first EEA launch that is
+    // false until the form has been answered, and the consent screen starts
+    // them.
+    if (ConsentManager.canRequestAds) unawaited(AdManager.init());
+  } catch (e, stack) {
+    // Reported as caught rather than fatal: the app carries on into the game,
+    // it just got there with less than it wanted.
+    CrashReporting.recordError(e, stack, fatal: false, context: 'boot');
+  }
 }
 
 /// Adds the bundled fonts' SIL Open Font License text to the licence page.
@@ -142,23 +175,24 @@ void _registerFontLicenses() {
 }
 
 class DottoApp extends StatefulWidget {
-  const DottoApp({super.key, this.showPrePrompt = false, this.signInRestored});
+  const DottoApp({super.key, this.boot});
 
-  /// Whether to open on the pre-prompt rather than the menu.
-  final bool showPrePrompt;
-
-  /// The launch-time read of the platform's sign-in state, still in flight.
-  ///
-  /// Null in tests and anywhere the probe was never started, which is treated
-  /// as "already settled" rather than as something to wait for.
-  final Future<void>? signInRestored;
+  /// Launch's initialisation, still in flight — see [_boot]. The splash holds
+  /// its handoff until this settles. Null in tests, where there is nothing to
+  /// wait for.
+  final Future<void>? boot;
 
   @override
   State<DottoApp> createState() => _DottoAppState();
 }
 
 class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
-  late bool _prePrompt = widget.showPrePrompt;
+  /// Whether the app opened on the pre-prompt. Decided at the splash's
+  /// handoff, once boot has settled and UMP's answer is in — deciding it any
+  /// earlier is the race this replaced, where a first launch whose UMP answer
+  /// missed runApp skipped the consent screen and let the one-shot sign-in
+  /// offer run ahead of it.
+  bool? _prePrompt;
 
   @override
   void initState() {
@@ -230,9 +264,12 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   /// first. Every route onwards goes through [_afterConsent], and the sign-in
   /// offer lives inside that — so there is no path where the platform's account
   /// screen appears before the player has been asked about their data.
-  Widget _afterSplash(BuildContext context) => _prePrompt
-      ? ConsentScreen(onContinue: () => _onContinue(context))
-      : _afterConsent(context);
+  Widget _afterSplash(BuildContext context) {
+    final prePrompt = _prePrompt ??= ConsentManager.needsPrePrompt;
+    return prePrompt
+        ? ConsentScreen(onContinue: () => _onContinue(context))
+        : _afterConsent(context);
+  }
 
   /// After consent: offer sign-in once, then the menu.
   ///
@@ -242,9 +279,17 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   ///
   /// Gated on the launch-time sign-in probe, because `needsSignInPrompt` is a
   /// plain getter over state that call is still writing.
+  ///
+  /// And held until the consent question is settled — answered by UMP this
+  /// launch, or introduced on an earlier one. A launch where UMP was
+  /// unreachable gets the menu, not the offer: the offer is one-shot, and
+  /// spending it here would put the platform's account screen ahead of a
+  /// consent screen the player is still owed. The next launch, with UMP's
+  /// cached answer, runs the two in the designed order instead.
   Widget _afterConsent(BuildContext context) => _SignInGate(
-        restored: widget.signInRestored,
-        builder: (context) => GameServices.needsSignInPrompt
+        restored: _signInRestored,
+        builder: (context) => GameServices.needsSignInPrompt &&
+                ConsentManager.consentSettled
             ? SignInScreen(
                 onDone: () => Navigator.of(context)
                     .pushReplacement(_fadeTo((_) => _menu())),
@@ -282,7 +327,7 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       // Lets the menu notice it has been uncovered and re-read progress.
       navigatorObservers: [routeObserver],
-      home: SplashScreen(next: _afterSplash),
+      home: SplashScreen(next: _afterSplash, holdFor: widget.boot),
     );
   }
 }
@@ -297,9 +342,10 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
 /// signed in gets offered sign-in again, and the offer is a screen they were
 /// promised they would only ever see once.
 ///
-/// The splash is left alone. It runs its full opening regardless, and this only
-/// covers whatever is left of the probe when the animation is done — normally
-/// nothing, since the two have been running side by side since launch.
+/// The splash is left alone: it holds for boot, not for this. The probe is
+/// boot's last act, so what this covers is the probe's own round trip after
+/// the handoff — bounded, because a platform that stays silent should cost a
+/// beat, not the launch.
 class _SignInGate extends StatefulWidget {
   const _SignInGate({required this.restored, required this.builder});
 
