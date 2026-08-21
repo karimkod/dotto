@@ -52,11 +52,11 @@ class AdManager {
   // requested under the iOS app id (or the reverse) simply never fills — hence
   // the platform switch rather than one shared constant.
 
-  static String get _rewardedUnitId => Platform.isAndroid
+  static String get _rewardedUnitId => !kIsWeb && Platform.isAndroid
       ? 'ca-app-pub-3605343790686215/6607406377'
       : 'ca-app-pub-3605343790686215/9812154217';
 
-  static String get _interstitialUnitId => Platform.isAndroid
+  static String get _interstitialUnitId => !kIsWeb && Platform.isAndroid
       ? 'ca-app-pub-3605343790686215/9149809232'
       : 'ca-app-pub-3605343790686215/8766665850';
 

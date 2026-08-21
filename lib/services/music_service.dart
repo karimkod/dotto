@@ -26,6 +26,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MusicService {
@@ -50,7 +51,8 @@ class MusicService {
   /// screen, both of which ask for music, so the subsystem stands down under
   /// test exactly as the sound effects do — the preference still changes, it
   /// just drives nothing.
-  static final bool _muted = Platform.environment.containsKey('FLUTTER_TEST');
+  static final bool _muted =
+      kIsWeb ? false : Platform.environment.containsKey('FLUTTER_TEST');
 
   static SharedPreferences? _prefs;
   static bool _enabled = true;
