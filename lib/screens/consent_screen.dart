@@ -1,10 +1,16 @@
-// The pre-prompt: what the next screen is about, before Google's form arrives.
+// The pre-prompt: what the next prompt is about, before the system asks it.
 //
-// It offers no choice of its own. UMP asks the actual question and owns the
-// answer; this exists so the form does not land on a player cold, which is both
-// kinder and the pattern Google recommends. Because it decides nothing, there
-// is no way to dismiss it without continuing — the only path forward is the one
-// button.
+// It offers no choice of its own. UMP and Apple ask the actual questions and
+// own the answers; this exists so neither lands on a player cold, which is both
+// kinder and the pattern Google and Apple each recommend. Because it decides
+// nothing, there is no way to dismiss it without continuing — the only path
+// forward is the one button.
+//
+// What comes after it differs by region, so the wording does too. In the EEA
+// there is Google's form to introduce; everywhere else on iOS there is only
+// Apple's tracking prompt, and promising a screen of choices that never arrives
+// would be worse than saying nothing. [ConsentScreen.hasAdChoices] picks
+// between the two — see `ConsentManager.hasUmpForm`.
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,10 +22,20 @@ import '../widgets/bouncy_button.dart';
 const _privacyUrl = 'https://reshaped.dev/projects/dotto/privacy';
 
 class ConsentScreen extends StatefulWidget {
-  const ConsentScreen({super.key, required this.onContinue});
+  const ConsentScreen({
+    super.key,
+    required this.onContinue,
+    this.hasAdChoices = true,
+  });
 
-  /// Runs the UMP form, then ATT, then moves on.
+  /// Runs ATT, then the UMP form if there is one, then moves on.
   final VoidCallback onContinue;
+
+  /// Whether Google's form actually follows, with its choice of ad
+  /// personalisation on it. False outside the EEA, where the only thing behind
+  /// Continue is Apple's tracking prompt — so the copy names that instead of
+  /// pointing at a "next screen" the player will never reach.
+  final bool hasAdChoices;
 
   @override
   State<ConsentScreen> createState() => _ConsentScreenState();
@@ -74,8 +90,14 @@ class _ConsentScreenState extends State<ConsentScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Dotto is free and supported by ads. On the next '
-                          'screen, you can choose how your data is used.',
+                          widget.hasAdChoices
+                              ? 'Dotto is free and supported by ads. On the '
+                                  'next screen, you can choose how your data '
+                                  'is used.'
+                              : 'Dotto is free and supported by ads. Next, '
+                                  'you can choose whether Dotto may use your '
+                                  'device’s advertising ID to keep those '
+                                  'ads relevant.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: AppColors.text.withValues(alpha: 0.8),
@@ -125,7 +147,14 @@ class _ConsentScreenState extends State<ConsentScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'You can change this anytime in Settings.',
+                  // Where "anytime" actually leads differs the same way. With
+                  // a form behind Continue, Settings → Ad preferences reopens
+                  // it. Without one there is nothing for that button to show,
+                  // and the tracking answer lives in iOS Settings → Privacy —
+                  // Apple's design, not ours.
+                  widget.hasAdChoices
+                      ? 'You can change this anytime in Settings.'
+                      : 'You can change this anytime in iOS Settings.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.text.withValues(alpha: 0.5),

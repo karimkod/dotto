@@ -64,14 +64,48 @@ class ConsentManager {
   /// cached answer, runs the two in the designed order instead.
   static bool get consentSettled => _prePromptSeen || _answered;
 
+  /// Whether UMP has a form to show — in practice, whether this player is in
+  /// the EEA or UK. Read by the pre-prompt, which words itself differently
+  /// depending on what is actually behind the Continue button.
+  static bool _formAvailable = false;
+  static bool get hasUmpForm => _formAvailable;
+
+  /// Whether Apple's tracking prompt can still be put to this player: iOS, and
+  /// a status of `notDetermined`. Read once per launch in [init], before the
+  /// network wait, because ATT is a local question and must not be held up by
+  /// — or lost to — a consent service that cannot be reached.
+  static bool _attPending = false;
+  static bool get attPending => _attPending;
+
   /// Whether to open on the pre-prompt.
   ///
-  /// Only when UMP actually has a form to show — outside the EEA there is
-  /// nothing behind the Continue button, and a screen that explains a choice
-  /// the player will never be offered is worse than no screen.
-  static bool _formAvailable = false;
+  /// Whenever there is something behind the Continue button. That used to mean
+  /// a UMP form and nothing else, which made the whole screen EEA-only — and
+  /// because ATT is asked from this flow, an iOS player outside the EEA was
+  /// therefore never asked about tracking at all. App Review rejected the
+  /// build for exactly that: a US reviewer on iPadOS saw no prompt.
+  ///
+  /// So the same screen now opens for both, and adapts to what follows it:
+  ///
+  ///   * EEA — the explainer, then ATT, then Google's form.
+  ///   * Everywhere else on iOS — the explainer, then ATT. Google requires no
+  ///     form outside the EEA; Apple requires the prompt everywhere.
+  ///
+  /// Android outside the EEA is the one case that still opens straight into
+  /// the game: no ATT there and no form either, so the screen would introduce
+  /// a choice that is never offered. That is not what was rejected — it is the
+  /// original rule, kept where it still holds.
   static bool get needsPrePrompt =>
-      _supported && !_prePromptSeen && _formAvailable;
+      _supported && !_prePromptSeen && (_formAvailable || _attPending);
+
+  /// Whether ads may be started at launch, as opposed to eventually.
+  ///
+  /// [canRequestAds] is UMP's answer and only UMP's; this adds Apple's half.
+  /// Starting the AdMob SDK ahead of a tracking prompt that is still owed is
+  /// precisely the "data collected before the request" App Review objected to
+  /// — so boot holds off, and the consent screen starts ads once ATT has been
+  /// answered.
+  static bool get adsMayStartAtLaunch => _canRequestAds && !needsPrePrompt;
 
   static bool get _supported {
     if (kIsWeb) return false;
@@ -91,6 +125,16 @@ class ConsentManager {
   /// Debug builds only. [ConsentDebugSettings] is ignored in release, so a
   /// stray id here cannot change what a player sees.
   static const List<String> _testDeviceIds = <String>[];
+
+  /// Which region a debug build pretends to be in. Debug only — see the
+  /// [ConsentRequestParameters] below, which passes null in release.
+  ///
+  /// EEA by default, because that is the flow with the most in it: explainer,
+  /// ATT, then Google's form. Switch to [DebugGeography.debugGeographyOther]
+  /// to walk the path a US player takes — explainer, ATT, and no form — which
+  /// is the one that had no screen at all until App Review found it. Worth
+  /// running on a simulator before any iOS release; nothing else exercises it.
+  static const _debugGeography = DebugGeography.debugGeographyEea;
 
   /// How long [init] will wait for a network before giving up on UMP.
   ///
@@ -165,6 +209,27 @@ class ConsentManager {
     return online;
   }
 
+  /// Read whether Apple's prompt is still open to being asked.
+  ///
+  /// Only `notDetermined` can be put to the player; every other status is a
+  /// settled answer that a second request would return without showing
+  /// anything. A read that fails is taken as settled — better an explainer
+  /// that does not appear than one that leads nowhere.
+  static Future<void> _refreshAttPending() async {
+    if (!Platform.isIOS) {
+      _attPending = false;
+      return;
+    }
+    try {
+      _attPending =
+          await AppTrackingTransparency.trackingAuthorizationStatus ==
+              TrackingStatus.notDetermined;
+    } catch (e) {
+      debugPrint('ATT status read failed: $e');
+      _attPending = false;
+    }
+  }
+
   /// Ask UMP what this user needs, and load the answer.
   ///
   /// Safe to call at launch: it is a network round trip, but nothing blocks on
@@ -177,6 +242,12 @@ class ConsentManager {
       // No storage. The pre-prompt may be shown twice; harmless.
     }
     if (!_supported) return;
+
+    // Before anything that can block or fail. ATT is a local read with no
+    // network behind it, and the pre-prompt is now gated on its answer as much
+    // as on UMP's — so a launch that never reaches Google must still know it
+    // owes the player Apple's prompt.
+    await _refreshAttPending();
 
     // UMP is a network round trip and nothing else, so asking it over no
     // connection is not a request that might fail — it is one that cannot
@@ -191,17 +262,18 @@ class ConsentManager {
       return;
     }
 
-    // Debug builds always claim to be in the EEA, so the form can be walked
-    // through from anywhere — the flow is otherwise untestable outside Europe,
-    // where UMP simply answers "not required" and shows nothing. Attached
-    // unconditionally in debug rather than only when [_testDeviceIds] is
-    // filled: on an emulator or simulator that alone is enough, and a developer
-    // should not have to find their device id before the form will appear.
-    // Release builds get null, so this cannot follow a build to the store.
+    // Debug builds claim a geography, so both flows can be walked through from
+    // anywhere — they are otherwise untestable outside their own region, which
+    // is the whole reason the missing non-EEA prompt reached App Review rather
+    // than a developer. Attached unconditionally in debug rather than only when
+    // [_testDeviceIds] is filled: on an emulator or simulator that alone is
+    // enough, and a developer should not have to find their device id before
+    // the form will appear. Release builds get null, so none of this can follow
+    // a build to the store.
     final params = ConsentRequestParameters(
       consentDebugSettings: kDebugMode
           ? ConsentDebugSettings(
-              debugGeography: DebugGeography.debugGeographyEea,
+              debugGeography: _debugGeography,
               testIdentifiers: _testDeviceIds,
             )
           : null,
@@ -268,13 +340,19 @@ class ConsentManager {
   /// calls this too, and a returning player changing their mind is not part of
   /// the first-launch funnel — counting it there would inflate a step that is
   /// supposed to measure new players only.
+  ///
+  /// So does [hasUmpForm], now that the pre-prompt runs outside the EEA as
+  /// well: the call below is a no-op where there is no form, and reporting a
+  /// UMP step for every non-EEA player would drown the one measurement this
+  /// event exists to make.
   static Future<bool> showFormIfRequired({
     bool duringOnboarding = false,
   }) async {
     // Nothing to show and nothing that can fail: on web and under `flutter
     // test` there is no form to come back to, so this is a success.
     if (!_supported) return true;
-    if (duringOnboarding) Analytics.onboardingUmpShown();
+    final reportFunnel = duringOnboarding && _formAvailable;
+    if (reportFunnel) Analytics.onboardingUmpShown();
     var ok = true;
     final done = Completer<void>();
     try {
@@ -299,7 +377,7 @@ class ConsentManager {
     } catch (_) {
       _canRequestAds = true;
     }
-    if (duringOnboarding) Analytics.onboardingUmpCompleted();
+    if (reportFunnel) Analytics.onboardingUmpCompleted();
     return ok;
   }
 
@@ -346,12 +424,19 @@ class ConsentManager {
   /// form: two dialogs at once reads as a wall of permissions, which is why the
   /// explainer comes before both.
   ///
-  /// UMP's answer does not decide this one either way — Apple requires the
-  /// prompt before the IDFA may be read, whatever was agreed for GDPR.
+  /// UMP's answer does not decide this one either way, and neither does UMP
+  /// having anything to ask. Apple requires the prompt before the IDFA may be
+  /// read, whatever was agreed for GDPR and wherever the player is — which is
+  /// why the pre-prompt that leads here no longer waits for a form that only
+  /// the EEA ever gets. See [needsPrePrompt].
   static Future<void> requestTrackingAuthorization() async {
     if (kIsWeb) return;
     if (Platform.environment.containsKey('FLUTTER_TEST')) return;
     if (!Platform.isIOS) return;
+    // Asked or not, the question is not owed twice. Cleared before the request
+    // rather than after it, so a prompt the player leaves unanswered by
+    // backgrounding the app cannot leave the flag set for a second pass.
+    _attPending = false;
     try {
       final status = await AppTrackingTransparency.trackingAuthorizationStatus;
       // Only `notDetermined` can be asked. Every other state is settled, and
@@ -383,6 +468,7 @@ class ConsentManager {
   static void resetForTest() {
     _prePromptSeen = false;
     _formAvailable = false;
+    _attPending = false;
     _canRequestAds = false;
     _answered = false;
     _prefs = null;
@@ -393,11 +479,13 @@ class ConsentManager {
   static void setForTest({
     bool prePromptSeen = false,
     bool formAvailable = false,
+    bool attPending = false,
     bool canRequestAds = false,
     bool answered = false,
   }) {
     _prePromptSeen = prePromptSeen;
     _formAvailable = formAvailable;
+    _attPending = attPending;
     _canRequestAds = canRequestAds;
     _answered = answered;
   }

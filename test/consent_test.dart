@@ -34,19 +34,88 @@ void main() {
     test('not on a platform with no UMP', () {
       // Web and the test runner have no consent SDK; an explainer for a form
       // that will never arrive is worse than no screen.
-      ConsentManager.setForTest(formAvailable: true);
+      ConsentManager.setForTest(formAvailable: true, attPending: true);
       expect(ConsentManager.needsPrePrompt, isFalse);
     });
 
     test('not once it has been seen', () {
-      ConsentManager.setForTest(prePromptSeen: true, formAvailable: true);
+      ConsentManager.setForTest(
+          prePromptSeen: true, formAvailable: true, attPending: true);
       expect(ConsentManager.needsPrePrompt, isFalse);
     });
 
-    test('not where UMP has no form to show', () {
-      // Outside the EEA there is usually nothing behind Continue.
-      ConsentManager.setForTest(formAvailable: false);
+    test('not with neither a form nor a tracking prompt behind it', () {
+      // Android outside the EEA: UMP has nothing to show, and there is no ATT
+      // to ask either, so Continue would lead nowhere.
+      ConsentManager.setForTest(formAvailable: false, attPending: false);
       expect(ConsentManager.needsPrePrompt, isFalse);
+    });
+  });
+
+  // App Review rejected the build because a US reviewer on iPadOS never saw
+  // the tracking prompt: the screen that asks it opened only when UMP had a
+  // form, and UMP has one in the EEA only. The gate is a disjunction now, so
+  // an iOS player anywhere is still asked.
+  group('the pre-prompt is not EEA-only any more', () {
+    /// Source with comments stripped, so a comment about the old rule cannot
+    /// pass for the rule itself.
+    String code(String path) => File(path)
+        .readAsLinesSync()
+        .where((l) => !l.trimLeft().startsWith('//'))
+        .join('\n');
+
+    // The flags cannot be exercised from here: `_supported` is false under
+    // `flutter test`, so needsPrePrompt is false whatever they say. What is
+    // checkable is the shape of the condition they feed.
+    test('a pending tracking prompt is reason enough on its own', () {
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src, contains('(_formAvailable || _attPending)'),
+          reason: 'a form is one reason to open the screen, not the only one');
+    });
+
+    test('the tracking status is read before anything that can block', () {
+      // ATT is a local question. Reading it after the connectivity wait would
+      // put it behind an early return, and an iOS launch with no network would
+      // owe a prompt it had no idea about.
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src.indexOf('_refreshAttPending()'),
+          lessThan(src.indexOf('await waitForInternet()')));
+    });
+
+    test('the tracking answer is not owed twice', () {
+      // Cleared on request, so a launch whose UMP form never loaded does not
+      // re-open the explainer next time for a prompt iOS will no longer show.
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src, contains('_attPending = false;'));
+    });
+  });
+
+  group('nothing trackable starts before Apple has been asked', () {
+    String code(String path) => File(path)
+        .readAsLinesSync()
+        .where((l) => !l.trimLeft().startsWith('//'))
+        .join('\n');
+
+    test('boot gates the ad SDK on ATT as well as on UMP', () {
+      // Apple's actual requirement: the request must come before any data is
+      // collected that could track the player. UMP says yes to ads straight
+      // away outside the EEA, so UMP on its own is not that gate.
+      final src = code('lib/main.dart');
+      expect(src, contains('ConsentManager.adsMayStartAtLaunch'));
+    });
+
+    test('the one UMP-only ad start left is the one after the prompt', () {
+      // The consent screen may use UMP's answer alone, because ATT has just
+      // been asked by the line above it. Anywhere earlier it would be the
+      // rejection again.
+      final src = code('lib/main.dart');
+      expect(src.indexOf('if (ConsentManager.canRequestAds)'),
+          greaterThan(src.indexOf('requestTrackingAuthorization()')));
+    });
+
+    test('and that gate is both halves', () {
+      final src = code('lib/consent/consent_manager.dart');
+      expect(src, contains('_canRequestAds && !needsPrePrompt'));
     });
   });
 
@@ -123,6 +192,23 @@ void main() {
       await tester.tap(find.text('Continue'));
       await tester.pump();
       expect(continued, 1);
+    });
+
+    testWidgets('names the tracking prompt where there is no form',
+        (tester) async {
+      // Outside the EEA the only thing behind Continue is Apple's prompt, so
+      // promising a screen of choices would be promising something that never
+      // arrives — and the app's own Settings cannot change the answer either.
+      await tester.pumpWidget(MaterialApp(
+        home: ConsentScreen(onContinue: () {}, hasAdChoices: false),
+      ));
+      await tester.pump();
+
+      expect(find.text('Before we start…'), findsOneWidget);
+      expect(find.textContaining('advertising ID'), findsOneWidget);
+      expect(find.textContaining('On the next screen'), findsNothing);
+      expect(find.textContaining('iOS Settings'), findsOneWidget);
+      expect(find.text('Continue'), findsOneWidget);
     });
 
     testWidgets('cannot be dismissed instead of continued', (tester) async {

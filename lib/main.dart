@@ -145,10 +145,13 @@ Future<void> _boot() async {
     // one decision that depends on it does, in
     // [_DottoAppState._afterConsent].
     _signInRestored = GameServices.restoreSignInState();
-    // Ads only once UMP says they are allowed. On a first EEA launch that is
-    // false until the form has been answered, and the consent screen starts
-    // them.
-    if (ConsentManager.canRequestAds) unawaited(AdManager.init());
+    // Ads only once UMP says they are allowed *and* Apple's prompt is not
+    // still owed. On a first EEA launch UMP alone holds them; on a first iOS
+    // launch anywhere else UMP allows them straight away and it is ATT that
+    // holds them — starting the AdMob SDK ahead of a tracking request the
+    // player has not been shown is the thing App Review rejected the build
+    // for. Either way the consent screen starts them once it is through.
+    if (ConsentManager.adsMayStartAtLaunch) unawaited(AdManager.init());
   } catch (e, stack) {
     // Reported as caught rather than fatal: the app carries on into the game,
     // it just got there with less than it wanted.
@@ -240,6 +243,11 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
     // round the form is assembled against a tracking state that changes a
     // second later. Never both at once: two system dialogs back to back with no
     // explanation is a wall of permissions, which is what this screen is for.
+    //
+    // Outside the EEA only the first of the two shows anything: UMP has no
+    // form there and the call below returns straight away, having done nothing
+    // but confirm as much. That is the point of the screen now running
+    // everywhere — ATT is asked either way.
     await ConsentManager.requestTrackingAuthorization();
     final answered =
         await ConsentManager.showFormIfRequired(duringOnboarding: true);
@@ -267,7 +275,13 @@ class _DottoAppState extends State<DottoApp> with WidgetsBindingObserver {
   Widget _afterSplash(BuildContext context) {
     final prePrompt = _prePrompt ??= ConsentManager.needsPrePrompt;
     return prePrompt
-        ? ConsentScreen(onContinue: () => _onContinue(context))
+        ? ConsentScreen(
+            onContinue: () => _onContinue(context),
+            // Outside the EEA there is no form behind Continue, only Apple's
+            // prompt, and the screen says so rather than pointing at choices
+            // that never arrive.
+            hasAdChoices: ConsentManager.hasUmpForm,
+          )
         : _afterConsent(context);
   }
 
