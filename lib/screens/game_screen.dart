@@ -449,7 +449,7 @@ class _GameScreenState extends State<GameScreen>
     _idleTimer = Timer(_idleBeforeWiggle, () {
       // Nothing to point at, or nothing to point with: stay still rather than
       // wave at a button that cannot help.
-      if (!mounted || !_hintAvailable) return;
+      if (!mounted || !_hintAvailable || !_canPayForHint) return;
       _wiggleCtrl.repeat();
     });
   }
@@ -458,13 +458,22 @@ class _GameScreenState extends State<GameScreen>
   /// plus anything won from challenges, capped at [ChallengeService.maxHints].
   int get _hintsInHand => ChallengeService.hintsInHand;
 
-  /// "14h 32m" while the daily hint regenerates, empty when one is ready.
+  /// Whether tapping the bulb could actually hand a hint over: one in hand, or
+  /// an ad that can be served this second. With neither there is nothing to
+  /// buy, and the button has to stop pretending otherwise.
+  bool get _canPayForHint => _hintsInHand > 0 || AdManager.rewardedAvailable;
+
+  /// "14h 32m" while the daily hint regenerates, empty when one is ready. Shown
+  /// in the ad dialog, and on the button only when there is no ad to be had
+  /// either — see [_buildHintButton].
   String get _freeHintCountdown => FreeHintService.remainingLabel(
         DateTime.now(),
       );
 
-  /// Tick the button once a minute while the countdown is showing, and stop as
-  /// soon as it is not — a timer running behind a static label is just battery.
+  /// Tick the button once a minute while the free hint is away, so it flips
+  /// back to "×1" the moment one returns — and so the countdown it shows when
+  /// there is no ad either stays true. Stops once the hint is back: a timer
+  /// running behind a settled label is just battery.
   void _startHintClock() {
     _hintClock?.cancel();
     if (FreeHintService.available) return;
@@ -556,11 +565,30 @@ class _GameScreenState extends State<GameScreen>
   /// The confirmation comes first: a video that starts the instant a button is
   /// pressed feels like a trap. Only after the player agrees is the ad shown.
   ///
-  /// When no ad can be served — offline, no fill, the SDK never started, or
-  /// running on web where there is no AdMob at all — the hint is given anyway.
-  /// The alternative is a player stuck behind an ad that will never arrive,
-  /// which punishes them for a failure that is entirely ours.
+  /// The hint is handed over only when AdMob reports the reward earned. An ad
+  /// closed early buys nothing, and neither does an ad that could not be
+  /// served: this used to grant the hint in that case so a player was never
+  /// stuck behind an ad that would not come, but it meant the price of a hint
+  /// was "be offline", which is no price at all. What is owed instead is a
+  /// reason — see [_sayNoHint].
   Future<bool> _offerAd() async {
+    // The countdown belongs HERE, not on the button. At the moment of deciding
+    // it is the other half of the choice — wait, or watch — where on the button
+    // it only ever read as "come back tomorrow". It also corrects the old copy:
+    // the free hint is a daily allowance shared across the game, not something
+    // this level used up.
+    final countdown = _freeHintCountdown;
+    // Nothing to show: say so, rather than open a dialog promising a video and
+    // then fail to produce one. The hint button rules this state out before it
+    // ever offers, but the fail overlay's "Use Hint" does not, and the cached
+    // ad can also go between the build and the tap.
+    if (!AdManager.rewardedAvailable) {
+      _sayNoHint(countdown.isEmpty
+          ? 'No video available right now. Try again in a moment.'
+          : 'No video available right now. Your free hint is back in '
+              '$countdown.');
+      return false;
+    }
     final agreed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -570,9 +598,11 @@ class _GameScreenState extends State<GameScreen>
           side: const BorderSide(color: AppColors.ink, width: 3),
         ),
         title: const Text('Watch an ad for a hint?'),
-        content: const Text(
-          'Your free hint for this level is used up. Watch a short video to '
-          'reveal another piece.',
+        content: Text(
+          countdown.isEmpty
+              ? 'Watch a short video to reveal the next piece.'
+              : 'Your free hint is back in $countdown. Watch a short video to '
+                  'reveal the next piece now.',
         ),
         actions: [
           TextButton(
@@ -590,18 +620,31 @@ class _GameScreenState extends State<GameScreen>
 
     final id = _level!.id;
     final world = worldOf(id);
-    // No ad to show — the hint is granted, but nothing is reported as watched,
-    // so the ad funnel keeps meaning what it says.
-    if (!AdManager.supported || !AdManager.rewardedReady) return true;
-
     Analytics.rewardedAdShown(id);
-    final earned = await AdManager.showRewarded();
-    if (earned) {
-      Analytics.hintAdWatched(id, world);
-    } else {
+    if (!await AdManager.showRewarded()) {
       Analytics.hintAdDismissed(id, world);
+      // Closed early, or the ad fell over on its way up. Either way the reward
+      // was not earned, so there is no hint — and a tap that produces neither a
+      // hint nor a word reads as the game having taken something.
+      _sayNoHint('No hint — the ad did not finish.');
+      return false;
     }
-    return earned;
+    Analytics.hintAdWatched(id, world);
+    return true;
+  }
+
+  /// Say why no hint arrived.
+  ///
+  /// Floating, and clearing whatever was there, so two taps in a row do not
+  /// stack notices over the board.
+  void _sayNoHint(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ));
   }
 
   /// Pulse the target cell in gold, then drop the piece on it.
@@ -634,13 +677,34 @@ class _GameScreenState extends State<GameScreen>
     _commitPlace(key, hint.element, decrementKit: true);
   }
 
-  /// The hint button: a lightbulb with either the free-hint count or a video
-  /// icon, wobbling once the player has been still for a while.
+  /// The hint button: a lightbulb carrying whatever tapping it would actually
+  /// give you — a count while the player holds hints, an explicit "▶ Ad" when
+  /// an ad is there to be watched, the wait when it is neither. Wobbles once
+  /// the player has been still for a while.
   ///
   /// It greys out rather than disappearing when there is nothing left to
   /// reveal — a control that vanishes mid-level reads as a bug.
   Widget _buildHintButton() {
-    final enabled = _hintAvailable;
+    final revealable = _hintAvailable;
+    // Out of hints, an ad can be served, and the level still has something to
+    // give: the ad is the way to it, and the button has to SAY so.
+    //
+    // This used to show the free hint's countdown instead ("23h 47m"), which
+    // every player read as "locked until tomorrow" — so they sat looking at a
+    // button that would have helped them immediately, and the ad went
+    // undiscovered. (The video icon meant to advertise it was unreachable: its
+    // branch needed an empty countdown, which only happens when a hint IS in
+    // hand.) The countdown moved into the ad dialog, where it is the other half
+    // of a choice rather than a closed door.
+    final adState =
+        revealable && _hintsInHand == 0 && AdManager.rewardedAvailable;
+    // No hint and no ad to buy one with — on web, offline, or in the seconds
+    // after one was watched while the next loads. The countdown is the honest
+    // label HERE and nowhere else: a hint really cannot be had until the free
+    // one is back, so the button says when that is and takes no taps.
+    final waiting = revealable && !_canPayForHint;
+    final countdown = waiting ? _freeHintCountdown : '';
+    final enabled = revealable && !waiting;
     return AnimatedBuilder(
       animation: _wiggleCtrl,
       builder: (context, child) {
@@ -657,18 +721,19 @@ class _GameScreenState extends State<GameScreen>
       child: Opacity(
         opacity: enabled ? 1.0 : 0.45,
         child: BorderedTile(
-          background: AppColors.ink,
+          // The ad state wears the warm accent instead of the ink the other
+          // header tiles use, because it is the one state where the button is
+          // OFFERING something rather than reporting a number — the same accent
+          // the "+1 hint" reward pill wears, for the same reason.
+          background: adState ? AppColors.accent : AppColors.ink,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           onTap: enabled ? _onHintPressed : null,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('💡', style: TextStyle(fontSize: 16)),
-              const SizedBox(width: 5),
-              // Three states, in the order the player meets them: how many
-              // hints they have, how long until the next free one, or the ad
-              // that is the only way to get one sooner.
-              if (_hintsInHand > 0)
+              if (_hintsInHand > 0) ...[
+                const SizedBox(width: 5),
                 // "×1", not a bare "1" — it reads as a quantity the way the
                 // toolkit tiles do, and does not collide with their counts.
                 // Free and challenge-won hints are one number: the player has
@@ -677,16 +742,29 @@ class _GameScreenState extends State<GameScreen>
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
-                        fontWeight: FontWeight.w800))
-              else if (_freeHintCountdown.isNotEmpty)
-                Text(_freeHintCountdown,
+                        fontWeight: FontWeight.w800)),
+              ] else if (adState) ...[
+                const SizedBox(width: 5),
+                // Icon AND the word: the icon alone could be read as "play the
+                // level", and naming the ad is what makes the offer honest.
+                const Icon(Icons.play_circle_fill_rounded,
+                    color: AppColors.ink, size: 15),
+                const SizedBox(width: 3),
+                const Text('Ad',
+                    style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800)),
+              ] else if (countdown.isNotEmpty) ...[
+                const SizedBox(width: 5),
+                Text(countdown,
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
-                        fontWeight: FontWeight.w800))
-              else
-                const Icon(Icons.play_circle_fill_rounded,
-                    color: Colors.white, size: 16),
+                        fontWeight: FontWeight.w800)),
+              ],
+              // Nothing left to reveal: the bulb stands alone and greyed, since
+              // a trailing label would promise something tapping cannot give.
             ],
           ),
         ),

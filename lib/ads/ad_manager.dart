@@ -108,12 +108,36 @@ class AdManager {
   /// True when a rewarded ad is cached and could be shown right now.
   static bool get rewardedReady => _rewarded != null;
 
+  /// Whether a rewarded ad could actually be served this second.
+  ///
+  /// The one question callers should ask. "Ads do not run on this platform",
+  /// "the SDK never started" and "nothing is cached" are three different
+  /// stories that leave the player in exactly the same place, and anything
+  /// offering an ad in trade has to know that BEFORE it makes the offer.
+  static bool get rewardedAvailable =>
+      _rewardedStub != null || (supported && rewardedReady);
+
+  /// Tests only: stands in for the SDK, returning what the "reward earned"
+  /// callback would have reported.
+  ///
+  /// [supported] is false under `flutter test`, so without this seam the whole
+  /// rewarded path is unreachable there — which matters now that an ad which
+  /// does not play means no hint. Pass null to put the real SDK back.
+  static Future<bool> Function()? _rewardedStub;
+
+  @visibleForTesting
+  static void stubRewardedForTest(Future<bool> Function()? earns) {
+    _rewardedStub = earns;
+  }
+
   /// Show a rewarded ad; resolves true only if the reward was actually earned.
   ///
   /// Returns false when there is no ad to show, so the caller can decide what a
   /// player who cannot be served an ad deserves — never leave them stuck behind
   /// an ad that will not come.
   static Future<bool> showRewarded() async {
+    final stub = _rewardedStub;
+    if (stub != null) return stub();
     if (!_ready) return false;
     final ad = _rewarded;
     if (ad == null) {

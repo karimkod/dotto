@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dotto/ads/ad_manager.dart';
 import 'package:dotto/data/level_definitions.dart';
 import 'package:dotto/data/level_hints.dart';
 import 'package:dotto/data/levels.dart';
@@ -23,6 +24,10 @@ void main() {
   // The free hint is a daily allowance held in a process-global service now,
   // so one test spending it would otherwise starve the next.
   setUp(FreeHintService.resetForTest);
+
+  // Same for the ad stub: a test that leaves one standing would hand the next
+  // one an ad that cannot exist under `flutter test`.
+  tearDown(() => AdManager.stubRewardedForTest(null));
 
   final allLevels = [for (var n = 1; n <= kLevelCount; n++) n];
 
@@ -95,13 +100,28 @@ void main() {
       await tester.pump(const Duration(milliseconds: 30));
     }
 
-    // Free hint spent: the count is replaced by the regeneration countdown.
-    expect(find.text('24h 0m'), findsOneWidget,
-        reason: 'the daily hint is gone until tomorrow, and says so');
+    // Free hint spent — and level 2's kit is that one arrow, so the recorded
+    // solution is now complete. With nothing left to reveal the button goes
+    // quiet: no count, and no offer of an ad that could not buy anything.
+    expect(find.text('×1'), findsNothing, reason: 'the daily hint is gone');
+    expect(find.text('Ad'), findsNothing,
+        reason: 'nothing left to reveal, so there is nothing to sell');
+    expect(find.text('24h 0m'), findsNothing,
+        reason: 'a bare countdown here reads as "locked until tomorrow" — it '
+            'belongs in the ad dialog, as the other half of a choice');
+    final hintButton = tester.widget<BouncyButton>(find.ancestor(
+      of: find.text('💡'),
+      matching: find.byType(BouncyButton),
+    ));
+    expect(hintButton.onTap, isNull,
+        reason: 'the bulb stays put but disabled — a control that vanishes '
+            'mid-level reads as a bug');
   });
 
   testWidgets('a second hint costs an ad, and declining costs nothing',
       (tester) async {
+    // An ad that plays through to the reward.
+    AdManager.stubRewardedForTest(() async => true);
     // Level 4's kit is two arrows, so there is still something to reveal after
     // the free hint is spent.
     await tester.pumpWidget(MaterialApp(
@@ -125,13 +145,17 @@ void main() {
 
     await tester.tap(find.text('💡'));
     await settleReveal();
-    expect(find.text('24h 0m'), findsOneWidget,
-        reason: 'the free hint is gone until tomorrow');
+    expect(find.text('Ad'), findsOneWidget,
+        reason: 'the free hint is gone, so the button offers the ad instead');
 
     // Decline: no ad watched, so no piece revealed.
     await tester.tap(find.text('💡'));
     await tester.pump();
     expect(find.text('Not now'), findsOneWidget);
+    // The countdown lives here now: what waiting would cost, shown at the
+    // moment the player is actually choosing between waiting and watching.
+    expect(find.textContaining('back in 24h 0m'), findsOneWidget,
+        reason: 'the dialog should say when the free hint returns');
     await tester.tap(find.text('Not now'));
     await settleReveal();
 
@@ -148,6 +172,92 @@ void main() {
     ));
     expect(play.onTap, isNotNull,
         reason: 'both pieces are placed, so Play should be live');
+  });
+
+  // The reward is the whole price of the hint. Both ways of not paying it —
+  // closing the video early, and there being no video to close — have to leave
+  // the player exactly where they were, with a word about why.
+  testWidgets('an ad that does not pay out buys no hint', (tester) async {
+    // Shown, then closed before the reward: what AdMob reports as not earned.
+    AdManager.stubRewardedForTest(() async => false);
+    await tester.pumpWidget(MaterialApp(
+      home: GameScreen(
+        level: Level(
+          id: 4,
+          number: 4,
+          title: 'Two turns',
+          difficulty: Difficulty.easy,
+          status: LevelStatus.unlocked,
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    Future<void> settleReveal() async {
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+    }
+
+    // Spend the free hint first, to get to the state where an ad is the offer.
+    await tester.tap(find.text('💡'));
+    await settleReveal();
+    expect(find.text('Ad'), findsOneWidget);
+
+    await tester.tap(find.text('💡'));
+    await tester.pump();
+    await tester.tap(find.text('Watch'));
+    await settleReveal();
+
+    expect(find.textContaining('did not finish'), findsOneWidget,
+        reason: 'a tap that yields neither a hint nor a word reads as the game '
+            'having taken something');
+    final play = tester.widget<BouncyButton>(find.ancestor(
+      of: find.text('Play'),
+      matching: find.byType(BouncyButton),
+    ));
+    expect(play.onTap, isNull,
+        reason: 'the second piece is still in the kit — the reward was never '
+            'earned, so no hint was given');
+    // The offer stands: the ad is still there to be watched properly.
+    expect(find.text('Ad'), findsOneWidget);
+  });
+
+  testWidgets('with no ad to serve, the button says when the free hint is back',
+      (tester) async {
+    // No stub, so AdManager cannot serve anything — the web build, an offline
+    // player, or a unit with no fill.
+    await tester.pumpWidget(MaterialApp(
+      home: GameScreen(
+        level: Level(
+          id: 4,
+          number: 4,
+          title: 'Two turns',
+          difficulty: Difficulty.easy,
+          status: LevelStatus.unlocked,
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    await tester.tap(find.text('💡'));
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 30));
+    }
+
+    // There is a second arrow to reveal, but nothing to buy it with. The
+    // countdown is the truth here, where on a button that COULD sell an ad it
+    // was a lie.
+    expect(find.text('Ad'), findsNothing,
+        reason: 'no ad can be served, so the button must not offer one');
+    expect(find.text('24h 0m'), findsOneWidget,
+        reason: 'the wait is all that is actually on offer');
+    final hintButton = tester.widget<BouncyButton>(find.ancestor(
+      of: find.text('💡'),
+      matching: find.byType(BouncyButton),
+    ));
+    expect(hintButton.onTap, isNull,
+        reason: 'tapping could not produce a hint, so it does not take taps');
   });
 
   testWidgets('the button starts wiggling once the player goes quiet',
