@@ -159,19 +159,14 @@ void main() {
     await tester.tap(find.text('Not now'));
     await settleReveal();
 
-    // Accept: the second piece lands and the kit empties, which is what the
-    // Play button waits for.
+    // Accept: the second piece lands and the kit empties.
     await tester.tap(find.text('💡'));
     await tester.pump();
     await tester.tap(find.text('Watch'));
     await settleReveal();
 
-    final play = tester.widget<BouncyButton>(find.ancestor(
-      of: find.text('Play'),
-      matching: find.byType(BouncyButton),
-    ));
-    expect(play.onTap, isNotNull,
-        reason: 'both pieces are placed, so Play should be live');
+    expect(find.text('Ready! Hit Play'), findsOneWidget,
+        reason: 'the ad played through, so the second piece is on the board');
   });
 
   // The reward is the whole price of the hint. Both ways of not paying it —
@@ -212,11 +207,7 @@ void main() {
     expect(find.textContaining('did not finish'), findsOneWidget,
         reason: 'a tap that yields neither a hint nor a word reads as the game '
             'having taken something');
-    final play = tester.widget<BouncyButton>(find.ancestor(
-      of: find.text('Play'),
-      matching: find.byType(BouncyButton),
-    ));
-    expect(play.onTap, isNull,
+    expect(find.textContaining('1 left'), findsOneWidget,
         reason: 'the second piece is still in the kit — the reward was never '
             'earned, so no hint was given');
     // The offer stands: the ad is still there to be watched properly.

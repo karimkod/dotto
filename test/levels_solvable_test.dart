@@ -393,6 +393,19 @@ void main() {
     }, timeout: heavy);
   }
 
+  // Play no longer waits for the kit to be empty — a player can run the dot
+  // with every piece still in hand, which is how they read the board. So the
+  // bare board must not be a solution: a level the dot walks out of on its own
+  // would be a free win one tap from the start, and nothing in the game would
+  // say so. Level 1 is exempt and is the proof it is possible: it has no kit,
+  // and walking out IS the level.
+  test('no level is won by running the dot on an empty board', () {
+    for (final n in allLevels.where((n) => n > 1)) {
+      expect(tracePath(levelDataFor(n)!, const {}), isNull,
+          reason: 'level $n is won with nothing placed, so Play gives it away');
+    }
+  });
+
   // Reachability pruning must never discard a cell a real run can touch.
   test('reachable cells cover every cell the intended solutions visit', () {
     for (final n in allLevels) {

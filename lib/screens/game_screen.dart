@@ -2595,17 +2595,26 @@ class _GameScreenState extends State<GameScreen>
     }
 
     final running = _status == GameStatus.running;
-    // Every piece must be placed before Play is enabled (no effect on the
-    // no-toolkit Level 1, whose kit is already empty).
+    // Play runs whatever is on the board, pieces still in hand or not.
+    //
+    // It used to wait for an empty kit, which withheld the one thing a stuck
+    // player actually wants: to watch the dot go. The dot's path IS the puzzle,
+    // and working out where to put a piece means seeing where the dot would
+    // have gone without it — so making that a reward for having already
+    // decided had it backwards. A run that dies costs a tap on Try Again.
     final remaining = _remainingPieces;
-    final canPlay = remaining == 0;
-    // The hint line is always present (its space is reserved) so the Play button
-    // never shifts; only the message changes.
+    final ready = remaining == 0;
+    // The line is always present (its space is reserved) so the Play button
+    // never shifts; only the message changes. It reports what is left rather
+    // than instructing — "Place all elements" was an order, and it is not one
+    // any more.
     final hint = running
         ? 'Go!'
-        : (canPlay ? 'Ready! Hit Play' : 'Place all elements ($remaining left)');
+        : (ready
+            ? 'Ready! Hit Play'
+            : '$remaining left — or Play to see the path');
     final hintColor =
-        (canPlay && !running) ? AppColors.completed : AppColors.textSoft;
+        (ready && !running) ? AppColors.completed : AppColors.textSoft;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2624,7 +2633,7 @@ class _GameScreenState extends State<GameScreen>
             label: 'Play',
             icon: Icons.play_arrow_rounded,
             filled: true,
-            onTap: (running || !canPlay) ? null : _play,
+            onTap: running ? null : _play,
           ),
         ),
       ],

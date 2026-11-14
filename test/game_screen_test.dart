@@ -12,6 +12,7 @@ import 'package:dotto/models/level.dart';
 import 'package:dotto/models/level_data.dart';
 import 'package:dotto/widgets/game_grid.dart';
 import 'package:dotto/screens/game_screen.dart';
+import 'package:dotto/widgets/bouncy_button.dart';
 
 /// Drags from [source] to [target] in several steps so onPanStart/Update/End
 /// all fire, mimicking a real finger drag.
@@ -137,12 +138,12 @@ void main() {
     }
 
     // The counter must land at 0 — never -1 — with exactly one arrow consumed,
-    // and Play must be reachable rather than stuck on "Place all elements".
+    // and the footer must read as ready rather than still counting pieces.
     expect(find.text('-1'), findsNothing,
         reason: 'the kit count must never go negative');
     expect(find.text('0'), findsOneWidget, reason: 'one arrow consumed, kit 0');
-    expect(find.textContaining('Place all elements'), findsNothing,
-        reason: 'all pieces placed → Play is ready');
+    expect(find.text('Ready! Hit Play'), findsOneWidget,
+        reason: 'all pieces placed → nothing left to count');
   });
 
   testWidgets('a placed element can be dragged to another cell', (tester) async {
@@ -235,26 +236,39 @@ void main() {
     expect(find.text('Ran off the edge!'), findsOneWidget);
   });
 
-  testWidgets('Play is disabled until every piece is placed', (tester) async {
+  testWidgets('Play runs the dot with pieces still in the kit', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: GameScreen(level: level2)));
     await tester.pump();
 
-    // Hint shown; tapping Play does nothing (still planning, no overlay).
-    expect(find.textContaining('Place all elements'), findsOneWidget);
+    // Level 2's arrow is untouched, and Play is live anyway: seeing where the
+    // dot goes unaided is how a player works out where the arrow belongs.
+    expect(find.textContaining('1 left'), findsOneWidget);
+    final play = tester.widget<BouncyButton>(find.ancestor(
+      of: find.text('Play'),
+      matching: find.byType(BouncyButton),
+    ));
+    expect(play.onTap, isNotNull, reason: 'the kit does not gate Play');
+
     await tester.tap(find.text('Play'));
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
-    expect(find.text('Try Again'), findsNothing);
-    expect(find.text('Continue'), findsNothing);
 
-    // Place the arrow → the hint switches to "Ready!" (Play is now enabled),
-    // keeping the same space so the button doesn't shift.
+    // The run really happened: the dot had no arrow to turn it, so it left the
+    // board, and the fail overlay says so. Nothing is lost but a tap.
+    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Ran off the edge!'), findsOneWidget);
+
+    // Place the arrow → the line switches to "Ready!", keeping the same space
+    // so the button doesn't shift.
+    await tester.tap(find.text('Try Again'));
+    await tester.pump(const Duration(milliseconds: 40));
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
     final geo = GridGeometry(boardRect.width, gridN);
     await _dragArrow(tester, tester.getCenter(find.text('UP')),
         boardRect.topLeft + geo.center(2, 2));
-    expect(find.textContaining('Place all elements'), findsNothing);
+    expect(find.textContaining('left —'), findsNothing);
+    expect(find.text('Ready! Hit Play'), findsOneWidget);
   });
 
   testWidgets('Next Level button loads the next level', (tester) async {
@@ -447,11 +461,10 @@ void main() {
         reason: 'a piece was placed on top of the rotating arrow');
     expect(find.text('1'), findsOneWidget,
         reason: 'the refused piece must still be in the toolkit');
-    // Play stays gated: the level still wants its one arrow placed somewhere.
-    await tester.tap(find.text('Play'));
-    await tester.pump();
-    expect(grid().trail, hasLength(lessThanOrEqualTo(1)),
-        reason: 'the run must not start with the toolkit unplaced');
+    // The footer still counts the refused piece — it is in the kit, not on the
+    // board. (Play would run the dot anyway; that is not what this test is
+    // about.)
+    expect(find.textContaining('1 left'), findsOneWidget);
 
     // The same piece drops fine on a free cell.
     await _dragArrow(
