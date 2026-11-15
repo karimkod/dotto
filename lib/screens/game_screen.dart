@@ -44,6 +44,7 @@ import '../widgets/feedback_dialog.dart';
 import '../widgets/notification_prompt_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/game_toolbar.dart';
+import '../widgets/sound_settings.dart';
 import '../widgets/top_bar.dart';
 import 'level_designer_screen.dart';
 
@@ -2263,6 +2264,19 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  /// Sound, music and haptics over the board, without leaving the level.
+  ///
+  /// Open during a run as well — muting is wanted most while the dot is making
+  /// the noise — and the run carries on under the sheet. Time spent in there is
+  /// not the player going quiet on the level, so the hint button is not set
+  /// wiggling behind it; the idle clock starts again once the sheet closes.
+  Future<void> _openSettings() async {
+    _noteActivity(); // calls off a wiggle already going
+    _idleTimer?.cancel(); // and none starts while the sheet is up
+    await showSoundSettingsSheet(context);
+    if (mounted) _noteActivity();
+  }
+
   Widget _buildHeader() {
     return Row(
       children: [
@@ -2272,26 +2286,49 @@ class _GameScreenState extends State<GameScreen>
           child: const Icon(Icons.arrow_back_rounded,
               color: AppColors.ink, size: 24),
         ),
-        const Spacer(),
-        Text(
-          'Level ${_level!.id}',
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+        // Centred in whatever the tiles leave, and shrunk rather than pushed
+        // off the edge on the narrowest phones: the header holds three tiles,
+        // and the hint one widens with its label.
+        Expanded(
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Level ${_level!.id}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  // Dev-only: edit this level in the designer.
+                  if (isDevMode) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _openInDesigner,
+                      child: const Icon(Icons.edit_rounded,
+                          color: AppColors.textSoft, size: 20),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
-        // Dev-only: edit this level in the designer.
-        if (isDevMode) ...[
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _openInDesigner,
-            child: const Icon(Icons.edit_rounded,
-                color: AppColors.textSoft, size: 20),
-          ),
-        ],
-        const Spacer(),
         _buildHintButton(),
+        const SizedBox(width: 8),
+        // Settings without leaving the level: the menu's dark gear, in the
+        // same top-right corner.
+        BorderedTile(
+          background: AppColors.ink,
+          width: 46,
+          onTap: _openSettings,
+          child: const Icon(Icons.settings_rounded,
+              color: Colors.white, size: 22),
+        ),
         // The playtest feedback box. Gated harder than the designer beside it:
         // debug builds only, so it is absent from the public web build as well
         // as from the store one.
