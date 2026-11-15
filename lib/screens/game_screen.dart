@@ -1227,33 +1227,40 @@ class _GameScreenState extends State<GameScreen>
       _placeAnim.remove(key);
       _removing.add(FadingPiece(key, piece.tool, piece.direction)); // shrink-out
       _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
-      if (piece.type == PlacedType.teleporter) _reindexPortals();
     });
     Sfx.remove();
     Haptics.light();
   }
 
-  /// Teleporters already on the board, which is also the index the next one
-  /// gets — so placements alternate entrance, exit, entrance, exit…
-  int get _portalsPlaced =>
-      _placed.values.where((p) => p.type == PlacedType.teleporter).length;
+  /// The index the next teleporter gets: the lowest one not on the board.
+  ///
+  /// Index `i` pairs with `i ^ 1` and takes its colour from `i ~/ 2`, so an
+  /// index has to stay with its portal for as long as the portal is down.
+  /// Taking one back leaves a hole rather than closing it up: renumbering the
+  /// rest re-partners every pair after it — with four placed, removing the
+  /// first turned the first pair's exit into the second pair's entrance, and
+  /// the colours (truthfully) showed it. Filling the lowest hole instead puts
+  /// the next portal back where the missing one was, as the other half of the
+  /// pair it left.
+  ///
+  /// The same rule covers a portal dragged off the grid, which never went
+  /// through a renumber at all — and a count-based index then handed out a
+  /// number still in use.
+  int get _nextPortalIndex {
+    final used = {
+      for (final p in _placed.values)
+        if (p.type == PlacedType.teleporter) p.portalIndex,
+    };
+    var i = 0;
+    while (used.contains(i)) {
+      i++;
+    }
+    return i;
+  }
 
   /// True when the next teleporter dropped will be an ENTRANCE. Drives the
   /// toolkit tile's icon so the player can see which end they are holding.
-  bool get _nextPortalIsEntrance => _portalsPlaced.isEven;
-
-  /// Close the gap after a portal is taken back, so indices stay 0..n-1 and
-  /// pairs do not silently re-partner.
-  void _reindexPortals() {
-    final portals = _placed.entries
-        .where((e) => e.value.type == PlacedType.teleporter)
-        .toList()
-      ..sort((a, b) =>
-          (a.value.portalIndex ?? 0).compareTo(b.value.portalIndex ?? 0));
-    for (var i = 0; i < portals.length; i++) {
-      _placed[portals[i].key] = portals[i].value.withPortalIndex(i);
-    }
-  }
+  bool get _nextPortalIsEntrance => _nextPortalIndex.isEven;
 
   /// A fresh piece for [tool]. Teleporters get the next placement index, which
   /// carries entrance/exit, pair and partner all at once.
@@ -1261,7 +1268,7 @@ class _GameScreenState extends State<GameScreen>
     final el = PlacedElement(
         type: tool.placedType, tool: tool, direction: tool.direction);
     return tool.placedType == PlacedType.teleporter
-        ? el.withPortalIndex(_portalsPlaced)
+        ? el.withPortalIndex(_nextPortalIndex)
         : el;
   }
 
