@@ -1941,7 +1941,10 @@ class _GameScreenState extends State<GameScreen>
     _timer = null;
     _deathCause = cause;
     Future.delayed(const Duration(milliseconds: 520), () {
-      if (!mounted) return;
+      // Restarted mid-explosion: the player called the run off, so it is not a
+      // fail any more and the overlay would be arriving over a board that is
+      // already back in planning.
+      if (!mounted || _status != GameStatus.running) return;
       _reportFail();
       setState(() => _status = GameStatus.lost);
     });
@@ -1957,6 +1960,18 @@ class _GameScreenState extends State<GameScreen>
 
   /// Reset the dot but keep placed pieces (used by "Retry").
   void _retry() => setState(_resetDot);
+
+  /// Call off the run and put the dot back home, pieces where they are.
+  ///
+  /// The way out of a board the player has built into a circle the dot never
+  /// leaves, and of any run they have already read and do not want to sit
+  /// through. Not a fail: they stopped it themselves, so nothing is counted
+  /// against them and no attempt is spent. Same return as [_retry], reached
+  /// from the Reset tile during the run instead of from the overlay after it.
+  void _restartRun() {
+    if (_status != GameStatus.running) return;
+    setState(_resetDot);
+  }
 
   /// Remove every placed piece and restore the toolkit (used by "Reset").
   void _clearAll() {
@@ -2064,7 +2079,13 @@ class _GameScreenState extends State<GameScreen>
                         draggingTool: _dragTool,
                         portalNextIsEntrance: _nextPortalIsEntrance,
                         onSelect: (t) => setState(() => _selected = t),
-                        onReset: _confirmReset,
+                        // The same tile restarts a run in progress: during
+                        // planning it clears the board, during a run it puts
+                        // the dot back home and leaves the pieces alone.
+                        onReset: _status == GameStatus.running
+                            ? _restartRun
+                            : _confirmReset,
+                        restarting: _status == GameStatus.running,
                       ),
                     const SizedBox(height: 16),
                     _buildFooter(),

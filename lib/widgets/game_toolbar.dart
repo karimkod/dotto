@@ -21,6 +21,7 @@ class GameToolbar extends StatelessWidget {
     required this.tileKeys,
     this.draggingTool,
     this.onReset,
+    this.restarting = false,
     this.portalNextIsEntrance = true,
   });
 
@@ -46,6 +47,11 @@ class GameToolbar extends StatelessWidget {
   /// Shows a Reset tile at the end of the row when non-null.
   final VoidCallback? onReset;
 
+  /// True while the dot runs. The Reset tile is then the one control on the
+  /// row still live: it reads RESTART, and [onReset] is expected to call the
+  /// run off rather than clear the board.
+  final bool restarting;
+
   @override
   Widget build(BuildContext context) {
     return Wrap(
@@ -64,18 +70,29 @@ class GameToolbar extends StatelessWidget {
             dragging: draggingTool == t,
             onTap: () => onSelect(t),
           ),
-        if (onReset != null) _ResetTile(enabled: enabled, onTap: onReset!),
+        if (onReset != null)
+          _ResetTile(
+            enabled: enabled || restarting,
+            label: restarting ? 'RESTART' : 'RESET',
+            onTap: onReset!,
+          ),
       ],
     );
   }
 }
 
 /// Reset tile — looks like a toolkit item but uses a muted red outline to read
-/// as a distinct action rather than a placeable element.
+/// as a distinct action rather than a placeable element. Mid-run it is the
+/// Restart button, under the same circular arrow.
 class _ResetTile extends StatelessWidget {
-  const _ResetTile({required this.enabled, required this.onTap});
+  const _ResetTile({
+    required this.enabled,
+    required this.label,
+    required this.onTap,
+  });
 
   final bool enabled;
+  final String label;
   final VoidCallback onTap;
 
   static const _red = Color(0xFFCF6B61);
@@ -97,14 +114,14 @@ class _ResetTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _red, width: 3),
           ),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.restart_alt_rounded, color: _red, size: 24),
-              SizedBox(height: 2),
+              const Icon(Icons.restart_alt_rounded, color: _red, size: 24),
+              const SizedBox(height: 2),
               Text(
-                'RESET',
-                style: TextStyle(
+                label,
+                style: const TextStyle(
                   fontSize: 8,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.3,
