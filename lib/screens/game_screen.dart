@@ -16,6 +16,7 @@ import '../settings/haptics.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
+import '../data/hint_order.dart';
 import '../data/level_hints.dart';
 import '../data/levels.dart';
 import '../engine/simulator.dart'
@@ -416,17 +417,24 @@ class _GameScreenState extends State<GameScreen>
   /// asking for attention.
   static const _idleBeforeWiggle = Duration(seconds: 10);
 
-  /// The next placement to give away: the first one in the recorded solution
-  /// the player has not made, and still has the piece for.
+  /// The recorded solution in the order hints give it away: the piece a player
+  /// is least likely to find on their own first — see hint_order.dart.
+  ///
+  /// Ranked on first use rather than when the level opens. It runs the
+  /// simulator a few hundred times: nothing beside the reveal's own pulse, but
+  /// not something to pay for on a level the player never asks for help on.
+  late final List<HintPlacement> _hintPlan =
+      hintOrder(_level!, recordedSolution(_level!.id));
+
+  /// The first placement in [from] the player has not made, and still has the
+  /// piece for.
   ///
   /// Skipping cells that are already occupied means a hint never fights the
   /// player for a square — but it also means the hint only completes a winning
   /// board if what is already down is right. A hint is a nudge toward the
   /// recorded solution, not a promise that the current board can still reach it.
-  HintPlacement? _nextHint() {
-    final level = _level;
-    if (level == null) return null;
-    for (final p in recordedSolution(level.id)) {
+  HintPlacement? _firstUnplaced(Iterable<HintPlacement> from) {
+    for (final p in from) {
       if (_occupied(p.r, p.c)) continue;
       if ((_kit[p.element.tool] ?? 0) <= 0) continue;
       return p;
@@ -434,8 +442,18 @@ class _GameScreenState extends State<GameScreen>
     return null;
   }
 
+  /// The next placement to give away.
+  HintPlacement? _nextHint() =>
+      _level == null ? null : _firstUnplaced(_hintPlan);
+
+  /// Whether there is anything left to give away. Which piece comes first does
+  /// not matter for that, so this reads the solution as recorded and never
+  /// pays for the ranking — it is asked on every build.
   bool get _hintAvailable =>
-      _status == GameStatus.planning && !_hintRunning && _nextHint() != null;
+      _status == GameStatus.planning &&
+      !_hintRunning &&
+      _level != null &&
+      _firstUnplaced(recordedSolution(_level!.id)) != null;
 
   /// Restart the idle clock and call off any wiggle. Every player action that
   /// counts as "still thinking about this level" routes through here.
@@ -674,7 +692,48 @@ class _GameScreenState extends State<GameScreen>
     setState(() => _hintRunning = false);
     // Goes through the same funnel as a drop, so the kit count, the pop-in and
     // the neighbour ripple all behave exactly as if the player had placed it.
-    _commitPlace(key, hint.element, decrementKit: true);
+    _commitPlace(key, _hintElement(hint), decrementKit: true);
+  }
+
+  /// The piece a hint puts down. Only a portal needs any thought: its index is
+  /// worked out against the board as it is now, never copied from the recorded
+  /// solution.
+  ///
+  /// The recorded index says which portal is whose partner in the solution, and
+  /// that is all it can say. Used as-is it collided with portals the player had
+  /// already put down — two portals on one index, one of them left with no
+  /// partner — and it assumed hints arrive in the order they were written down,
+  /// which they no longer do.
+  PlacedElement _hintElement(HintPlacement hint) {
+    final el = hint.element;
+    if (el.type != PlacedType.teleporter) return el;
+    final mine = el.portalIndex ?? 0;
+    final used = {
+      for (final p in _placed.values)
+        if (p.type == PlacedType.teleporter) p.portalIndex,
+    };
+    // Its partner in the solution is already down and still waiting for a
+    // partner of its own: this is that partner, so take the slot beside it.
+    for (final other in _hintPlan) {
+      if (other.element.portalIndex != (mine ^ 1)) continue;
+      final there = _placed[_idx(other.r, other.c)];
+      final j = there?.portalIndex;
+      if (there?.type == PlacedType.teleporter &&
+          j != null &&
+          !used.contains(j ^ 1)) {
+        return el.withPortalIndex(j ^ 1);
+      }
+    }
+    // Otherwise a pair of its own — never the free half of someone else's.
+    // Completing whatever portal happens to be waiting would wire a solution
+    // portal to the player's guess, and pair the solution up wrongly once the
+    // rest of it arrived. The end it is in the solution (entrance or exit) is
+    // kept, so it reads the way the solution meant it.
+    var pair = 0;
+    while (used.contains(2 * pair) || used.contains(2 * pair + 1)) {
+      pair++;
+    }
+    return el.withPortalIndex(2 * pair + (mine & 1));
   }
 
   /// The hint button: a lightbulb carrying whatever tapping it would actually
@@ -1232,16 +1291,20 @@ class _GameScreenState extends State<GameScreen>
     Haptics.light();
   }
 
-  /// The index the next teleporter gets: the lowest one not on the board.
+  /// The index the next teleporter gets: the free half of the lowest pair
+  /// still waiting for one, or else the entrance of the lowest empty pair.
   ///
   /// Index `i` pairs with `i ^ 1` and takes its colour from `i ~/ 2`, so an
   /// index has to stay with its portal for as long as the portal is down.
   /// Taking one back leaves a hole rather than closing it up: renumbering the
   /// rest re-partners every pair after it — with four placed, removing the
   /// first turned the first pair's exit into the second pair's entrance, and
-  /// the colours (truthfully) showed it. Filling the lowest hole instead puts
-  /// the next portal back where the missing one was, as the other half of the
-  /// pair it left.
+  /// the colours (truthfully) showed it. The next portal goes back where the
+  /// missing one was, as the other half of the pair it left.
+  ///
+  /// A waiting half comes before an empty pair even when the empty pair is
+  /// lower. A hint puts a portal down on a pair of its own; the player then
+  /// places its partner, and that has to join it, not open a pair beside it.
   ///
   /// The same rule covers a portal dragged off the grid, which never went
   /// through a renumber at all — and a count-based index then handed out a
@@ -1251,11 +1314,16 @@ class _GameScreenState extends State<GameScreen>
       for (final p in _placed.values)
         if (p.type == PlacedType.teleporter) p.portalIndex,
     };
-    var i = 0;
-    while (used.contains(i)) {
-      i++;
+    final waiting = [
+      for (final i in used)
+        if (i != null && !used.contains(i ^ 1)) i ^ 1,
+    ]..sort();
+    if (waiting.isNotEmpty) return waiting.first;
+    var pair = 0;
+    while (used.contains(2 * pair)) {
+      pair++;
     }
-    return i;
+    return 2 * pair;
   }
 
   /// True when the next teleporter dropped will be an ENTRANCE. Drives the

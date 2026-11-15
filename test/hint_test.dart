@@ -19,6 +19,7 @@ import 'package:dotto/models/level.dart';
 import 'package:dotto/screens/game_screen.dart';
 import 'package:dotto/services/free_hint_service.dart';
 import 'package:dotto/widgets/bouncy_button.dart';
+import 'package:dotto/widgets/game_grid.dart';
 
 void main() {
   // The free hint is a daily allowance held in a process-global service now,
@@ -116,6 +117,41 @@ void main() {
     expect(hintButton.onTap, isNull,
         reason: 'the bulb stays put but disabled — a control that vanishes '
             'mid-level reads as a bug');
+  });
+
+  testWidgets('the first hint is the piece the board does not show you',
+      (tester) async {
+    // Level 22, "Trapdoor": shield through the mine, drop, climb back up
+    // through the hole it left, turn for the exit. The hints used to open with
+    // that last turn at (0,3) — the one you read straight off the exit. The
+    // climb at (4,3) is the move nothing on the board points at: without it the
+    // dot runs on along the bottom row and crashes three cells away.
+    await tester.pumpWidget(const MaterialApp(
+      home: GameScreen(
+        level: Level(
+          id: 22,
+          number: 22,
+          title: 'Trapdoor',
+          difficulty: Difficulty.easy,
+          status: LevelStatus.unlocked,
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    await tester.tap(find.text('💡'));
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 30));
+    }
+
+    final placed = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single
+        .placed;
+    expect(placed.keys, [4 * 5 + 3]);
+    expect(placed[4 * 5 + 3]!.direction, Direction.up);
   });
 
   testWidgets('a second hint costs an ad, and declining costs nothing',

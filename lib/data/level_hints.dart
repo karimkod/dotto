@@ -1,8 +1,9 @@
 // The recorded solution for every level — one known-good set of placements.
 //
-// This is the data the in-game hints read from: a hint reveals the next
-// placement the player has not made yet, so a wrong entry here would hand the
-// player a losing board, which is worse than offering no hint at all.
+// This is the data the in-game hints read from: a hint reveals a placement the
+// player has not made yet (which one first is hint_order.dart's call), so a
+// wrong entry here would hand the player a losing board, which is worse than
+// offering no hint at all.
 //
 // It is not trusted on faith. test/levels_solvable_test.dart imports these maps
 // and simulates each one, so "level N intended solution wins" is simultaneously
@@ -602,12 +603,12 @@ class HintPlacement {
   final PlacedElement element;
 }
 
-/// The recorded solution for [level], flattened into the order hints reveal it.
+/// The recorded solution for [level], flattened in toolkit groups.
 ///
-/// Teleporters come first and keep their recorded order, because they pair by
-/// placement order — revealing one half of a pair before the other, or out of
-/// sequence, would wire the portals differently from the solution that was
-/// verified. The rest follow in toolkit groups.
+/// This is not the order hints reveal it in — hint_order.dart ranks it. Each
+/// teleporter carries its recorded index, which says only who partners whom
+/// (index i with i ^ 1); the game works out the index it actually gets from the
+/// board when the hint lands, so the pairs come out as recorded in any order.
 List<HintPlacement> recordedSolution(int level) {
   final out = <HintPlacement>[];
 

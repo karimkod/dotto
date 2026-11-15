@@ -287,7 +287,16 @@ SimOutcome simulate(LevelData level, Map<int, PlacedElement> placed) =>
 
 /// Like [simulate], but also reports WHY the dot died (see [SimResult]). The
 /// game screen uses the cause to show a clear fail message.
-SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
+///
+/// Pass [trail] to have the run written into it: every cell the dot enters, in
+/// order, including the far end of a teleport and the cell it dies on. Losing
+/// runs are recorded too, which [tracePath] does not do — the hint ranking
+/// needs to see where a board without a piece goes wrong.
+SimResult simulateDetailed(
+  LevelData level,
+  Map<int, PlacedElement> placed, {
+  List<int>? trail,
+}) {
   final n = level.size;
 
   // Forced arrows behave like immovable placed arrows.
@@ -382,6 +391,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
     final fromR = r, fromC = c;
     r = nr;
     c = nc;
+    trail?.add(r * n + c);
     // Both have moved — a patrol kills the dot by sharing its final cell OR by
     // trading places with it (passing through counts as a hit).
     if (moverCollision(r, c, fromR: fromR, fromC: fromC)) {
@@ -435,6 +445,7 @@ SimResult simulateDetailed(LevelData level, Map<int, PlacedElement> placed) {
           if (dest != null) {
             r = dest ~/ n;
             c = dest % n;
+            trail?.add(dest);
             // A patrol sitting on the exit catches the dot as it materialises.
             if (moverCollision(r, c)) {
               return const SimResult(SimOutcome.lose, DeathCause.patrol);
