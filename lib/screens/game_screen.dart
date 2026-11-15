@@ -92,6 +92,13 @@ class _GameScreenState extends State<GameScreen>
 
   final Map<int, PlacedElement> _placed = {};
 
+  /// Cells holding a piece a hint put down. Each was paid for — the daily hint,
+  /// one won from a challenge, or an ad — so it stays for the rest of the
+  /// visit: Reset, Clear & Edit and the fail card's Use Hint clear the board
+  /// around it, and a tap or a drag will not take it back. Losing it would only
+  /// mean paying for it again, or having to remember where it went.
+  final Set<int> _hinted = {};
+
   bool _hintRunning = false;
   Timer? _idleTimer;
 
@@ -405,11 +412,14 @@ class _GameScreenState extends State<GameScreen>
   /// board. By the time a run has failed the player has usually placed every
   /// piece they own, so the kit is empty and [_nextHint] finds nothing — asking
   /// it here would hide the offer in precisely the situation it exists for.
-  /// [_onFailHintPressed] clears the board first, which puts the pieces back.
+  /// [_onFailHintPressed] clears the board first, which puts the player's own
+  /// pieces back. Hinted ones stay down, so once every piece of the solution
+  /// has been hinted there is nothing left to sell.
   bool get _offerHintOnFail =>
       _attempts >= 2 &&
       _level != null &&
-      recordedSolution(_level!.id).isNotEmpty;
+      recordedSolution(_level!.id)
+          .any((p) => !_hinted.contains(_idx(p.r, p.c)));
 
   // ----- hints -----
 
@@ -555,7 +565,8 @@ class _GameScreenState extends State<GameScreen>
   /// The board is cleared first, then the piece is placed onto it. Clearing is
   /// what makes this work at all: a failed run usually has every piece already
   /// down, and a hint has nowhere to go until they are back in the kit. It also
-  /// gives the player a clean board with one square settled, which is a better
+  /// gives the player a clean board with only hinted squares settled — this one
+  /// and any from before, which the clear leaves alone — and that is a better
   /// place to think from than a wrong arrangement with a correction bolted on.
   ///
   /// Declining the ad leaves them on the overlay with Try Again — nothing is
@@ -564,7 +575,7 @@ class _GameScreenState extends State<GameScreen>
     if (_hintRunning) return;
     if (!await _payForHint()) return;
     if (!mounted) return;
-    _clearAll(); // returns every placed piece to the kit and resets the dot
+    _clearAll(); // the player's pieces back to the kit, the dot back home
     await _revealHint();
   }
 
@@ -690,50 +701,83 @@ class _GameScreenState extends State<GameScreen>
       }
     }
     setState(() => _hintRunning = false);
+    final (piece, bump) = _hintPiece(hint);
     // Goes through the same funnel as a drop, so the kit count, the pop-in and
     // the neighbour ripple all behave exactly as if the player had placed it.
-    _commitPlace(key, _hintElement(hint), decrementKit: true);
+    if (!_commitPlace(key, piece, decrementKit: true)) return;
+    setState(() {
+      _hinted.add(key);
+      if (bump != null) {
+        final (cell, index) = bump;
+        _placed[cell] = _placed[cell]!.withPortalIndex(index);
+      }
+    });
   }
 
-  /// The piece a hint puts down. Only a portal needs any thought: its index is
-  /// worked out against the board as it is now, never copied from the recorded
-  /// solution.
-  ///
-  /// The recorded index says which portal is whose partner in the solution, and
-  /// that is all it can say. Used as-is it collided with portals the player had
-  /// already put down — two portals on one index, one of them left with no
-  /// partner — and it assumed hints arrive in the order they were written down,
-  /// which they no longer do.
-  PlacedElement _hintElement(HintPlacement hint) {
-    final el = hint.element;
-    if (el.type != PlacedType.teleporter) return el;
-    final mine = el.portalIndex ?? 0;
-    final used = {
-      for (final p in _placed.values)
-        if (p.type == PlacedType.teleporter) p.portalIndex,
+  /// Cell -> its partner's cell, for every portal in the recorded solution.
+  late final Map<int, int> _solutionPartner = () {
+    final portals = [
+      for (final p in recordedSolution(_level!.id))
+        if (p.element.portalIndex != null) p,
+    ];
+    return {
+      for (final p in portals)
+        for (final q in portals)
+          if (q.element.portalIndex == (p.element.portalIndex! ^ 1))
+            _idx(p.r, p.c): _idx(q.r, q.c),
     };
-    // Its partner in the solution is already down and still waiting for a
-    // partner of its own: this is that partner, so take the slot beside it.
-    for (final other in _hintPlan) {
-      if (other.element.portalIndex != (mine ^ 1)) continue;
-      final there = _placed[_idx(other.r, other.c)];
-      final j = there?.portalIndex;
-      if (there?.type == PlacedType.teleporter &&
-          j != null &&
-          !used.contains(j ^ 1)) {
-        return el.withPortalIndex(j ^ 1);
+  }();
+
+  /// The piece a hint puts down, and the portal it moves out of its way if
+  /// there is one: that portal's cell, and the index it takes instead.
+  ///
+  /// Only a portal needs any thought. Its index is worked out against the board
+  /// as it is now, never copied from the recorded solution: the recorded index
+  /// says which portal is whose partner, and that is all it can say. Used as-is
+  /// it collided with portals the player had already put down — two portals on
+  /// one index, one of them left with no partner — and it assumed hints arrive
+  /// in the order they were written down, which they no longer do.
+  (PlacedElement, (int, int)?) _hintPiece(HintPlacement hint) {
+    final el = hint.element;
+    if (el.type != PlacedType.teleporter) return (el, null);
+    // Index -> the cell holding it.
+    final held = {
+      for (final e in _placed.entries)
+        if (e.value.type == PlacedType.teleporter &&
+            e.value.portalIndex != null)
+          e.value.portalIndex!: e.key,
+    };
+    int freshPair() {
+      var pair = 0;
+      while (held.containsKey(2 * pair) || held.containsKey(2 * pair + 1)) {
+        pair++;
       }
+      return pair;
     }
-    // Otherwise a pair of its own — never the free half of someone else's.
-    // Completing whatever portal happens to be waiting would wire a solution
-    // portal to the player's guess, and pair the solution up wrongly once the
-    // rest of it arrived. The end it is in the solution (entrance or exit) is
-    // kept, so it reads the way the solution meant it.
-    var pair = 0;
-    while (used.contains(2 * pair) || used.contains(2 * pair + 1)) {
-      pair++;
+
+    // Whatever portal stands on its partner's cell is its partner, whoever put
+    // it there: take the slot beside it.
+    final partner = _solutionPartner[_idx(hint.r, hint.c)];
+    final there = partner == null ? null : _placed[partner];
+    final j = there?.type == PlacedType.teleporter ? there!.portalIndex : null;
+    if (j != null) {
+      final rival = held[j ^ 1];
+      if (rival == null) return (el.withPortalIndex(j ^ 1), null);
+      // Taken — by a portal that is, as of now, plainly the wrong partner. It
+      // moves to a pair of its own, as the same end it was. Left where it is,
+      // this pair could never join up: the hint cannot be taken back to try
+      // again, and when its partner is a hint as well, neither can that.
+      return (
+        el.withPortalIndex(j ^ 1),
+        (rival, 2 * freshPair() + ((j ^ 1) & 1)),
+      );
     }
-    return el.withPortalIndex(2 * pair + (mine & 1));
+    // Nothing there yet: a pair of its own — never the free half of someone
+    // else's. Completing whatever portal happens to be waiting would wire a
+    // solution portal to the player's guess. The end it is in the solution
+    // (entrance or exit) is kept, so it reads the way the solution meant it.
+    final mine = el.portalIndex ?? 0;
+    return (el.withPortalIndex(2 * freshPair() + (mine & 1)), null);
   }
 
   /// The hint button: a lightbulb carrying whatever tapping it would actually
@@ -1123,7 +1167,8 @@ class _GameScreenState extends State<GameScreen>
     if (cell != null) {
       final key = _idx(cell.$1, cell.$2);
       final piece = _placed[key];
-      if (piece != null) {
+      // A hinted piece stays where the hint put it — see _hinted.
+      if (piece != null && !_hinted.contains(key)) {
         setState(() {
           _placed.remove(key);
           _dragPiece = piece;
@@ -1227,9 +1272,12 @@ class _GameScreenState extends State<GameScreen>
     final piece = _snapPiece;
     if (key != null) {
       if (tool != null) {
-        _commitPlace(key, _newPiece(tool), decrementKit: true);
-      } else if (piece != null) {
-        _commitPlace(key, piece, decrementKit: false);
+        _commitPlace(key, _newPiece(tool, key), decrementKit: true);
+      } else if (piece != null &&
+          !_commitPlace(key, piece, decrementKit: false)) {
+        // Something took the cell while the piece was in flight. It left the
+        // board when it was picked up, so it goes back to the kit, not nowhere.
+        _kit[piece.tool] = (_kit[piece.tool] ?? 0) + 1;
       }
     }
     setState(() {
@@ -1241,8 +1289,9 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
-  /// Drop a piece onto a cell with the full landing reaction.
-  void _commitPlace(int key, PlacedElement el, {required bool decrementKit}) {
+  /// Drop a piece onto a cell with the full landing reaction. Returns whether
+  /// it landed.
+  bool _commitPlace(int key, PlacedElement el, {required bool decrementKit}) {
     // A new placement (decrementKit) reserves stock from the kit. The kit is not
     // decremented until the magnet-snap lands, so a second placement — a quick
     // tap, or another drop — can slip past _canPlace/_canDropAt while the first
@@ -1251,11 +1300,13 @@ class _GameScreenState extends State<GameScreen>
     // cell is committed twice:
     //   * out of stock  → refuse (would drive the counter to -1);
     //   * cell taken     → refuse (a race already committed a piece here).
-    if (decrementKit &&
-        ((_kit[el.tool] ?? 0) <= 0 ||
-            _occupied(key ~/ _level!.size, key % _level!.size))) {
+    // The second goes for a piece being moved as well: landing on a taken cell
+    // would write over what is there — a hinted piece among them — and lose it
+    // from the board and the kit at once.
+    if ((decrementKit && (_kit[el.tool] ?? 0) <= 0) ||
+        _occupied(key ~/ _level!.size, key % _level!.size)) {
       _stopHand();
-      return;
+      return false;
     }
     _stopHand();
     _noteActivity();
@@ -1271,15 +1322,18 @@ class _GameScreenState extends State<GameScreen>
     });
     Sfx.place();
     Haptics.medium();
+    return true;
   }
 
   void _placeTool((int, int) cell, ToolType tool) {
-    _commitPlace(_idx(cell.$1, cell.$2), _newPiece(tool), decrementKit: true);
+    final key = _idx(cell.$1, cell.$2);
+    _commitPlace(key, _newPiece(tool, key), decrementKit: true);
   }
 
   void _removeAt(int key) {
     final piece = _placed[key];
-    if (piece == null) return;
+    // A hinted piece stays where the hint put it — see _hinted.
+    if (piece == null || _hinted.contains(key)) return;
     _noteActivity();
     setState(() {
       _placed.remove(key);
@@ -1291,8 +1345,11 @@ class _GameScreenState extends State<GameScreen>
     Haptics.light();
   }
 
-  /// The index the next teleporter gets: the free half of the lowest pair
+  /// The index a teleporter dropped on [cell] gets: the slot beside a hinted
+  /// portal whose partner [cell] is, or else the free half of the lowest pair
   /// still waiting for one, or else the entrance of the lowest empty pair.
+  /// [cell] is null for the toolkit tile, which shows the end in hand before it
+  /// has anywhere to go.
   ///
   /// Index `i` pairs with `i ^ 1` and takes its colour from `i ~/ 2`, so an
   /// index has to stay with its portal for as long as the portal is down.
@@ -1305,15 +1362,26 @@ class _GameScreenState extends State<GameScreen>
   /// A waiting half comes before an empty pair even when the empty pair is
   /// lower. A hint puts a portal down on a pair of its own; the player then
   /// places its partner, and that has to join it, not open a pair beside it.
+  /// For the same reason a hinted portal's partner cell goes to the hint ahead
+  /// of any lower pair: the hint cannot be taken back, so with a portal of the
+  /// player's own waiting lower down, the right cell would join theirs and
+  /// leave the hint on its own until they took their portal up again.
   ///
   /// The same rule covers a portal dragged off the grid, which never went
   /// through a renumber at all — and a count-based index then handed out a
   /// number still in use.
-  int get _nextPortalIndex {
+  int _portalIndexAt(int? cell) {
     final used = {
       for (final p in _placed.values)
         if (p.type == PlacedType.teleporter) p.portalIndex,
     };
+    if (cell != null) {
+      for (final h in _hinted) {
+        if (_solutionPartner[h] != cell) continue;
+        final i = _placed[h]?.portalIndex;
+        if (i != null && !used.contains(i ^ 1)) return i ^ 1;
+      }
+    }
     final waiting = [
       for (final i in used)
         if (i != null && !used.contains(i ^ 1)) i ^ 1,
@@ -1328,15 +1396,16 @@ class _GameScreenState extends State<GameScreen>
 
   /// True when the next teleporter dropped will be an ENTRANCE. Drives the
   /// toolkit tile's icon so the player can see which end they are holding.
-  bool get _nextPortalIsEntrance => _nextPortalIndex.isEven;
+  bool get _nextPortalIsEntrance => _portalIndexAt(null).isEven;
 
-  /// A fresh piece for [tool]. Teleporters get the next placement index, which
-  /// carries entrance/exit, pair and partner all at once.
-  PlacedElement _newPiece(ToolType tool) {
+  /// A fresh piece for [tool], going onto [cell]. Teleporters get their
+  /// placement index, which carries entrance/exit, pair and partner all at
+  /// once.
+  PlacedElement _newPiece(ToolType tool, int cell) {
     final el = PlacedElement(
         type: tool.placedType, tool: tool, direction: tool.direction);
     return tool.placedType == PlacedType.teleporter
-        ? el.withPortalIndex(_nextPortalIndex)
+        ? el.withPortalIndex(_portalIndexAt(cell))
         : el;
   }
 
@@ -2048,11 +2117,16 @@ class _GameScreenState extends State<GameScreen>
     setState(_resetDot);
   }
 
-  /// Remove every placed piece and restore the toolkit (used by "Reset").
+  /// Take every piece the player placed back into the toolkit (used by
+  /// "Reset", and by Clear & Edit and Use Hint on the fail card). Hinted pieces
+  /// stay down, and stay out of the kit — see [_hinted].
   void _clearAll() {
     setState(() {
-      _placed.clear();
+      _placed.removeWhere((key, _) => !_hinted.contains(key));
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
+      for (final piece in _placed.values) {
+        _kit[piece.tool] = (_kit[piece.tool] ?? 0) - 1;
+      }
       _resetDot();
     });
   }
@@ -2072,9 +2146,12 @@ class _GameScreenState extends State<GameScreen>
           style: TextStyle(
               fontWeight: FontWeight.w800, color: AppColors.ink, fontSize: 18),
         ),
-        content: const Text(
-          'This removes everything you placed on the board.',
-          style: TextStyle(color: AppColors.textSoft),
+        content: Text(
+          _hinted.isEmpty
+              ? 'This removes everything you placed on the board.'
+              : 'This removes everything you placed on the board. Your hints '
+                  'stay where they are.',
+          style: const TextStyle(color: AppColors.textSoft),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         actions: [
@@ -2292,6 +2369,9 @@ class _GameScreenState extends State<GameScreen>
                                       !_spentOneShots.contains(e.key))
                                     e.key: e.value,
                               },
+                        // Hinted pieces wear a fixed piece's dashed border:
+                        // they cannot be moved either.
+                        hinted: _hinted,
                         trail: _trail,
                         revision: _revision,
                         placeAnim: _placeAnim,

@@ -707,10 +707,16 @@ class GameGridPainter extends CustomPainter {
     this.movers = const [],
     this.spinCell,
     this.spinProgress = 0,
+    this.hinted = const {},
   });
 
   final LevelData level;
   final Map<int, PlacedElement> placed;
+
+  /// The [placed] pieces a hint put down. The player cannot move them for the
+  /// rest of the visit, so they wear the dashed "locked here" border of a fixed
+  /// piece.
+  final Set<int> hinted;
 
   /// Immovable, level-defined arrows (drawn with a fixed "pinned" look).
   final Map<int, PlacedElement> forced;
@@ -812,7 +818,9 @@ class GameGridPainter extends CustomPainter {
       final scale = p == null ? 1.0 : popScale(p);
       final border = 2.5 + (p == null ? 0.0 : placeBorderBoost(p));
       _paintPiece(canvas, geo, key, piece.tool, piece.direction, scale, border,
-          portalPair: _portalPairs[key], portalEntrance: piece.isPortalEntrance);
+          portalPair: _portalPairs[key],
+          portalEntrance: piece.isPortalEntrance,
+          pinned: hinted.contains(key));
     });
 
     // Pieces shrinking away.
@@ -1057,7 +1065,7 @@ class GameGridPainter extends CustomPainter {
 
   void _paintPiece(Canvas canvas, GridGeometry geo, int key, ToolType tool,
       Direction? dir, double scale, double borderWidth,
-      {int? portalPair, bool? portalEntrance}) {
+      {int? portalPair, bool? portalEntrance, bool pinned = false}) {
     if (scale <= 0) return;
     final r = key ~/ geo.n;
     final c = key % geo.n;
@@ -1076,13 +1084,15 @@ class GameGridPainter extends CustomPainter {
     canvas.translate(-center.dx, -center.dy);
 
     canvas.drawRRect(rrect, Paint()..color = fill);
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = borderWidth
-        ..color = color,
-    );
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = borderWidth
+      ..color = color;
+    if (pinned) {
+      _drawDashedRRect(canvas, rrect, edge);
+    } else {
+      canvas.drawRRect(rrect, edge);
+    }
     switch (tool.placedType) {
       case PlacedType.shield:
         paintShieldIcon(canvas, center, geo.cell * 0.28, color: color);
