@@ -87,10 +87,27 @@ class Analytics {
     );
   }
 
+  /// A level id as it is sent: as text, zero-padded to three digits.
+  ///
+  /// GA4 fills an event-scoped custom dimension from a text parameter only.
+  /// Sent as numbers, `level_id` and `world_id` left the registered Level ID
+  /// and World ID dimensions `(not set)` on every event, while the text
+  /// `hint_type` filled its own. Padded so that a text sort, which is what
+  /// GA4 applies to dimensions, keeps levels in order: "009" before "011".
+  @visibleForTesting
+  static String levelIdParam(int levelId) => levelId.toString().padLeft(3, '0');
+
+  /// A world id as it is sent: as text, for the same reason as [levelIdParam].
+  @visibleForTesting
+  static String worldIdParam(int worldId) => '$worldId';
+
   // ----- game -----
 
   static void levelStart(int levelId, int worldId) =>
-      _log('level_start', {'level_id': levelId, 'world_id': worldId});
+      _log('level_start', {
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
+      });
 
   static void levelComplete(
     int levelId,
@@ -99,8 +116,8 @@ class Analytics {
     required int hintsUsed,
   }) =>
       _log('level_complete', {
-        'level_id': levelId,
-        'world_id': worldId,
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
         'time_seconds': timeSeconds,
         'hints_used': hintsUsed,
       });
@@ -109,8 +126,8 @@ class Analytics {
   /// at 1 — which is what makes "how many tries does level 84 take" answerable.
   static void levelFail(int levelId, int worldId, int attemptNumber) =>
       _log('level_fail', {
-        'level_id': levelId,
-        'world_id': worldId,
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
         'attempt_number': attemptNumber,
       });
 
@@ -118,45 +135,126 @@ class Analytics {
   /// event name is settled before the feature lands, rather than invented in a
   /// hurry beside it.
   static void levelSkip(int levelId, int worldId) =>
-      _log('level_skip', {'level_id': levelId, 'world_id': worldId});
+      _log('level_skip', {
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
+      });
+
+  /// The player left a level without finishing it.
+  ///
+  /// This is what makes drop-off answerable directly rather than by subtracting
+  /// [levelComplete] from [levelStart]. That subtraction counts an install that
+  /// was killed by the OS the same as a player who gave up, and it cannot say
+  /// how long they fought before leaving; this can.
+  ///
+  /// Fired from the game screen's dispose, so it covers backing out to the menu
+  /// and being popped for any other reason. It does NOT fire when the app is
+  /// swept away from the task switcher — there is no dispose in that path — so
+  /// `level_start` still exceeds `level_complete + level_abandon`. The
+  /// remainder is the "app closed on this level" bucket, which is itself worth
+  /// reading: see docs/analytics-setup.md.
+  static void levelAbandon(
+    int levelId,
+    int worldId, {
+    required int secondsSpent,
+    required int attempts,
+    required int hintsUsed,
+  }) =>
+      _log('level_abandon', {
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
+        'seconds_spent': secondsSpent,
+        'attempts': attempts,
+        'hints_used': hintsUsed,
+      });
 
   // ----- hints -----
 
   /// [hintType] is 'free' or 'ad' — the two ways a hint can be paid for.
   static void hintUsed(int levelId, int worldId, String hintType) =>
       _log('hint_used', {
-        'level_id': levelId,
-        'world_id': worldId,
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
         'hint_type': hintType,
       });
 
   static void hintAdWatched(int levelId, int worldId) =>
-      _log('hint_ad_watched', {'level_id': levelId, 'world_id': worldId});
+      _log('hint_ad_watched', {
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
+      });
 
   /// Covers both a player dismissing the video early and an ad that could not
   /// be served — from the player's side the outcome is the same: no reward.
   static void hintAdDismissed(int levelId, int worldId) =>
-      _log('hint_ad_dismissed', {'level_id': levelId, 'world_id': worldId});
+      _log('hint_ad_dismissed', {
+        'level_id': levelIdParam(levelId),
+        'world_id': worldIdParam(worldId),
+      });
 
   // ----- ads -----
 
   static void rewardedAdShown(int levelId) =>
-      _log('rewarded_ad_shown', {'level_id': levelId});
+      _log('rewarded_ad_shown', {'level_id': levelIdParam(levelId)});
 
   /// [trigger] records why the break happened, so the fail-counter interstitial
   /// stays distinguishable from whatever triggers get added later.
   static void interstitialShown(int levelId, String trigger) =>
-      _log('interstitial_shown', {'level_id': levelId, 'trigger': trigger});
+      _log('interstitial_shown', {
+        'level_id': levelIdParam(levelId),
+        'trigger': trigger,
+      });
 
   /// Unused: AdMob does not report clicks to the app, so this can only ever
   /// fire if a future SDK exposes them. Kept for the same reason as levelSkip.
   static void interstitialClicked(int levelId) =>
-      _log('interstitial_clicked', {'level_id': levelId});
+      _log('interstitial_clicked', {'level_id': levelIdParam(levelId)});
+
+  /// What an impression was worth, from AdMob's paid-event callback.
+  ///
+  /// `ad_impression` is a *reserved* GA4 event name with a fixed parameter
+  /// schema, and that is the whole point of it: GA4 reads `value` + `currency`
+  /// off this event and nothing else to build its ad-revenue metrics, so ARPU
+  /// and ARPDAU stay empty until something sends it. [rewardedAdShown] and
+  /// [interstitialShown] count impressions but carry no money, and no amount of
+  /// counting them adds up to revenue.
+  ///
+  /// The parameter names below are GA4's, not ours — `ad_platform`,
+  /// `ad_source`, `ad_format`, `ad_unit_name`, `value`, `currency` — and
+  /// renaming one drops it out of the revenue calculation while leaving the
+  /// event itself looking healthy. Two rules that fail silently the same way:
+  ///
+  ///   * `value` must be a number and `currency` a 3-letter ISO code. A `value`
+  ///     with no `currency` beside it is discarded, not assumed to be USD.
+  ///   * The value is in whole currency units. AdMob reports micros, so the
+  ///     conversion happens at the call site in [AdManager] — sending micros
+  ///     here would report a thousandth of a cent as a dollar.
+  ///
+  /// [precision] is AdMob's own estimate of how much to trust the number
+  /// (`unknown`, `estimated`, `publisherProvided`, `precise`). It is not part of
+  /// GA4's schema, so it rides along under a name of our own for filtering:
+  /// `unknown` in particular means AdMob had no value to give.
+  static void adImpression({
+    required String format,
+    required String adUnitName,
+    required double value,
+    required String currency,
+    required String precision,
+  }) =>
+      _log('ad_impression', {
+        'ad_platform': 'AdMob',
+        'ad_source': 'AdMob Network',
+        'ad_format': format,
+        'ad_unit_name': adUnitName,
+        'value': value,
+        'currency': currency,
+        'value_precision': precision,
+      });
 
   // ----- progression -----
 
   static void worldUnlocked(int worldId) =>
-      _log('world_unlocked', {'world_id': worldId});
+      _log('world_unlocked', {'world_id': worldIdParam(worldId)});
 
   static void gameCompleted() => _log('game_completed');
 

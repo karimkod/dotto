@@ -406,6 +406,28 @@ class _GameScreenState extends State<GameScreen>
     Analytics.levelFail(_level!.id, worldOf(_level!.id), _attempts);
   }
 
+  /// Report leaving a level unfinished, so drop-off has an event of its own.
+  ///
+  /// Gated the same way [Analytics.levelStart] is — campaign levels only, never
+  /// a designer preview — because a level that never reported starting must not
+  /// report being abandoned. Challenges are excluded for the same reason: they
+  /// have their own completion event and are not part of the campaign funnel.
+  ///
+  /// [GameStatus.won] is the whole test for "finished". Advancing to the next
+  /// level disposes this screen with the status still won, so a player working
+  /// through the game reports nothing here; only actually leaving does.
+  void _reportAbandonIfUnfinished() {
+    if (widget.levelOverride != null || widget.challenge != null) return;
+    if (_level == null || _status == GameStatus.won) return;
+    Analytics.levelAbandon(
+      _level!.id,
+      worldOf(_level!.id),
+      secondsSpent: DateTime.now().difference(_levelStartedAt).inSeconds,
+      attempts: _attempts,
+      hintsUsed: _hintsThisLevel,
+    );
+  }
+
   /// Whether the fail overlay should offer a hint.
   ///
   /// Never on the first fail: losing once is how the level teaches itself, and
@@ -891,6 +913,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    _reportAbandonIfUnfinished();
     _timer?.cancel();
     _handTimer?.cancel();
     _idleTimer?.cancel();

@@ -44,6 +44,34 @@ void main() {
     }, returnsNormally);
   });
 
+  test('the drop-off and revenue events are safe with analytics off too', () {
+    // level_abandon runs from dispose, which is the one place a throw would be
+    // hardest to attribute: the screen is already going away.
+    expect(() {
+      Analytics.levelAbandon(84, 7, secondsSpent: 41, attempts: 3, hintsUsed: 1);
+      Analytics.adImpression(
+        format: 'rewarded',
+        adUnitName: 'ca-app-pub-0000000000000000/0000000000',
+        value: 0.0034,
+        currency: 'USD',
+        precision: 'estimated',
+      );
+    }, returnsNormally);
+  });
+
+  test('level and world ids go out as text, padded to sort in order', () {
+    // GA4 leaves a custom dimension (not set) when its parameter arrives as a
+    // number, which is how Level ID and World ID stayed empty for months. So
+    // the ids are sent as text, and level ids padded so that a text sort keeps
+    // them in level order.
+    expect(Analytics.levelIdParam(7), '007');
+    expect(Analytics.levelIdParam(84), '084');
+    expect(Analytics.levelIdParam(110), '110');
+    expect(Analytics.worldIdParam(3), '3');
+    final ids = [110, 9, 84, 11].map(Analytics.levelIdParam).toList()..sort();
+    expect(ids, ['009', '011', '084', '110']);
+  });
+
   group('worldOf', () {
     test('maps each world to its own range', () {
       expect(worldOf(1), 1);

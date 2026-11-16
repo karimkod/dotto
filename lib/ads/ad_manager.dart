@@ -30,9 +30,40 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../analytics/analytics_service.dart';
+
 
 class AdManager {
   AdManager._();
+
+  /// Report what an impression earned, for GA4's ad-revenue metrics.
+  ///
+  /// Attached to every ad as it loads rather than as it shows: the callback can
+  /// arrive after the ad is dismissed and disposed, and an ad that was never
+  /// given the listener simply never reports. [format] is the GA4 ad format
+  /// name, [unitId] the AdMob unit so revenue can be split by placement.
+  ///
+  /// AdMob hands out micros — a millionth of a currency unit — and GA4 wants
+  /// whole units, so the division belongs here, once, next to the SDK that
+  /// chose the unit. See [Analytics.adImpression] for why sending the raw
+  /// number would be wrong in a way nothing would flag.
+  ///
+  /// Worth knowing before reading the numbers: the paid-event callback is only
+  /// populated for accounts Google has enabled it for. Where it is not, this
+  /// never fires and ad revenue stays empty — which looks identical to no ads
+  /// having served, so check impressions before concluding anything.
+  static void _reportPaid(Ad ad, String format, String unitId) {
+    (ad as AdWithoutView).onPaidEvent =
+        (_, valueMicros, precision, currencyCode) {
+      Analytics.adImpression(
+        format: format,
+        adUnitName: unitId,
+        value: valueMicros / 1000000.0,
+        currency: currencyCode,
+        precision: precision.name,
+      );
+    };
+  }
 
   /// Whether ads can run at all. Ads are a mobile-only concern here: the web
   /// build has no AdMob SDK, and `flutter test` has no plugin host.
@@ -93,6 +124,7 @@ class AdManager {
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
+          _reportPaid(ad, 'rewarded', _rewardedUnitId);
           _rewarded = ad;
           _loadingRewarded = false;
         },
@@ -180,6 +212,7 @@ class AdManager {
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
+          _reportPaid(ad, 'interstitial', _interstitialUnitId);
           _interstitial = ad;
           _loadingInterstitial = false;
         },
