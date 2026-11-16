@@ -15,7 +15,7 @@ void main() {
   List<int> runClean(int n) => [
         for (var i = 1; i <= n; i++)
           if (AdPacing.noteLevelCompleted(
-              levelId: AdPacing.minLevel + i, usedHint: false))
+              levelNumber: AdPacing.minLevel + i, usedHint: false))
             i,
       ];
 
@@ -25,7 +25,7 @@ void main() {
       // because of where the player is, not how many levels they have done.
       final due = [
         for (var level = 1; level < AdPacing.minLevel; level++)
-          if (AdPacing.noteLevelCompleted(levelId: level, usedHint: false))
+          if (AdPacing.noteLevelCompleted(levelNumber: level, usedHint: false))
             level,
       ];
       expect(due, isEmpty,
@@ -34,20 +34,20 @@ void main() {
 
     test('the threshold level itself is eligible', () {
       // "level 10 or higher" includes 10.
-      AdPacing.noteLevelCompleted(levelId: 1, usedHint: false); // 1
-      AdPacing.noteLevelCompleted(levelId: 2, usedHint: false); // 2
+      AdPacing.noteLevelCompleted(levelNumber: 1, usedHint: false); // 1
+      AdPacing.noteLevelCompleted(levelNumber: 2, usedHint: false); // 2
       expect(
           AdPacing.noteLevelCompleted(
-              levelId: AdPacing.minLevel, usedHint: false),
+              levelNumber: AdPacing.minLevel, usedHint: false),
           isTrue); // 3
     });
 
     test('the level below the threshold is not', () {
-      AdPacing.noteLevelCompleted(levelId: 1, usedHint: false); // 1
-      AdPacing.noteLevelCompleted(levelId: 2, usedHint: false); // 2
+      AdPacing.noteLevelCompleted(levelNumber: 1, usedHint: false); // 1
+      AdPacing.noteLevelCompleted(levelNumber: 2, usedHint: false); // 2
       expect(
           AdPacing.noteLevelCompleted(
-              levelId: AdPacing.minLevel - 1, usedHint: false),
+              levelNumber: AdPacing.minLevel - 1, usedHint: false),
           isFalse); // 3
     });
 
@@ -55,14 +55,17 @@ void main() {
       // Someone who plays 1–9 and then 10 has already used up two thirds of a
       // cadence slot; level 10 must not arrive as an immediate interruption.
       for (var level = 1; level < AdPacing.minLevel; level++) {
-        AdPacing.noteLevelCompleted(levelId: level, usedHint: false);
+        AdPacing.noteLevelCompleted(levelNumber: level, usedHint: false);
       }
       expect(AdPacing.levelsCompletedThisSession, AdPacing.minLevel - 1);
       // The 9th completion was a multiple of three but below the threshold, so
       // the next ad is at the 12th — not on the very next level.
-      expect(AdPacing.noteLevelCompleted(levelId: 10, usedHint: false), isFalse);
-      expect(AdPacing.noteLevelCompleted(levelId: 11, usedHint: false), isFalse);
-      expect(AdPacing.noteLevelCompleted(levelId: 12, usedHint: false), isTrue);
+      expect(AdPacing.noteLevelCompleted(levelNumber: 10, usedHint: false),
+          isFalse);
+      expect(AdPacing.noteLevelCompleted(levelNumber: 11, usedHint: false),
+          isFalse);
+      expect(AdPacing.noteLevelCompleted(levelNumber: 12, usedHint: false),
+          isTrue);
     });
   });
 
@@ -87,40 +90,45 @@ void main() {
 
   group('hints', () {
     test('taking a hint spares that level its ad', () {
-      AdPacing.noteLevelCompleted(levelId: 20, usedHint: false); // 1
-      AdPacing.noteLevelCompleted(levelId: 21, usedHint: false); // 2
-      expect(AdPacing.noteLevelCompleted(levelId: 22, usedHint: true), isFalse,
+      AdPacing.noteLevelCompleted(levelNumber: 20, usedHint: false); // 1
+      AdPacing.noteLevelCompleted(levelNumber: 21, usedHint: false); // 2
+      expect(AdPacing.noteLevelCompleted(levelNumber: 22, usedHint: true),
+          isFalse,
           reason: 'a hint may already have cost a rewarded video — two ads '
               'around one level is too many');
     });
 
     test('a skipped slot is dropped, not deferred to the next level', () {
-      AdPacing.noteLevelCompleted(levelId: 20, usedHint: false); // 1
-      AdPacing.noteLevelCompleted(levelId: 21, usedHint: false); // 2
-      AdPacing.noteLevelCompleted(levelId: 22, usedHint: true); // 3 — skipped
-      expect(AdPacing.noteLevelCompleted(levelId: 23, usedHint: false), isFalse,
+      AdPacing.noteLevelCompleted(levelNumber: 20, usedHint: false); // 1
+      AdPacing.noteLevelCompleted(levelNumber: 21, usedHint: false); // 2
+      AdPacing.noteLevelCompleted(levelNumber: 22, usedHint: true); // 3 — skipped
+      expect(AdPacing.noteLevelCompleted(levelNumber: 23, usedHint: false),
+          isFalse,
           reason: 'the fourth level must not inherit the third\'s ad');
       expect(
-          AdPacing.noteLevelCompleted(levelId: 24, usedHint: false), isFalse);
-      expect(AdPacing.noteLevelCompleted(levelId: 25, usedHint: false), isTrue,
+          AdPacing.noteLevelCompleted(levelNumber: 24, usedHint: false),
+          isFalse);
+      expect(AdPacing.noteLevelCompleted(levelNumber: 25, usedHint: false),
+          isTrue,
           reason: 'the cadence stays on multiples of three');
     });
 
     test('a hinted level still counts toward the cadence', () {
       // Otherwise a player who hints often would drift out of the rhythm and
       // could go a long stretch with no ad at all.
-      AdPacing.noteLevelCompleted(levelId: 20, usedHint: true); // 1
-      AdPacing.noteLevelCompleted(levelId: 21, usedHint: true); // 2
+      AdPacing.noteLevelCompleted(levelNumber: 20, usedHint: true); // 1
+      AdPacing.noteLevelCompleted(levelNumber: 21, usedHint: true); // 2
       expect(AdPacing.levelsCompletedThisSession, 2);
-      expect(AdPacing.noteLevelCompleted(levelId: 22, usedHint: false), isTrue);
+      expect(AdPacing.noteLevelCompleted(levelNumber: 22, usedHint: false),
+          isTrue);
     });
   });
 
   test('the counter tracks completions, whatever suppressed the ad', () {
-    AdPacing.noteLevelCompleted(levelId: 1, usedHint: false); // below
-    AdPacing.noteLevelCompleted(levelId: 2, usedHint: true); // below + hint
-    AdPacing.noteLevelCompleted(levelId: 40, usedHint: true); // hint
-    AdPacing.noteLevelCompleted(levelId: 41, usedHint: false);
+    AdPacing.noteLevelCompleted(levelNumber: 1, usedHint: false); // below
+    AdPacing.noteLevelCompleted(levelNumber: 2, usedHint: true); // below + hint
+    AdPacing.noteLevelCompleted(levelNumber: 40, usedHint: true); // hint
+    AdPacing.noteLevelCompleted(levelNumber: 41, usedHint: false);
     expect(AdPacing.levelsCompletedThisSession, 4);
   });
 }

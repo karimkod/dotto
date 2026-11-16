@@ -149,8 +149,8 @@ The game is structured into 50 worlds with 15 levels each (750 levels). Each wor
   previous worlds (hardest of the world).
 
 ### Phase 1: Foundations (Worlds 1-3, 45 levels)
-- **World 1:** Arrows + walls + forced arrows (tutorial world, done)
-- **World 2:** Static destroyers intro (5 levels, 16–20, done)
+- **World 1:** Arrows + walls + forced arrows (tutorial world, 10 levels, done)
+- **World 2:** Static destroyers intro (3 levels: 16, 17 and 20, done)
 - **World 3:** Shields + chain explosions — shielded hits blast adjacent walls
   into doors (15 levels, 21–35, done)
 

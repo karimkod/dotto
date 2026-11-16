@@ -128,8 +128,8 @@ void main() {
 
   test('every shipped level still has no fixed shields or pauses', () {
     // The new fields default to empty, so this pins that adding them changed
-    // nothing about the existing 50 levels.
-    for (var n = 1; n <= 50; n++) {
+    // nothing about the levels of the first four worlds (ids up to 50).
+    for (final n in levelDefinitions.keys.where((n) => n <= 50)) {
       final lvl = levelDataFor(n)!;
       expect(lvl.forcedShields, isEmpty, reason: 'level $n');
       expect(lvl.forcedPauses, isEmpty, reason: 'level $n');

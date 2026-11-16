@@ -300,7 +300,7 @@ void main() {
     });
 
     test('finishing everything completes every world', () {
-      final all = {for (var n = 1; n <= kLevelCount; n++) n};
+      final all = levelIds.toSet();
       for (var w = 1; w <= 7; w++) {
         expect(isWorldComplete(w, all), isTrue, reason: 'world $w');
       }

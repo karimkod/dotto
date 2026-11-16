@@ -34,11 +34,11 @@ void main() {
     return box.localToGlobal(Offset(0, box.size.height / 2)).dy;
   }
 
-  /// Where the card for level [n] sits vertically, or null if it is not laid
+  /// Where the card for level [id] sits vertically, or null if it is not laid
   /// out at all (scrolled far enough off that it was never built).
-  double? cardCentre(WidgetTester tester, int n) {
+  double? cardCentre(WidgetTester tester, int id) {
     final finder =
-        find.byWidgetPredicate((w) => w is LevelCard && w.level.number == n);
+        find.byWidgetPredicate((w) => w is LevelCard && w.level.id == id);
     if (finder.evaluate().isEmpty) return null;
     final box = tester.renderObject<RenderBox>(finder);
     return box.localToGlobal(Offset(0, box.size.height / 2)).dy;
@@ -52,12 +52,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  void expectCentred(WidgetTester tester, int n) {
-    final centre = cardCentre(tester, n);
+  void expectCentred(WidgetTester tester, int id) {
+    final centre = cardCentre(tester, id);
     expect(centre, isNotNull,
-        reason: 'level $n is not on screen at all, let alone centred');
+        reason: 'level $id is not on screen at all, let alone centred');
     expect((centre! - viewportCentre(tester)).abs(), lessThan(1.0),
-        reason: 'level $n should sit in the middle of the path viewport');
+        reason: 'level $id should sit in the middle of the path viewport');
   }
 
   // Ordered: ProgressStore is process-global, so each test builds on the last.
@@ -112,10 +112,10 @@ void main() {
 
   testWidgets('centres on the last level', (tester) async {
     // The top of the path — the same end-of-list problem as level 1, mirrored.
-    for (var n = 1; n < kLevelCount; n++) {
-      ProgressStore.markCompleted(n);
+    for (final id in levelIds.take(levelIds.length - 1)) {
+      ProgressStore.markCompleted(id);
     }
     await pumpMenu(tester);
-    expectCentred(tester, kLevelCount);
+    expectCentred(tester, levelIds.last);
   });
 }

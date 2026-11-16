@@ -288,17 +288,21 @@ void main() {
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
-    // Now on level 3 (its header title).
+    // Now on the third level players meet: id 4, since 3 is retired. The
+    // header shows its number, not its id.
     expect(find.text('Level 3'), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((w) => w is GameScreen && w.level.id == 4),
+        findsOneWidget);
   });
 
-  // Keyed off kLevelCount rather than a hardcoded number, so adding a level
-  // moves this test with it instead of quietly asserting the wrong thing.
+  // Keyed off the last level id rather than a hardcoded number, so adding a
+  // level moves this test with it instead of quietly asserting the wrong thing.
   testWidgets('the last level shows Back to Menu, not Continue', (tester) async {
     final lastLevel = Level(
-      id: kLevelCount,
+      id: levelIds.last,
       number: kLevelCount,
-      title: levelDataFor(kLevelCount)!.title,
+      title: levelDataFor(levelIds.last)!.title,
       difficulty: Difficulty.easy,
       status: LevelStatus.unlocked,
     );
@@ -307,7 +311,8 @@ void main() {
     await tester.pump();
 
     final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
-    final geo = GridGeometry(boardRect.width, levelDataFor(kLevelCount)!.size);
+    final geo =
+        GridGeometry(boardRect.width, levelDataFor(levelIds.last)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
     // Level 110 "Once and For All": the World 7 finale. Once-up at (7,3),
     // the doorstep pause at (7,2), and the portal pair (0,6)->(3,4) — placed

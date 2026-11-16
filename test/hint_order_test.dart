@@ -90,7 +90,7 @@ void main() {
 
   group('every level', () {
     final levels = [
-      for (var n = 1; n <= kLevelCount; n++)
+      for (final n in levelIds)
         if (recordedSolution(n).length > 1) n,
     ];
 

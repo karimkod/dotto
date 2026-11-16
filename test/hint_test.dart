@@ -30,7 +30,7 @@ void main() {
   // one an ad that cannot exist under `flutter test`.
   tearDown(() => AdManager.stubRewardedForTest(null));
 
-  final allLevels = [for (var n = 1; n <= kLevelCount; n++) n];
+  final allLevels = levelIds;
 
   test('every level with a toolkit has a hint to give', () {
     for (final n in allLevels) {

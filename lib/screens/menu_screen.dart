@@ -303,52 +303,14 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     );
                     // Place a world banner just below the first level of each
                     // world (so it reads "entering World N" while climbing up).
-                    if (level.number == 1) {
+                    // Found by id, not by number: the numbers players see
+                    // close up around retired levels.
+                    final world = worldOf(level.id);
+                    if (level.id == firstLevelOfWorld(world)) {
                       return Column(children: [
                         slot,
-                        const _WorldBanner(
-                            number: 1, subtitle: 'Getting Started'),
-                      ]);
-                    }
-                    if (level.number == kWorld2Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(
-                            number: 2, subtitle: 'Static Destroyers'),
-                      ]);
-                    }
-                    if (level.number == kWorld3Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(
-                            number: 3, subtitle: 'Shields & Explosions'),
-                      ]);
-                    }
-                    if (level.number == kWorld4Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(
-                            number: 4, subtitle: 'Patrols & Pause'),
-                      ]);
-                    }
-                    if (level.number == kWorld5Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(number: 5, subtitle: 'Teleporters'),
-                      ]);
-                    }
-                    if (level.number == kWorld6Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(
-                            number: 6, subtitle: 'Rotating Arrows'),
-                      ]);
-                    }
-                    if (level.number == kWorld7Start) {
-                      return Column(children: [
-                        slot,
-                        const _WorldBanner(
-                            number: 7, subtitle: 'One-Shot Arrows'),
+                        _WorldBanner(
+                            number: world, subtitle: _worldSubtitles[world]!),
                       ]);
                     }
                     return slot;
@@ -440,6 +402,17 @@ class _LevelSlot extends StatelessWidget {
     );
   }
 }
+
+/// The theme each world's banner names.
+const _worldSubtitles = {
+  1: 'Getting Started',
+  2: 'Static Destroyers',
+  3: 'Shields & Explosions',
+  4: 'Patrols & Pause',
+  5: 'Teleporters',
+  6: 'Rotating Arrows',
+  7: 'One-Shot Arrows',
+};
 
 /// A banner marking the start of a world on the path. Sits centered on the
 /// dashed line as a rounded pill with the world number and theme name.

@@ -17,7 +17,8 @@ class ProgressStore {
   /// below are synchronous, so anything not loaded by then reads as unplayed.
   static Future<void> init() => impl.init();
 
-  /// The set of completed level numbers.
+  /// The set of completed level ids. It can hold a retired id (see `levelIds`),
+  /// so count it with `completedCount` rather than by length.
   static Set<int> completed() => impl.completed();
 
   /// Record a level as completed (which unlocks the next one).

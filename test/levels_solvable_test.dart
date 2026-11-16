@@ -186,19 +186,31 @@ void main() {
             : null);
   }
 
-  // The World 1 exam levels (11–15) are designed to have a single solution.
-  for (final n in [11, 12, 13, 14, 15]) {
-    test('World 1 — exam level $n has a unique solution', () {
+  // The World 1 exam levels (11, 14, 15) are designed to have a single
+  // solution — all but 14, which also wins turning along row 1 instead of row
+  // 0: the same route, one row lower. Counted exactly, so a change that opens
+  // a third way in still fails.
+  for (final (n, count) in [(11, 1), (14, 2), (15, 1)]) {
+    test('World 1 — exam level $n has exactly $count solution(s)', () {
       final level = levelDataFor(n)!;
-      expect(pathSolve(level).length, 1,
-          reason: 'exam level $n should have exactly one solution');
+      expect(pathSolve(level).length, count,
+          reason: 'exam level $n should have exactly $count solution(s)');
     });
   }
 
   // Forced arrows must lie on the winning path, not be decoys.
   // 47, 48 and 50 are absent: their redesigns dropped the forced arrows they
   // used to carry.
-  for (final n in [7, 8, 11, 12, 13, 14, 15, 19, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 49]) {
+  // The exceptions sit off the route on purpose and are named here: 15's at
+  // (4,0) is a guard that catches a dot sent straight down the first column,
+  // and 29's at (3,1) and 30's at (6,0) are never reached by a winning run.
+  // They are checked to stay off it, so the list cannot quietly go stale.
+  const offRoute = <int, Set<(int, int)>>{
+    15: {(4, 0)},
+    29: {(3, 1)},
+    30: {(6, 0)},
+  };
+  for (final n in [7, 8, 11, 14, 15, 20, 22, 25, 27, 29, 30, 38, 39, 43, 45, 49]) {
     test('level $n forced arrow is on the solution path', () {
       final level = levelDataFor(n)!;
       final visited = tracePath(
@@ -208,7 +220,14 @@ void main() {
               oneShots[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
-        expect(visited!.contains(a.r * level.size + a.c), isTrue,
+        final onRoute = visited!.contains(a.r * level.size + a.c);
+        if (offRoute[n]?.contains((a.r, a.c)) ?? false) {
+          expect(onRoute, isFalse,
+              reason: 'the forced arrow at (${a.r},${a.c}) is listed as off '
+                  'the route');
+          continue;
+        }
+        expect(onRoute, isTrue,
             reason: 'the dot must pass through the forced arrow at '
                 '(${a.r},${a.c})');
       }
@@ -242,7 +261,7 @@ void main() {
   }
 
   test('pause-free static levels still use the fast path solver', () {
-    for (final n in [11, 12, 13, 14, 15]) {
+    for (final n in [11, 14, 15]) {
       expect(needsBruteSolver(levelDataFor(n)!), isFalse);
     }
   });
@@ -301,7 +320,7 @@ void main() {
     return keys.map((k) => '$k:${m[k]!.tool.name}').join(',');
   }
 
-  for (final n in [2, 5, 12, 21, 24, 41, 42]) {
+  for (final n in [2, 5, 11, 21, 24, 41, 42]) {
     test('level $n — iterative solveAll matches the reference recursion', () {
       final level = levelDataFor(n)!;
       final got = solveAll(level).map(canon).toList();
@@ -352,7 +371,7 @@ void main() {
   // it would not be minimal.) The solution COUNT may legitimately be smaller,
   // since the exhaustive search also counts placements that dump spare pieces
   // on cells the dot never visits.
-  for (final n in [2, 5, 12, 21, 24, 27, 41, 42, 43, 47, 48]) {
+  for (final n in [2, 5, 11, 21, 24, 27, 41, 42, 43, 47, 48]) {
     test('level $n — path search agrees with exhaustive brute force', () {
       final level = levelDataFor(n)!;
       // Guard, so editing a level can never silently turn this into a hang:

@@ -317,7 +317,7 @@ class _GameScreenState extends State<GameScreen>
         setState(() => _showHand = false);
       }
     });
-    _level = widget.levelOverride ?? levelDataFor(widget.level.number);
+    _level = widget.levelOverride ?? levelDataFor(widget.level.id);
     if (_level != null) {
       _kit = {for (final e in _level!.toolkit) e.type: e.count};
       for (final e in _level!.toolkit) {
@@ -372,22 +372,25 @@ class _GameScreenState extends State<GameScreen>
     );
 
     final completed = ProgressStore.completed();
+    // A save can still hold retired ids; only levels in the game count.
+    final done = completedCount(completed);
     Analytics.setProgress(
-      levelsCompleted: completed.length,
+      levelsCompleted: done,
       currentWorld: world,
     );
     // The first level of a world is what opens it, so finishing the one before
     // it is the moment the next world becomes reachable.
-    if (id < kLevelCount && worldOf(id + 1) != world) {
-      Analytics.worldUnlocked(worldOf(id + 1));
+    final next = nextLevelId(id);
+    if (next != null && worldOf(next) != world) {
+      Analytics.worldUnlocked(worldOf(next));
     }
-    if (completed.length >= kLevelCount) Analytics.gameCompleted();
+    if (done >= kLevelCount) Analytics.gameCompleted();
 
     CloudSaveService.save();
     GameServices.onLevelCompleted(
       world: world,
       worldFinished: isWorldComplete(world, completed),
-      totalCompleted: completed.length,
+      totalCompleted: done,
       levelCount: kLevelCount,
       lifetimeHints: ProgressStore.hintsUsed(),
     );
@@ -1905,7 +1908,7 @@ class _GameScreenState extends State<GameScreen>
       // completion advances the cadence exactly once, whichever way the player
       // then leaves the level — or if they never leave it at all.
       _interstitialDue = AdPacing.noteLevelCompleted(
-        levelId: _level!.id,
+        levelNumber: levelNumberOf(_level!.id),
         usedHint: _hintsThisLevel > 0,
       );
     }
@@ -1951,7 +1954,7 @@ class _GameScreenState extends State<GameScreen>
     if (widget.levelOverride != null) return;
     // Read after [ProgressStore.markCompleted] in [_win], so the level just
     // finished is part of the count.
-    final completed = ProgressStore.completed().length;
+    final completed = completedCount(ProgressStore.completed());
     if (!NotificationService.shouldPromptAt(completed)) return;
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
@@ -1981,9 +1984,9 @@ class _GameScreenState extends State<GameScreen>
 
   /// Load the next level in place (no trip back to the menu).
   Future<void> _goToNextLevel() async {
-    final next = _level!.id + 1;
-    final data = levelDataFor(next);
-    if (data == null) return;
+    final next = nextLevelId(_level!.id);
+    if (next == null) return;
+    final data = levelDataFor(next)!;
     await _maybeShowInterstitial();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
@@ -1991,7 +1994,7 @@ class _GameScreenState extends State<GameScreen>
         builder: (_) => GameScreen(
           level: Level(
             id: next,
-            number: next,
+            number: levelNumberOf(next),
             title: data.title,
             difficulty: Difficulty.easy,
             status: LevelStatus.unlocked,
@@ -2277,6 +2280,12 @@ class _GameScreenState extends State<GameScreen>
     if (mounted) _noteActivity();
   }
 
+  /// The number the header and the win card show. For a campaign level that is
+  /// its place in play order, which stops matching its id once a level before
+  /// it is retired; a board from outside the campaign keeps showing its own id.
+  int get _shownNumber =>
+      widget.levelOverride == null ? widget.level.number : _level!.id;
+
   Widget _buildHeader() {
     return Row(
       children: [
@@ -2297,7 +2306,7 @@ class _GameScreenState extends State<GameScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Level ${_level!.id}',
+                    'Level $_shownNumber',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -2617,7 +2626,7 @@ class _GameScreenState extends State<GameScreen>
               Opacity(
                 opacity: subT,
                 child: Text(
-                  'Level ${_level!.id}',
+                  'Level $_shownNumber',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -2857,7 +2866,7 @@ class _GameScreenState extends State<GameScreen>
   /// level). One clean action — no Replay / Menu.
   Widget _buildContinueCluster() {
     final hasNext =
-        widget.levelOverride == null && levelDataFor(_level!.id + 1) != null;
+        widget.levelOverride == null && nextLevelId(_level!.id) != null;
     return SizedBox(
       width: double.infinity,
       child: _PillButton(

@@ -114,9 +114,9 @@ void main() {
   }
 
   testWidgets('Reset clears the board around a hint', (tester) async {
-    await open(tester, 9);
-    final level = levelDataFor(9)!;
-    final plan = hintOrder(level, recordedSolution(9));
+    await open(tester, 6);
+    final level = levelDataFor(6)!;
+    final plan = hintOrder(level, recordedSolution(6));
     await hint();
     final hinted = at(plan.first);
     expect(placed().keys, [hinted]);
@@ -153,8 +153,8 @@ void main() {
 
   testWidgets('a hinted piece cannot be tapped or dragged off',
       (tester) async {
-    await open(tester, 9);
-    final first = hintOrder(levelDataFor(9)!, recordedSolution(9)).first;
+    await open(tester, 6);
+    final first = hintOrder(levelDataFor(6)!, recordedSolution(6)).first;
     await hint();
     final hinted = at(first);
     final before = kit();
@@ -181,8 +181,8 @@ void main() {
   });
 
   testWidgets('the fail card clears around hints too', (tester) async {
-    await open(tester, 9);
-    final plan = hintOrder(levelDataFor(9)!, recordedSolution(9));
+    await open(tester, 6);
+    final plan = hintOrder(levelDataFor(6)!, recordedSolution(6));
     await hint();
 
     Future<void> fail() async {

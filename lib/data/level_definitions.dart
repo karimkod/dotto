@@ -1,7 +1,13 @@
 import '../models/grid_cell.dart';
 import '../models/level_data.dart';
 
-/// Playable level definitions, keyed by level number.
+/// Playable level definitions, keyed by level id.
+///
+/// Ids are permanent: saved progress, hints and analytics all key on them. A
+/// level taken out of the game leaves its id unused rather than reused, so a
+/// save keeps pointing at the same boards; the number a player sees is the
+/// level's place in play order (see `levelIds` in levels.dart). Ids 3, 9, 10,
+/// 12, 13, 18 and 19 are retired.
 ///
 /// World 1 (levels 1–15): from "press Play" to multi-turn routing around walls
 /// and fixed (forced) arrows.
@@ -36,17 +42,6 @@ const Map<int, LevelData> levelDefinitions = {
     start: StartSpec(2, 0, Direction.right),
     exit: Pos(0, 2),
     toolkit: [ToolkitEntry(ToolType.arrowUp, 1)],
-  ),
-
-  // 3 — a different heading.
-  3: LevelData(
-    id: 3,
-    size: 3,
-    title: 'New Heading',
-    tip: 'The dot heads down. Use the Right arrow to steer it home.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(2, 2),
-    toolkit: [ToolkitEntry(ToolType.arrowRight, 1)],
   ),
 
   // 4 — two turns, starting top-right heading down to the top-left exit.
@@ -127,43 +122,9 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 9 — the dot starts in the MIDDLE heading down, then wraps around the right
-  // and top edges to the opposite corner. A wall blocks the short hop up the
-  // left side, forcing the long way around. Three turns.
-  // Solution: Right(4,2), Up(4,4), Left(0,4).
-  9: LevelData(
-    id: 9,
-    size: 5,
-    title: 'Zig Zag',
-    tip: 'Another centre start — weave it around the edge to the far corner.',
-    start: StartSpec(2, 2, Direction.down),
-    exit: Pos(0, 0),
-    walls: [Pos(2, 0), Pos(1, 2)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowUp, 1),
-      ToolkitEntry(ToolType.arrowLeft, 1),
-    ],
-  ),
-
-  // 10 — the grand tour. Start centre-left heading right to the far corner.
-  10: LevelData(
-    id: 10,
-    size: 6,
-    title: 'Grand Tour',
-    tip: 'A big board and a long path. Take your time.',
-    start: StartSpec(2, 0, Direction.right),
-    exit: Pos(5, 5),
-    walls: [Pos(2, 4), Pos(5, 3)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // ----- World 1 exam levels (11–15): combine arrows + walls + forced arrows
-  // at higher difficulty. Each has a distinct layout/shape. Solver-verified
-  // tight (every piece required) with the forced arrows on the path. -----
+  // ----- World 1 exam levels (11, 14, 15): combine arrows + walls + forced
+  // arrows at higher difficulty. Each has a distinct layout/shape.
+  // Solver-verified tight (every piece required). -----
 
   // 11 — a spiral that winds in toward a centre exit; two fixed arrows on the
   // outer ring, three turns are yours.
@@ -192,120 +153,69 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 12 — a vertical snake (columns instead of rows); fixed arrows turn the
-  // bottom corners, you handle the rest.
-  12: LevelData(
-    id: 12,
-    size: 7,
-    title: 'The Maze',
-    tip: 'A tall maze — the fixed arrows turn the corners for you.',
-    start: StartSpec(0, 0, Direction.down),
-    exit: Pos(0, 6),
-    walls: [
-      Pos(0, 1), Pos(1, 1), Pos(2, 1), Pos(3, 1), Pos(4, 1), Pos(5, 1),
-      Pos(1, 3), Pos(2, 3), Pos(3, 3), Pos(4, 3), Pos(5, 3), Pos(6, 3),
-      Pos(0, 5), Pos(1, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5),
-    ],
-    forcedArrows: [
-      ForcedArrow(6, 0, Direction.right),
-      ForcedArrow(0, 2, Direction.right),
-      ForcedArrow(6, 4, Direction.right),
-    ],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
-    ],
-  ),
-
-  // 13 — a diagonal staircase from corner to corner; most steps are fixed,
-  // you fill three gaps.
-  13: LevelData(
-    id: 13,
-    size: 7,
-    title: 'Guided Path',
-    tip: 'A staircase across the board — fill the gaps in the steps.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(6, 6),
-    walls: [
-      Pos(0, 2), Pos(0, 3), Pos(0, 4), Pos(0, 5), Pos(0, 6),
-      Pos(1, 0), Pos(1, 3), Pos(1, 4), Pos(1, 5), Pos(1, 6),
-      Pos(2, 0), Pos(2, 1), Pos(2, 4), Pos(2, 5), Pos(2, 6),
-      Pos(3, 0), Pos(3, 1), Pos(3, 2), Pos(3, 5), Pos(3, 6),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 6),
-      Pos(5, 0), Pos(5, 1), Pos(5, 2), Pos(5, 3), Pos(5, 4),
-      Pos(6, 0), Pos(6, 1), Pos(6, 2), Pos(6, 3), Pos(6, 4), Pos(6, 5),
-    ],
-    forcedArrows: [
-      ForcedArrow(1, 1, Direction.right),
-      ForcedArrow(1, 2, Direction.down),
-      ForcedArrow(2, 3, Direction.down),
-      ForcedArrow(3, 3, Direction.right),
-      ForcedArrow(3, 4, Direction.down),
-      ForcedArrow(4, 4, Direction.right),
-      ForcedArrow(5, 5, Direction.right),
-      ForcedArrow(5, 6, Direction.down),
-    ],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowDown, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 14 — the dot starts in the MIDDLE of the board and shoots straight up, then
-  // cascades back down across the whole grid. Four fixed arrows turn it at the
-  // edges; your three Down arrows drop it onto each new row. Radiating from the
-  // centre, it looks nothing like the corner-start staircase of level 15.
-  // Solution: Down(0,6), Down(2,0), Down(4,6).
+  // 14 — the dot starts in the MIDDLE heading left. Turn it up the third
+  // column, along the top and down the right edge; the fixed arrow sends it
+  // back along row 2, straight across its own climb — the one place in World 1
+  // where the route crosses itself. Then down the left side and back and forth
+  // along the bottom two rows to the corner. The walls at (3,1) and (4,2) stop
+  // the short cuts down the left.
+  // Solution: Up(3,2), Right(0,2), Down(0,6), Down(2,0), Down(5,6). It also
+  // wins turning along row 1 instead of row 0: Right(1,2), Down(1,6).
   14: LevelData(
     id: 14,
     size: 7,
     title: 'Tight Squeeze',
-    tip: 'The dot starts dead centre and shoots up. Drop it down each row.',
-    start: StartSpec(3, 3, Direction.up),
+    tip: 'The dot heads left from the centre. Send it up and over, then down row by row.',
+    start: StartSpec(3, 3, Direction.left),
     exit: Pos(6, 0),
+    walls: [Pos(3, 1), Pos(4, 2)],
     forcedArrows: [
-      ForcedArrow(0, 3, Direction.right),
       ForcedArrow(2, 6, Direction.left),
-      ForcedArrow(4, 0, Direction.right),
       ForcedArrow(6, 6, Direction.left),
+      ForcedArrow(5, 0, Direction.right),
     ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
       ToolkitEntry(ToolType.arrowDown, 3),
+      ToolkitEntry(ToolType.arrowRight, 1),
     ],
   ),
 
-  // 15 — the ultimate exam: a wide-open 8x8 that runs in VERTICAL columns, not
-  // rows. The dot plunges straight down column 0; from then on the fixed arrows
-  // flip it up and down the columns, and YOU shift it one column right each time
-  // it reaches an edge. The whole toolkit is five Right arrows, so every column
-  // must be left at exactly the corner the next fixed arrow waits on. A few
-  // walls block the tempting straight slides. The grid stands on end compared to
-  // level 14's horizontal cascade.
-  // Solution: Right(7,0), Right(0,1), Right(7,3), Right(0,4), Right(7,6).
+  // 15 — the ultimate exam, in two halves. First a loop: down from the
+  // corner, right along row 3, down the right edge and back along row 5. Then
+  // the column climb — up and down columns 1, 3, 4 and 6, shifting right at
+  // each edge — crossing the loop's rows on every pass. The whole toolkit is
+  // six Right arrows. The fixed arrow at (4,0) is a guard: it catches a dot
+  // sent straight down the first column and turns it into a dead end.
+  // Solution: Right(3,0), Right(7,0), Right(0,1), Right(7,3), Right(0,4),
+  // Right(7,6).
   15: LevelData(
     id: 15,
     size: 8,
     title: 'Final Exam',
-    tip: 'This board runs in columns. Shift the dot right at each edge.',
+    tip: 'Loop the dot round the middle first, then climb the columns to the corner.',
     start: StartSpec(0, 0, Direction.down),
     exit: Pos(7, 7),
-    walls: [Pos(3, 2), Pos(5, 2), Pos(2, 5), Pos(4, 5), Pos(3, 7)],
     forcedArrows: [
       ForcedArrow(7, 1, Direction.up),
       ForcedArrow(0, 3, Direction.down),
       ForcedArrow(7, 4, Direction.up),
       ForcedArrow(0, 6, Direction.down),
+      ForcedArrow(4, 0, Direction.right),
+      ForcedArrow(3, 7, Direction.down),
+      ForcedArrow(5, 7, Direction.left),
+      ForcedArrow(5, 0, Direction.down),
     ],
     toolkit: [
-      ToolkitEntry(ToolType.arrowRight, 5),
+      ToolkitEntry(ToolType.arrowRight, 6),
     ],
   ),
 
   // ======================= WORLD 2 — STATIC DESTROYERS =======================
-  // Levels 16–20. Red destroyer cells are lethal on contact. Five hand-picked,
-  // distinct patterns (a 4x4 intro, a 5x5 centre-start spiral, a 6x6 minefield,
-  // a 6x6 forced-arrow escape and a 7x7 forced staircase). All solver-verified
-  // tight (every toolkit piece required).
+  // Levels 16, 17 and 20 (18 and 19 are retired). Red destroyer cells are
+  // lethal on contact. Three hand-picked, distinct patterns (a 4x4 intro, a 5x5
+  // centre-start loop and a 7x7 forced staircase). All solver-verified tight
+  // (every toolkit piece required).
 
   // 16 — First Danger: a destroyer sits in the straight path; turn up before it.
   16: LevelData(
@@ -333,52 +243,6 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.arrowLeft, 1),
       ToolkitEntry(ToolType.arrowDown, 1),
       ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 18 — Minefield: an open board scattered with destroyers; thread the one
-  // safe staircase up to the corner.
-  18: LevelData(
-    id: 18,
-    size: 6,
-    title: 'Minefield',
-    tip: 'Thread the staircase between the destroyers to the top corner.',
-    start: StartSpec(5, 0, Direction.right),
-    exit: Pos(0, 5),
-    destroyers: [
-      Pos(5, 4),
-      Pos(2, 1),
-      Pos(2, 2),
-      Pos(1, 3),
-      Pos(4, 4),
-      Pos(3, 4),
-    ],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowUp, 2),
-      ToolkitEntry(ToolType.arrowRight, 1),
-    ],
-  ),
-
-  // 19 — Into the Fire: the fixed arrow plunges the dot toward a destroyer.
-  // Escape left across the board, then drop down to the corner.
-  19: LevelData(
-    id: 19,
-    size: 6,
-    title: 'Into the Fire',
-    tip: 'The fixed arrow drops you toward danger. Escape left and find the exit.',
-    start: StartSpec(0, 0, Direction.right),
-    exit: Pos(5, 0),
-    destroyers: [
-      Pos(3, 5),
-      Pos(2, 2),
-      Pos(1, 1),
-      Pos(1, 3),
-      Pos(1, 4),
-    ],
-    forcedArrows: [ForcedArrow(0, 5, Direction.down)],
-    toolkit: [
-      ToolkitEntry(ToolType.arrowLeft, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
@@ -589,56 +453,73 @@ const Map<int, LevelData> levelDefinitions = {
     ],
   ),
 
-  // 29 — Switchback: two full-row barriers, each with a single destroyer-door
-  // offset from the last, so the dot zig-zags down — shielding through each door
-  // — while a fixed arrow drops it onto the second. The exit is tucked behind a
-  // wall so the lower leg is forced. Loose mines at (5,1) and (1,5) punish a
-  // wrong turn.
+  // 29 — Switchback: two full-row barriers, each with one destroyer-door. The
+  // dot starts heading AWAY from the first door, so it needs a hook — down the
+  // left edge and back right along row 1 — before it can shield through (2,2).
+  // Then right along row 3 to the fixed arrow over the second door at (4,4),
+  // and right again to drop into the exit. The fixed arrow at (3,1), pointing
+  // into the mine at (4,1), is bait for a dot turned the wrong way.
+  // Solution: Down(0,0), Right(1,0), Down(1,2), Right(3,2), Right(5,4),
+  // Down(5,6); shields (1,1), (3,3). The first shield also wins from (0,1).
   29: LevelData(
     id: 29,
     size: 7,
     title: 'Switchback',
-    tip: 'Zig-zag down, blasting a shield through each door.',
-    start: StartSpec(0, 2, Direction.down),
+    tip: 'The dot starts the wrong way. Hook it round, then blast through each door.',
+    start: StartSpec(0, 2, Direction.left),
     exit: Pos(6, 6),
     walls: [
       Pos(2, 0), Pos(2, 1), Pos(2, 3), Pos(2, 4), Pos(2, 5), Pos(2, 6),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 5), Pos(4, 6),
       Pos(6, 5),
+      Pos(4, 0), Pos(4, 2), Pos(4, 3), Pos(4, 5), Pos(4, 6),
     ],
-    destroyers: [Pos(2, 2), Pos(4, 4), Pos(5, 1), Pos(1, 5)],
-    forcedArrows: [ForcedArrow(3, 4, Direction.down)],
+    destroyers: [Pos(2, 2), Pos(4, 4), Pos(1, 5), Pos(4, 1)],
+    forcedArrows: [
+      ForcedArrow(3, 4, Direction.down),
+      ForcedArrow(3, 1, Direction.down),
+    ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowDown, 3),
+      ToolkitEntry(ToolType.arrowRight, 3),
       ToolkitEntry(ToolType.shield, 2),
-      ToolkitEntry(ToolType.arrowRight, 2),
-      ToolkitEntry(ToolType.arrowDown, 1),
     ],
   ),
 
-  // 30 — Grand Demolition: the World 3 finale. A wide 8x8 with THREE full-row
-  // barriers, each holding one destroyer-door, the doors staggered so the dot
-  // must shield through all three and weave between them, finishing on a fixed
-  // arrow that sweeps it to the corner. Loose mines at (3,1) and (5,6) punish
-  // the tempting wrong turns.
+  // 30 — Grand Demolition: the World 3 finale. A walled fortress with the exit
+  // in the bottom-left. Drop from the start, climb back up to the top corridor,
+  // then blast three doors in turn: (1,5) along the top, (3,7) down the right
+  // edge, and (7,5) along the bottom once the fixed arrow turns the dot home.
+  // The climb back up can turn on row 2, 3 or 4, and each shield has a few
+  // cells to go on, so it wins several ways along the one route.
+  // Solution: Right(4,2), Up(4,3), Right(1,3), Down(1,7); shields (1,4), (2,7),
+  // (7,6).
   30: LevelData(
     id: 30,
     size: 8,
     title: 'Grand Demolition',
-    tip: 'Three barriers, three doors. Blast a path all the way down.',
-    start: StartSpec(0, 3, Direction.down),
-    exit: Pos(7, 7),
+    tip: 'Climb to the top, then blast three doors on the way down to the exit.',
+    start: StartSpec(1, 2, Direction.down),
+    exit: Pos(7, 2),
     walls: [
-      Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 4), Pos(2, 5), Pos(2, 6), Pos(2, 7),
-      Pos(4, 0), Pos(4, 1), Pos(4, 2), Pos(4, 3), Pos(4, 4), Pos(4, 6), Pos(4, 7),
-      Pos(6, 0), Pos(6, 1), Pos(6, 3), Pos(6, 4), Pos(6, 5), Pos(6, 6), Pos(6, 7),
+      Pos(0, 5), Pos(2, 5), Pos(3, 5), Pos(4, 5), Pos(5, 5), Pos(6, 5),
+      Pos(6, 6), Pos(5, 6), Pos(4, 6), Pos(3, 6), Pos(2, 6), Pos(0, 6),
+      Pos(0, 7), Pos(0, 3), Pos(0, 2), Pos(0, 1), Pos(0, 0), Pos(1, 0),
+      Pos(2, 0), Pos(5, 0), Pos(7, 0), Pos(7, 1), Pos(5, 1), Pos(4, 1),
+      Pos(5, 2), Pos(5, 3), Pos(1, 6), Pos(4, 7), Pos(5, 4), Pos(7, 4),
     ],
-    destroyers: [Pos(2, 3), Pos(4, 5), Pos(6, 2), Pos(3, 1), Pos(5, 6)],
-    forcedArrows: [ForcedArrow(7, 2, Direction.right)],
+    destroyers: [
+      Pos(2, 4), Pos(1, 5), Pos(0, 4), Pos(3, 7), Pos(4, 4), Pos(4, 0),
+      Pos(7, 5),
+    ],
+    forcedArrows: [
+      ForcedArrow(7, 7, Direction.left),
+      ForcedArrow(6, 0, Direction.right),
+    ],
     toolkit: [
+      ToolkitEntry(ToolType.arrowUp, 1),
+      ToolkitEntry(ToolType.arrowDown, 1),
+      ToolkitEntry(ToolType.arrowRight, 2),
       ToolkitEntry(ToolType.shield, 3),
-      ToolkitEntry(ToolType.arrowRight, 1),
-      ToolkitEntry(ToolType.arrowDown, 2),
-      ToolkitEntry(ToolType.arrowLeft, 1),
     ],
   ),
 

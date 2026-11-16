@@ -19,6 +19,10 @@ class AdPacing {
   /// this one. The opening stretch is where a player decides whether the game
   /// is worth their time, and an ad in the middle of that is expensive in a way
   /// that does not show up in ad revenue.
+  ///
+  /// Counted in play order, by the number the player sees on the level. Ids
+  /// keep the gaps that retired levels leave, so counting by id would shorten
+  /// this stretch by every level retired from it.
   static const int minLevel = 10;
 
   static int _completed = 0;
@@ -27,6 +31,8 @@ class AdPacing {
   static int get levelsCompletedThisSession => _completed;
 
   /// Record a completed level and say whether an interstitial is now due.
+  ///
+  /// [levelNumber] is the place in play order, not the id; see [minLevel].
   ///
   /// Four things stop one:
   ///
@@ -47,11 +53,11 @@ class AdPacing {
   /// and keeping it that way is what stops a player who crosses the threshold
   /// mid-session from being interrupted immediately on level 10.
   static bool noteLevelCompleted({
-    required int levelId,
+    required int levelNumber,
     required bool usedHint,
   }) {
     _completed++;
-    if (levelId < minLevel) return false;
+    if (levelNumber < minLevel) return false;
     if (usedHint) return false;
     return _completed % everyN == 0;
   }

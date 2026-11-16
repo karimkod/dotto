@@ -120,7 +120,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final completed = ProgressStore.completed().length;
+    // Counted against the levels in the game, so a save holding a retired id
+    // never reads as more than all of them.
+    final completed = completedCount(ProgressStore.completed());
 
     return Scaffold(
       backgroundColor: AppColors.background,
