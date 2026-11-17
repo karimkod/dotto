@@ -88,7 +88,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   LevelData? _level;
 
   final Map<int, PlacedElement> _placed = {};
@@ -186,9 +186,9 @@ class _GameScreenState extends State<GameScreen>
   late final AnimationController _winCtrl;
   bool _celebrationDone = false;
 
-  /// Set when a completed level makes an interstitial due; spent by the next
-  /// transition off the celebration screen.
-  bool _interstitialDue = false;
+  /// Set when a completed level makes an interstitial due, with the rule that
+  /// asked for it; spent by the next transition off the celebration screen.
+  AdBreak? _interstitialDue;
 
   /// What the just-finished challenge paid out, for the celebration line.
   ChallengeReward _challengeReward = ChallengeReward.none;
@@ -242,6 +242,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Already playing when the player came through the menu; this covers the
     // ways into a level that do not, such as a challenge opened from a tapped
     // notification.
@@ -331,7 +332,8 @@ class _GameScreenState extends State<GameScreen>
       _selected = _level!.toolkit.isNotEmpty ? _level!.toolkit.first.type : null;
       _resetDot();
       if (widget.levelOverride == null) {
-        _levelStartedAt = DateTime.now();
+        _levelClock.start();
+        AdPacing.noteLevelStarted();
         Analytics.levelStart(_level!.id, worldOf(_level!.id));
       }
       // The free hint is a daily allowance now, held by FreeHintService, so
@@ -354,10 +356,13 @@ class _GameScreenState extends State<GameScreen>
 
   // ----- analytics -----
 
-  /// When this visit to the level began, for the completion time. Reset by
-  /// Retry as well as by loading a level, so the number means "how long the
-  /// winning attempt took" rather than how long the app has been open.
-  DateTime _levelStartedAt = DateTime.now();
+  /// Play time on this visit to the level, for the completion time and for
+  /// AdPacing's long-level rule. Started when a campaign level loads and not
+  /// reset by Retry, so it covers every attempt: how long the level took, not
+  /// the winning try. Stopped while the app is off screen, see
+  /// [didChangeAppLifecycleState], so a player who answers a message mid-level
+  /// is not counted as playing, and does not come back to an ad for it.
+  final Stopwatch _levelClock = Stopwatch();
   int _attempts = 0;
   int _hintsThisLevel = 0;
 
@@ -367,7 +372,7 @@ class _GameScreenState extends State<GameScreen>
     Analytics.levelComplete(
       id,
       world,
-      timeSeconds: DateTime.now().difference(_levelStartedAt).inSeconds,
+      timeSeconds: _levelClock.elapsed.inSeconds,
       hintsUsed: _hintsThisLevel,
     );
 
@@ -422,7 +427,7 @@ class _GameScreenState extends State<GameScreen>
     Analytics.levelAbandon(
       _level!.id,
       worldOf(_level!.id),
-      secondsSpent: DateTime.now().difference(_levelStartedAt).inSeconds,
+      secondsSpent: _levelClock.elapsed.inSeconds,
       attempts: _attempts,
       hintsUsed: _hintsThisLevel,
     );
@@ -912,8 +917,25 @@ class _GameScreenState extends State<GameScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The level clock follows the app out and back, on the same states the
+    // music follows in main.dart, so time with the game off screen is never
+    // time on the level.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _levelClock.stop();
+    } else if (state == AppLifecycleState.resumed &&
+        widget.levelOverride == null &&
+        _level != null &&
+        _status != GameStatus.won) {
+      _levelClock.start();
+    }
+  }
+
+  @override
   void dispose() {
     _reportAbandonIfUnfinished();
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _handTimer?.cancel();
     _idleTimer?.cancel();
@@ -1925,6 +1947,7 @@ class _GameScreenState extends State<GameScreen>
     Sfx.exit();
     // Record completion → unlocks the next level (skipped for designer tests).
     if (widget.levelOverride == null) {
+      _levelClock.stop(); // the level is done; the celebration is not on it
       ProgressStore.markCompleted(_level!.id);
       _reportWin();
       // Decided here, spent at the transition. Counting on the win means one
@@ -1932,7 +1955,7 @@ class _GameScreenState extends State<GameScreen>
       // then leaves the level — or if they never leave it at all.
       _interstitialDue = AdPacing.noteLevelCompleted(
         levelNumber: levelNumberOf(_level!.id),
-        usedHint: _hintsThisLevel > 0,
+        timeOnLevel: _levelClock.elapsed,
       );
     }
     // A challenge is recorded against itself, never against the campaign — it
@@ -1987,7 +2010,7 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
-  /// Show the between-levels interstitial if one is due.
+  /// Show the end-of-level interstitial if one is due.
   ///
   /// Called from the transitions off the celebration screen rather than when
   /// the celebration ends, so the ad never lands on top of the win — the player
@@ -1995,13 +2018,15 @@ class _GameScreenState extends State<GameScreen>
   /// they expect a pause anyway.
   ///
   /// Silent on failure, in every sense: no ad loaded, no fill, no SDK, nothing
-  /// reported. The player just moves on.
+  /// reported. The player just moves on. Nor is the ad lost with it: AdPacing
+  /// hears only about ads that showed, so the next level end asks again.
   Future<void> _maybeShowInterstitial() async {
-    if (!_interstitialDue) return;
-    _interstitialDue = false; // consumed either way — never retried later
+    final due = _interstitialDue;
+    if (due == null) return;
+    _interstitialDue = null; // consumed either way — never retried here
     final id = _level!.id;
     if (await AdManager.showInterstitial()) {
-      Analytics.interstitialShown(id, 'between_levels');
+      Analytics.interstitialShown(id, due.trigger);
     }
   }
 

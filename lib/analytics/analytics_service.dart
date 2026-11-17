@@ -197,8 +197,9 @@ class Analytics {
   static void rewardedAdShown(int levelId) =>
       _log('rewarded_ad_shown', {'level_id': levelIdParam(levelId)});
 
-  /// [trigger] records why the break happened, so the fail-counter interstitial
-  /// stays distinguishable from whatever triggers get added later.
+  /// [trigger] records which pacing rule asked for the break: `between_levels`
+  /// for the every-other-level beat, `long_level` for a level that ran past
+  /// three minutes. See AdBreak in lib/ads/ad_pacing.dart.
   static void interstitialShown(int levelId, String trigger) =>
       _log('interstitial_shown', {
         'level_id': levelIdParam(levelId),

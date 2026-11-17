@@ -31,6 +31,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../analytics/analytics_service.dart';
+import 'ad_pacing.dart';
 
 
 class AdManager {
@@ -179,8 +180,10 @@ class AdManager {
     _rewarded = null; // a loaded ad is single-use
 
     var earned = false;
+    var shown = false;
     final closed = Completer<void>();
     ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) => shown = true,
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         unawaited(_loadRewarded());
@@ -196,10 +199,13 @@ class AdManager {
 
     await ad.show(onUserEarnedReward: (_, _) => earned = true);
     await closed.future;
+    // Watched to the end or closed after a second, it was an ad on screen, and
+    // the pacing counts it as one whether or not it paid out a hint.
+    if (shown) AdPacing.noteAdShown();
     return earned;
   }
 
-  // ----- interstitial (reserved for the fail counter) -----
+  // ----- interstitial -----
 
   static InterstitialAd? _interstitial;
   static bool _loadingInterstitial = false;
@@ -227,9 +233,9 @@ class AdManager {
 
   /// Show a cached interstitial if there is one. Returns whether it showed.
   ///
-  /// Nothing calls this yet — it is here so the planned "after N failures"
-  /// break has a loaded ad waiting rather than a cold start at the moment it is
-  /// wanted.
+  /// AdPacing decides when. What this owes it is the news that an ad was
+  /// actually on screen: one that fails to show must not restart the count, or
+  /// a run of no-fill would quietly hold ads back.
   static Future<bool> showInterstitial() async {
     if (!_ready) return false;
     final ad = _interstitial;
@@ -239,8 +245,10 @@ class AdManager {
     }
     _interstitial = null;
 
+    var shown = false;
     final closed = Completer<void>();
     ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) => shown = true,
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         unawaited(_loadInterstitial());
@@ -255,6 +263,7 @@ class AdManager {
     );
     await ad.show();
     await closed.future;
-    return true;
+    if (shown) AdPacing.noteAdShown();
+    return shown;
   }
 }

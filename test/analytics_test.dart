@@ -34,7 +34,7 @@ void main() {
       Analytics.hintAdWatched(1, 1);
       Analytics.hintAdDismissed(1, 1);
       Analytics.rewardedAdShown(1);
-      Analytics.interstitialShown(1, 'fail_counter');
+      Analytics.interstitialShown(1, 'long_level');
       Analytics.interstitialClicked(1);
       Analytics.worldUnlocked(2);
       Analytics.gameCompleted();
