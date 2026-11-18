@@ -375,6 +375,14 @@ App Store Connect **rejects a build number it has already accepted**, so build
 numbers must only ever go up. Build 6 is taken. Use the `build_number` input when
 re-running after a failed upload.
 
+Apple also sets the Xcode an upload must be built with: from April 2027 it is
+Xcode 27 or later, which Apple warned about (ITMS-90725) on 1.6.0 build 27. The
+Xcode comes from the runner image, not from the `setup-xcode` step, which only
+picks the newest version the image already has. `macos-26` stops at Xcode 26.6,
+so the workflow runs on GitHub's separate `xcode-27` image (macOS 27, still a
+GitHub preview when it was switched in November 2026). When Apple next raises
+the floor, `runs-on` is the line to change.
+
 ## What is left
 
 The listing is filled in, mostly through the App Store Connect API rather than

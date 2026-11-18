@@ -27,8 +27,8 @@ name: iOS Release to App Store
 #     confusing place to land.
 #   * IPHONEOS_DEPLOYMENT_TARGET is 15.0, raised from 14.0 after Apple returned
 #     ITMS-90068 against build 7: from Spring 2027 an upload must declare 15.0
-#     or later. That and the Xcode version below are the two knobs for when
-#     Apple next moves the floor.
+#     or later. That and the runner image below, which decides the Xcode, are
+#     the two knobs for when Apple next moves the floor.
 #   * Profiles are downloaded per run through the App Store Connect API — there
 #     is no profile in a secret and no Fastlane match. That means a portal
 #     change is picked up automatically, with one exception: adding a capability
@@ -61,9 +61,13 @@ env:
 jobs:
   build-and-upload:
     name: Build & Upload iOS to App Store Connect
-    # Apple requires a recent Xcode for App Store uploads; macos-26 defaults to
-    # Xcode 26, where macos-15 only ships Xcode 16.
-    runs-on: macos-26
+    # The image decides which Xcodes exist; setup-xcode below only picks the
+    # newest of them. macos-26 stops at Xcode 26.6, and from April 2027 Apple
+    # refuses uploads built with anything older than Xcode 27 (ITMS-90725,
+    # warned against 1.6.0 build 27), so this is the line that moves when Apple
+    # raises the floor. GitHub ships Xcode 27 as an image of its own, on
+    # macOS 27, still marked preview when this was switched in November 2026.
+    runs-on: xcode-27
     # Pods plus xcodebuild archive run long; a named bound surfaces a runner
     # SIGTERM as a clear timeout rather than an opaque cancel.
     timeout-minutes: 60
