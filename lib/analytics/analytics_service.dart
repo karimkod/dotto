@@ -267,6 +267,12 @@ class Analytics {
   static void musicToggled(bool on) =>
       _log('music_toggled', {'enabled': on ? 'on' : 'off'});
 
+  /// The player changed how fast the dot runs, to [speed] times the game's own
+  /// pace. Sent as text ('2x'): a GA4 custom dimension fills from text only,
+  /// should this one ever be registered.
+  static void runSpeedChanged(int speed) =>
+      _log('run_speed_changed', {'speed': '${speed}x'});
+
   // ----- onboarding funnel -----
   //
   // A first launch only. Every step marks the funnel as running, and

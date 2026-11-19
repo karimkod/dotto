@@ -39,6 +39,7 @@ void main() {
       Analytics.worldUnlocked(2);
       Analytics.gameCompleted();
       Analytics.levelDesignerOpened();
+      Analytics.runSpeedChanged(2);
       Analytics.setProgress(levelsCompleted: 3, currentWorld: 1);
       Analytics.setHintsUsedTotal(4);
     }, returnsNormally);

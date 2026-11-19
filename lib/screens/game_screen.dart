@@ -13,6 +13,7 @@ import '../services/free_hint_service.dart';
 import '../services/game_services.dart';
 import '../services/music_service.dart';
 import '../settings/haptics.dart';
+import '../settings/settings_store.dart';
 import '../analytics/analytics_service.dart';
 import '../audio/sfx.dart';
 import '../data/level_definitions.dart';
@@ -48,8 +49,23 @@ import '../widgets/sound_settings.dart';
 import '../widgets/top_bar.dart';
 import 'level_designer_screen.dart';
 
-/// Milliseconds between dot movement ticks.
+/// Milliseconds between dot movement ticks at the game's own pace. A player can
+/// run the dot faster (see [SettingsStore.runSpeed]), which divides this and
+/// every animation that plays on the beat by the same amount, so a faster run
+/// looks the same, only quicker.
 const _tickMs = 400;
+
+/// The dot's glide into its next cell within a beat; patrols glide with it.
+const _glideMs = 320;
+
+/// One half of a teleport: the shrink at the entrance, or the grow at the exit.
+const _teleportMs = 210;
+
+/// The hidden hold between the two halves of a teleport.
+const _teleportHoldMs = 90;
+
+/// A rotating arrow's quarter-turn.
+const _spinMs = 260;
 
 /// Fixed height reserved for the bottom button area (the hint line + Play, the
 /// win pause, or Continue/Back to Menu). Pinning it keeps the grid above from
@@ -133,6 +149,13 @@ class _GameScreenState extends State<GameScreen>
   late final AnimationController _teleportCtrl; // one phase of a teleport
   late final AnimationController _moverCtrl; // patrol glide (every beat)
   late final AnimationController _spinCtrl; // a rotating arrow's quarter-turn
+
+  /// How fast the dot runs, as a multiple of the game's own pace: the player's
+  /// choice, kept across runs, levels and launches.
+  int _speed = SettingsStore.runSpeed;
+
+  /// The beat [_timer] was started at, so that [_beat] notices a new speed.
+  int _timerMs = _tickMs;
 
   /// The rotating arrow currently mid-turn, if any. [_rotations] keeps the
   /// pre-turn heading until the turn lands — the painter swings the glyph off it.
@@ -249,11 +272,11 @@ class _GameScreenState extends State<GameScreen>
     MusicService.play();
     _dotCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 320),
+      duration: _paced(_glideMs),
     );
     _moverCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 320),
+      duration: _paced(_glideMs),
     )..value = 1;
     // Brief squish: stays at 1.0, then pops to 1.15 and settles on arrival.
     _dotScale = TweenSequence<double>([
@@ -274,12 +297,12 @@ class _GameScreenState extends State<GameScreen>
     // Always-running driver for the dot's glow pulse and cell effect decay.
     _teleportCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 210),
+      duration: _paced(_teleportMs),
     );
-    // One quarter-turn of a rotating arrow — the beat is held while it plays.
+    // One quarter-turn of a rotating arrow, played behind the departing dot.
     _spinCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: _paced(_spinMs),
     );
     _glowCtrl = AnimationController(
       vsync: this,
@@ -1460,14 +1483,43 @@ class _GameScreenState extends State<GameScreen>
 
   // ----- run loop -----
 
+  /// The time between beats at the current speed.
+  int get _beatMs => _tickMs ~/ _speed;
+
+  /// [ms] at the game's own pace, shortened to the current speed.
+  Duration _paced(int ms) => Duration(milliseconds: ms ~/ _speed);
+
+  /// Start the beat, or start it over, at the current speed.
+  void _startBeats() {
+    _timer?.cancel();
+    _timerMs = _beatMs;
+    _timer = Timer.periodic(Duration(milliseconds: _timerMs), (_) => _beat());
+  }
+
+  /// Move to the next speed, and from the fastest back to the game's own pace.
+  ///
+  /// Live during a run, which is when a slow one is noticed. What is already
+  /// moving finishes at the pace it started at, and the beat changes from the
+  /// next step (see [_beat]), so nothing on the board jumps.
+  void _cycleSpeed() {
+    const speeds = SettingsStore.runSpeeds;
+    final next = speeds[(speeds.indexOf(_speed) + 1) % speeds.length];
+    setState(() => _speed = next);
+    _dotCtrl.duration = _paced(_glideMs);
+    _moverCtrl.duration = _paced(_glideMs);
+    _teleportCtrl.duration = _paced(_teleportMs);
+    _spinCtrl.duration = _paced(_spinMs);
+    SettingsStore.setRunSpeed(next);
+    Analytics.runSpeedChanged(next);
+  }
+
   void _play() {
     if (_status == GameStatus.running) return;
     setState(() {
       _resetDot();
       _status = GameStatus.running;
     });
-    _timer =
-        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
+    _startBeats();
   }
 
   List<MoverState> _moversAt(int r, int c) =>
@@ -1583,12 +1635,15 @@ class _GameScreenState extends State<GameScreen>
     // The blast can end the run (a teleport landing on the exit wins), so only
     // resume beats if it did not.
     if (!mounted || _status != GameStatus.running) return;
-    _timer =
-        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
+    _startBeats();
   }
 
   void _beat() {
     if (_status != GameStatus.running) return;
+    // The speed has changed since the timer started, so keep the new pace from
+    // this step on. Waiting for the step, instead of restarting the timer when
+    // the button is tapped, lets the glide in flight land first.
+    if (_timerMs != _beatMs) _startBeats();
     final size = _level!.size;
 
     // 1. Patrols advance simultaneously with the dot — collisions are checked
@@ -1798,8 +1853,9 @@ class _GameScreenState extends State<GameScreen>
   /// turn can never be drawn while the dot is still standing on it.
   Future<void> _spinRotorBehindDot(int cell, Direction from) async {
     // One controller serves every rotor, so a turn still in flight elsewhere is
-    // landed first rather than dropped half-done. At a 400ms beat and a 260ms
-    // turn this cannot currently happen — it keeps a faster beat honest.
+    // landed first rather than dropped half-done. The turn is shorter than a
+    // beat at every speed, since the speed divides both, so this cannot
+    // currently happen — it keeps a later change to either one honest.
     final busy = _spinCell;
     if (busy != null && busy != cell) {
       _rotations[busy] = _rotations[busy]!.rotatedCW;
@@ -1843,8 +1899,7 @@ class _GameScreenState extends State<GameScreen>
     final dest = links[fromKey];
     if (dest == null) {
       // An unpaired portal is inert — just carry on beating.
-      _timer = Timer.periodic(
-          const Duration(milliseconds: _tickMs), (_) => _beat());
+      _startBeats();
       return;
     }
 
@@ -1878,7 +1933,7 @@ class _GameScreenState extends State<GameScreen>
     _jump(_dot.r, _dot.c);
 
     // A brief hidden hold between the two halves.
-    await Future<void>.delayed(const Duration(milliseconds: 90));
+    await Future<void>.delayed(_paced(_teleportHoldMs));
     if (!mounted || _status != GameStatus.running) {
       setState(() => _teleporting = false);
       return;
@@ -1926,8 +1981,7 @@ class _GameScreenState extends State<GameScreen>
       _win();
       return;
     }
-    _timer =
-        Timer.periodic(const Duration(milliseconds: _tickMs), (_) => _beat());
+    _startBeats();
   }
 
   /// Ball scale multiplier and opacity for the current teleport phase (1, 1 when
@@ -2897,14 +2951,28 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: _PillButton(
-            label: 'Play',
-            icon: Icons.play_arrow_rounded,
-            filled: true,
-            onTap: running ? null : _play,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _PillButton(
+                label: 'Play',
+                icon: Icons.play_arrow_rounded,
+                filled: true,
+                onTap: running ? null : _play,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // How fast the dot runs, and the way to change it. It sits by Play
+            // rather than in the settings because a slow run is noticed while
+            // watching one, which is also why it stays live during the run.
+            // The choice is kept, so it takes one tap, not one a level.
+            _PillButton(
+              label: '$_speed×',
+              icon: Icons.fast_forward_rounded,
+              filled: false,
+              onTap: _cycleSpeed,
+            ),
+          ],
         ),
       ],
     );

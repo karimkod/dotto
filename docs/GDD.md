@@ -66,7 +66,7 @@ whether the plan works — a small, repeatable hit of "I solved it."
 5. **Resolve** — win (reach exit) or fail (edge / wall / hazard).
 6. **Iterate or progress** — retry with pieces intact, or move to the next level.
 
-### 2.2 Movement rules (one tick ≈ 400ms)
+### 2.2 Movement rules (one tick ≈ 400ms at normal speed; players can run it at 2× or 3×)
 Each tick, resolved in order:
 
 1. Moving hazards advance.
