@@ -41,5 +41,20 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Xcode 27 fails the build for any target set below iOS 15.0, where earlier
+    # Xcodes only warned, and dozens of pods still declare 9.0 to 14.0. The
+    # Flutter helper above lifts only the pods that depend on Flutter and sit
+    # below 13, so the rest are raised here to the app's own floor. Building a
+    # pod for a newer iOS than it supports is safe; only the other direction
+    # breaks.
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      # Unset means it inherits the platform line at the top, which is 15.0.
+      next if current.nil?
+      if Gem::Version.new(current) < Gem::Version.new('15.0')
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
   end
 end
