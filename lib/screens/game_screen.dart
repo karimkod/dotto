@@ -171,6 +171,13 @@ class _GameScreenState extends State<GameScreen>
   /// cell, so the board changes behind the dot rather than under it.
   int? _pendingOneShot;
 
+  /// A bouncer the dot has just turned on: (cell, the heading it came in
+  /// with). The dot turns at once, but the board shows the turn when the dot
+  /// has glided into the middle of the cell, where it happens: the boing
+  /// plays, the bend it used lights up and the other melts away. Shown any
+  /// earlier, the unused bend vanished while the dot was still a cell away.
+  (int, Direction)? _pendingBounce;
+
   /// Teleport animation state. [_teleporting] gates the whole overlay; while it
   /// runs, [_teleportGrowing] is false during the shrink-out at the entrance and
   /// true during the grow-in at the exit. The two ring cells and the pair colour
@@ -189,6 +196,8 @@ class _GameScreenState extends State<GameScreen>
   final List<FadingPiece> _removing = []; // shrinking-away pieces
   final Map<int, double> _cellGlow = {}; // cell → glow intensity
   final Map<int, Color> _cellGlowColor = {};
+  // Bouncer cell → the heading the dot last arrived with, for the lit bend.
+  final Map<int, Direction> _bounceLit = {};
   final Map<int, double> _cellPulse = {}; // cell → neighbor ripple progress
   final List<Explosion> _explosions = []; // destroyer blasts in progress
   final Set<int> _destroyedCells = {}; // destroyers cleared by a shielded dot
@@ -991,6 +1000,16 @@ class _GameScreenState extends State<GameScreen>
   /// Advance per-frame visual effects (called on every [_glowCtrl] tick).
   void _onFxTick() {
     const dt = 1 / 60;
+    // A bounce owed since the beat lands once the dot has glided into the
+    // bouncer, or straight away if it has already set off for another cell.
+    final bounce = _pendingBounce;
+    if (bounce != null &&
+        (!_dotCtrl.isAnimating || _idx(_animTo.$1, _animTo.$2) != bounce.$1)) {
+      _pendingBounce = null;
+      _bounceLit[bounce.$1] = bounce.$2;
+      _glow(bounce.$1, kBouncerColor, 1.0); // bouncer activation flash
+      Sfx.bounce();
+    }
     if (_placeAnim.isNotEmpty) {
       final done = <int>[];
       _placeAnim.updateAll((k, v) => v + dt / 0.60); // ~600ms leisurely bounce
@@ -1068,6 +1087,7 @@ class _GameScreenState extends State<GameScreen>
     _spinCell = null;
     _pendingSpin = null;
     _pendingOneShot = null;
+    _pendingBounce = null;
     final s = _level!.start;
     _status = GameStatus.planning;
     _dot = DotState(r: s.r, c: s.c, dir: s.dir);
@@ -1076,6 +1096,7 @@ class _GameScreenState extends State<GameScreen>
       ..add(_idx(s.r, s.c));
     _cellGlow.clear();
     _cellGlowColor.clear();
+    _bounceLit.clear();
     _cellPulse.clear();
     _removing.clear();
     _explosions.clear();
@@ -1811,6 +1832,12 @@ class _GameScreenState extends State<GameScreen>
             if (piece.tool.isOneShot) _pendingOneShot = newKey;
           });
           Sfx.arrow();
+        case PlacedType.bouncer:
+          setState(() {
+            // Shown on arrival, by [_onFxTick]. See [_pendingBounce].
+            _pendingBounce = (newKey, _dot.dir);
+            _dot.dir = piece.tool.bounce(_dot.dir);
+          });
         case PlacedType.pause:
           setState(() {
             _dot.pause = 2;
@@ -2536,6 +2563,7 @@ class _GameScreenState extends State<GameScreen>
                         spinProgress: _spinCtrl.value,
                         cellGlow: _cellGlow,
                         cellGlowColor: _cellGlowColor,
+                        bounceLit: _bounceLit,
                         cellPulse: _cellPulse,
                         explosions: _explosions,
                         destroyedCells: _destroyedCells,

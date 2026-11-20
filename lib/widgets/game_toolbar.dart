@@ -186,6 +186,8 @@ class _ToolTile extends StatelessWidget {
             size: 26, dir: tool.direction!, oneShot: tool.isOneShot);
       case PlacedType.pause:
         return const PauseGlyph(size: 26);
+      case PlacedType.bouncer:
+        return BouncerGlyph(size: 26, tool: tool);
     }
   }
 

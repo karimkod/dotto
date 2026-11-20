@@ -314,11 +314,43 @@ void main() {
     final geo =
         GridGeometry(boardRect.width, levelDataFor(levelIds.last)!.size);
     Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
-    // Level 110 "Once and For All": the World 7 finale. Once-up at (7,3),
-    // the doorstep pause at (7,2), and the portal pair (0,6)->(3,4) — placed
-    // in that order so the placement-order pairing matches the recorded
-    // solution. Exercises one-shot consumption, pause holds, warp AND rotor
-    // through the real widget.
+    // Level 113 "Hairpin": the backslash at (1,4) drops the dot through the
+    // gap and the slash at (3,4) sends it home along row 3, so both kinds of
+    // bouncer turn the dot through the real widget.
+    await _dragArrow(
+        tester, tester.getCenter(find.text('BOUNCE \u005C')), cell(1, 4));
+    await _dragArrow(
+        tester, tester.getCenter(find.text('BOUNCE /')), cell(3, 4));
+
+    await runToWin(tester);
+
+    // Last level → no Continue; the button is Back to Menu.
+    expect(find.text('Continue'), findsNothing);
+    expect(find.text('Back to Menu'), findsOneWidget);
+  });
+
+  // The World 7 finale. It used to be the last level, and it is still the one
+  // run that puts one-shot consumption, pause holds, warp AND rotor through the
+  // real widget together.
+  testWidgets('level 110 plays one-shot, pause, warp and rotor to a win',
+      (tester) async {
+    const finale = Level(
+      id: 110,
+      number: 103,
+      title: 'Once and For All',
+      difficulty: Difficulty.hard,
+      status: LevelStatus.unlocked,
+    );
+    await tester
+        .pumpWidget(const MaterialApp(home: GameScreen(level: finale)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, levelDataFor(110)!.size);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+    // Once-up at (7,3), the doorstep pause at (7,2), and the portal pair
+    // (0,6)->(3,4), placed in that order so the placement-order pairing
+    // matches the recorded solution.
     await _dragArrow(
         tester, tester.getCenter(find.text('ONCE UP')), cell(7, 3));
     await _dragArrow(tester, tester.getCenter(find.text('PAUSE')), cell(7, 2));
@@ -326,10 +358,54 @@ void main() {
     await _dragArrow(tester, tester.getCenter(find.text('WARP')), cell(3, 4));
 
     await runToWin(tester);
+    // 110 ends World 7 but no longer the game, so the win card offers Continue.
+    expect(find.text('Continue'), findsOneWidget);
+  });
 
-    // Last level → no Continue; the button is Back to Menu.
-    expect(find.text('Continue'), findsNothing);
-    expect(find.text('Back to Menu'), findsOneWidget);
+  // The board shows a bounce when the dot reaches the middle of the bouncer,
+  // where the turn happens. Shown as the dot set off towards it, the bend it
+  // would not use faded out while the dot was still a cell away.
+  testWidgets('a bouncer lights its bend only once the dot arrives',
+      (tester) async {
+    const bounce = Level(
+      id: 111,
+      number: 104,
+      title: 'Bounce',
+      difficulty: Difficulty.easy,
+      status: LevelStatus.unlocked,
+    );
+    await tester.pumpWidget(const MaterialApp(home: GameScreen(level: bounce)));
+    await tester.pump();
+
+    final boardRect = tester.getRect(find.byKey(const ValueKey('gameBoard')));
+    final geo = GridGeometry(boardRect.width, 5);
+    Offset cell(int r, int c) => boardRect.topLeft + geo.center(r, c);
+    GameGridPainter grid() => tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('gameBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+
+    await _dragArrow(
+        tester, tester.getCenter(find.text('BOUNCE /')), cell(4, 3));
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+
+    const key = 4 * 5 + 3;
+    var setOff = -1, lit = -1;
+    for (var i = 0; i < 200 && lit < 0; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final g = grid();
+      if (setOff < 0 && g.trail.isNotEmpty && g.trail.last == key) setOff = i;
+      if (g.bounceLit.containsKey(key)) lit = i;
+    }
+    expect(setOff, isNonNegative, reason: 'the dot must head for the bouncer');
+    expect(lit, greaterThan(setOff + 10),
+        reason: 'the bend lights after the glide into the cell, not before');
+
+    await runToWin(tester);
   });
 
   // A one-shot leaves the board as the dot turns on it — but only for the run.

@@ -78,7 +78,7 @@ extension DirectionX on Direction {
 enum CellType { empty, start, exit, wall, destroyer, movingDestroyer, gap }
 
 /// A piece the player places on the board.
-enum PlacedType { arrow, pause, teleporter, shield }
+enum PlacedType { arrow, pause, teleporter, shield, bouncer }
 
 /// Selectable toolkit item kinds.
 ///
@@ -98,6 +98,13 @@ enum ToolType {
   pause,
   teleporter,
   shield,
+  // A bouncer turns the dot a quarter-turn, and which way depends on the side
+  // it comes in from (see [ToolTypeX.bounce]). The slash kind joins the left
+  // side of its cell to the top and the right to the bottom; the backslash
+  // kind joins left to bottom and right to top. Last, so every older tool
+  // keeps its index.
+  bouncerSlash,
+  bouncerBackslash,
 }
 
 extension ToolTypeX on ToolType {
@@ -109,6 +116,9 @@ extension ToolTypeX on ToolType {
         return PlacedType.teleporter;
       case ToolType.shield:
         return PlacedType.shield;
+      case ToolType.bouncerSlash:
+      case ToolType.bouncerBackslash:
+        return PlacedType.bouncer;
       case ToolType.arrowUp:
       case ToolType.arrowDown:
       case ToolType.arrowLeft:
@@ -136,7 +146,52 @@ extension ToolTypeX on ToolType {
       case ToolType.pause:
       case ToolType.teleporter:
       case ToolType.shield:
+      case ToolType.bouncerSlash:
+      case ToolType.bouncerBackslash:
         return false;
+    }
+  }
+
+  /// True for either kind of bouncer. See [bounce].
+  bool get isBouncer =>
+      this == ToolType.bouncerSlash || this == ToolType.bouncerBackslash;
+
+  /// The heading a bouncer sends the dot off on, given the [heading] it
+  /// arrives with. Always a quarter-turn: a bouncer never lets the dot run
+  /// straight on and never sends it back. The slash kind swaps right with up
+  /// and left with down; the backslash kind swaps right with down and left
+  /// with up. So one bouncer turns the dot one way from one side and the
+  /// other way from another, which is the whole point of the piece.
+  ///
+  /// Any other tool leaves [heading] as it is.
+  Direction bounce(Direction heading) {
+    switch (this) {
+      case ToolType.bouncerSlash:
+        return switch (heading) {
+          Direction.right => Direction.up,
+          Direction.up => Direction.right,
+          Direction.left => Direction.down,
+          Direction.down => Direction.left,
+        };
+      case ToolType.bouncerBackslash:
+        return switch (heading) {
+          Direction.right => Direction.down,
+          Direction.down => Direction.right,
+          Direction.left => Direction.up,
+          Direction.up => Direction.left,
+        };
+      case ToolType.arrowUp:
+      case ToolType.arrowDown:
+      case ToolType.arrowLeft:
+      case ToolType.arrowRight:
+      case ToolType.oneShotUp:
+      case ToolType.oneShotDown:
+      case ToolType.oneShotLeft:
+      case ToolType.oneShotRight:
+      case ToolType.pause:
+      case ToolType.teleporter:
+      case ToolType.shield:
+        return heading;
     }
   }
 
@@ -157,6 +212,8 @@ extension ToolTypeX on ToolType {
       case ToolType.pause:
       case ToolType.teleporter:
       case ToolType.shield:
+      case ToolType.bouncerSlash:
+      case ToolType.bouncerBackslash:
         return null;
     }
   }
@@ -181,6 +238,10 @@ extension ToolTypeX on ToolType {
         return '◎';
       case ToolType.shield:
         return '🛡';
+      case ToolType.bouncerSlash:
+        return '/';
+      case ToolType.bouncerBackslash:
+        return '\u005C';
     }
   }
 
@@ -208,6 +269,10 @@ extension ToolTypeX on ToolType {
         return 'WARP';
       case ToolType.shield:
         return 'SHIELD';
+      case ToolType.bouncerSlash:
+        return 'BOUNCE /';
+      case ToolType.bouncerBackslash:
+        return 'BOUNCE \u005C';
     }
   }
 }

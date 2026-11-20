@@ -125,6 +125,13 @@ void playArrow() {
   _tone(1200, dur: 0.09, gain: 0.16, delay: 0.05);
 }
 
+/// Bouncer: a boing — a low thump and a spring that rises and settles back.
+void playBounce() {
+  _toneThock(300, dur: 0.06, gain: 0.20);
+  _tone(330, dur: 0.10, gain: 0.14, freqEnd: 660);
+  _tone(660, dur: 0.12, gain: 0.12, freqEnd: 495, delay: 0.08);
+}
+
 void playPause() => _tone(200, dur: 0.20, gain: 0.16);
 
 void playTeleport() =>

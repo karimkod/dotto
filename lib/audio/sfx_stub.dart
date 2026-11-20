@@ -4,6 +4,7 @@ void playPlace() {}
 void playRemove() {}
 void playTick() {}
 void playArrow() {}
+void playBounce() {}
 void playPause() {}
 void playTeleport() {}
 void playDie() {}

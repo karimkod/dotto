@@ -264,7 +264,7 @@ void main() {
   group('world membership', () {
     test('every level belongs to exactly one world', () {
       final seen = <int>{};
-      for (var w = 1; w <= 7; w++) {
+      for (var w = 1; w <= worldOf(levelIds.last); w++) {
         for (final n in levelsInWorld(w)) {
           expect(seen.add(n), isTrue, reason: 'level $n counted twice');
         }
@@ -276,7 +276,7 @@ void main() {
     test('no world is empty', () {
       // An empty world would be "complete" from the first level won, firing its
       // badge immediately.
-      for (var w = 1; w <= 7; w++) {
+      for (var w = 1; w <= worldOf(levelIds.last); w++) {
         expect(levelsInWorld(w), isNotEmpty, reason: 'world $w has no levels');
       }
     });
@@ -301,13 +301,13 @@ void main() {
 
     test('finishing everything completes every world', () {
       final all = levelIds.toSet();
-      for (var w = 1; w <= 7; w++) {
+      for (var w = 1; w <= worldOf(levelIds.last); w++) {
         expect(isWorldComplete(w, all), isTrue, reason: 'world $w');
       }
     });
 
     test('an empty save completes nothing', () {
-      for (var w = 1; w <= 7; w++) {
+      for (var w = 1; w <= worldOf(levelIds.last); w++) {
         expect(isWorldComplete(w, const <int>{}), isFalse, reason: 'world $w');
       }
     });

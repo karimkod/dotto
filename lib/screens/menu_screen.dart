@@ -412,6 +412,7 @@ const _worldSubtitles = {
   5: 'Teleporters',
   6: 'Rotating Arrows',
   7: 'One-Shot Arrows',
+  8: 'Bouncers',
 };
 
 /// A banner marking the start of a world on the path. Sits centered on the

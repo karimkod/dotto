@@ -82,6 +82,8 @@ Each tick, resolved in order:
      **chain-exploded** (removed, opening a path), and the dot survives and
      continues; otherwise **die** (with an explosion).
    - **Arrow** → adopt its direction.
+   - **Bouncer** → turn a quarter-turn, which way depending on the side the
+     dot came in from.
    - **Pause** → halt for 2 ticks.
    - **Shield** → gain a one-use protective aura (only one at a time).
    - **Teleporter** → jump to its pair (instant).
@@ -117,6 +119,7 @@ removing returns it. Optional star goals reward solving with fewer pieces.
 | **Arrow** (Up/Down/Left/Right) | Blue `#1E88E5` | Redirect the dot to a new heading |
 | **Pause** | Purple `#BA68C8` | Hold the dot in place for 2 ticks |
 | **Teleporter** | Orange `#FF8A65` | Placed in pairs; enter one, exit the other |
+| **Bouncer** (slash / backslash) | Teal `#00897B` | Turns the dot a quarter-turn, never straight on or back. The slash joins the left side of its cell to the top and the right to the bottom; the backslash joins left to bottom and right to top. It never changes, so one bouncer turns the dot one way from one side and the other way from another (World 8). Drawn as two curved two-way arrows, one filled shape each. Levels can also pin one to the board. |
 | **Shield** | Cyan `#38BDF8` | A bubble that gives the dot a one-use protective aura. The next destroyer it touches is **destroyed** and the dot **survives** (the aura is then spent), and every **wall adjacent** to that destroyer is **chain-exploded** away — turning a destroyer-next-to-a-wall into a *door*. Only one shield at a time; an unshielded dot dies normally. |
 
 ### 3.3 Proposed elements (roadmap — not yet implemented)
@@ -129,7 +132,6 @@ removing returns it. Optional star goals reward solving with fewer pieces.
 | **Toggle wall** | Alternates solid/open on a timer |
 | **Button + gate** | Dot crossing a button opens a remote gate |
 | **Color keys / doors** | Dot must collect a key cell before a matching door |
-| **Bouncer** | Reflects the dot like a wall at 45° |
 | **Sticky pause** | Holds until a moving hazard passes, then releases |
 | **Portal exit** | Multiple exits; any one completes (or a specific colored one) |
 
@@ -289,6 +291,7 @@ on the first user interaction (browser autoplay policy).
 | Remove element | Soft filtered-noise whoosh |
 | Dot moves one cell | Very subtle tick (~1000Hz, barely audible) |
 | Dot hits arrow | Satisfying two-note ping (880→1200Hz) |
+| Dot hits bouncer | Boing: a low thump (300Hz) and a spring that rises and settles (330→660→495Hz) |
 | Dot hits pause | Low hum (200Hz) |
 | Dot enters teleporter | Frequency sweep (400→1600Hz) "zzip" |
 | Dot dies (edge / wall / gap) | Noise-burst "poof" with decay |

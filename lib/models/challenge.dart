@@ -164,9 +164,15 @@ class Challenge {
         _ => null,
       };
 
-  static ToolType? _tool(String? type, Direction? dir) => switch (type) {
-        'arrow' => dir?.arrowTool,
-        'oneShot' => dir?.oneShotTool,
+  static ToolType? _tool(String? type, Object? direction) => switch (type) {
+        'arrow' => _dir(direction)?.arrowTool,
+        'oneShot' => _dir(direction)?.oneShotTool,
+        // For a bouncer the direction says which way it leans.
+        'bouncer' => switch (direction) {
+            'slash' => ToolType.bouncerSlash,
+            'backslash' => ToolType.bouncerBackslash,
+            _ => null,
+          },
         'shield' => ToolType.shield,
         'pause' => ToolType.pause,
         'teleporter' => ToolType.teleporter,
@@ -201,7 +207,7 @@ class Challenge {
     for (final e in (map['pieces'] as List?) ?? const []) {
       if (e is! Map) continue;
       final piece = e.cast<String, dynamic>();
-      final tool = _tool(piece['type'] as String?, _dir(piece['direction']));
+      final tool = _tool(piece['type'] as String?, piece['direction']);
       final count = _int(piece['count']) ?? 1;
       if (tool != null && count > 0) toolkit.add(ToolkitEntry(tool, count));
     }
@@ -209,6 +215,7 @@ class Challenge {
     final forcedArrows = <ForcedArrow>[];
     final forcedShields = <Pos>[];
     final forcedPauses = <Pos>[];
+    final forcedBouncers = <ForcedBouncer>[];
     for (final e in (map['forcedPieces'] as List?) ?? const []) {
       if (e is! Map) continue;
       final piece = e.cast<String, dynamic>();
@@ -222,6 +229,9 @@ class Challenge {
           forcedShields.add(at);
         case 'pause':
           forcedPauses.add(at);
+        case 'bouncer':
+          final t = _tool('bouncer', piece['direction']);
+          if (t != null) forcedBouncers.add(ForcedBouncer(at.r, at.c, t));
       }
     }
 
@@ -283,6 +293,7 @@ class Challenge {
       gaps: positions(map['gaps']),
       forcedArrows: forcedArrows,
       rotatingArrows: rotating,
+      forcedBouncers: forcedBouncers,
       forcedShields: forcedShields,
       forcedPauses: forcedPauses,
       teleporters: teleporters,

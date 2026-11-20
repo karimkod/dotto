@@ -98,6 +98,7 @@ List<HintPlacement> hintOrder(LevelData level, List<HintPlacement> solution) {
     final p = solution[i];
     final rest = {...full}..remove(key(p));
     final turns = p.element.type == PlacedType.arrow ||
+        p.element.type == PlacedType.bouncer ||
         p.element.type == PlacedType.teleporter;
 
     // How far past the piece the dot gets before the board complains.

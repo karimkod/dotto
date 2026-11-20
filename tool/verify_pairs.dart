@@ -218,10 +218,13 @@ class PairSearch {
 
   /// Applies a landed-on piece. Returns false when it killed the dot (only a
   /// teleport can, by dropping it onto a hazard).
-  bool _apply(_State s, PlacedType type, Direction? dir, int key) {
+  bool _apply(_State s, PlacedType type, Direction? dir, int key,
+      {ToolType? tool}) {
     switch (type) {
       case PlacedType.arrow:
         s.dir = dir!;
+      case PlacedType.bouncer:
+        s.dir = tool!.bounce(s.dir);
       case PlacedType.pause:
         s.pause = 2;
       case PlacedType.shield:
@@ -364,12 +367,16 @@ class PairSearch {
       final placedHere = s.spent.contains(key) ? null : s.placed[key];
       if (placedHere != null) {
         if (placedHere.isOneShot) s.spent.add(key);
-        if (!_apply(s, placedHere.placedType, placedHere.direction, key)) {
+        if (!_apply(s, placedHere.placedType, placedHere.direction, key,
+            tool: placedHere)) {
           return;
         }
       } else {
         final f = forced[key];
-        if (f != null && !_apply(s, f.type, f.direction, key)) return;
+        if (f != null &&
+            !_apply(s, f.type, f.direction, key, tool: f.tool)) {
+          return;
+        }
       }
       if (level.baseTypeAt(s.r, s.c) == CellType.exit) {
         _recordWin(s);
@@ -405,7 +412,7 @@ class PairSearch {
       // The dot is standing on the piece it just "placed", so a one-shot is
       // consumed by this very first pass.
       if (t.isOneShot) next.spent.add(key);
-      if (!_apply(next, t.placedType, t.direction, key)) continue;
+      if (!_apply(next, t.placedType, t.direction, key, tool: t)) continue;
       if (level.baseTypeAt(next.r, next.c) == CellType.exit) {
         _recordWin(next);
       } else {
@@ -452,7 +459,9 @@ String _describe(LevelData level, Map<int, PlacedElement> placement) {
         ? e.direction!.name
         : e.type == PlacedType.teleporter
             ? 'portal#${e.portalIndex}'
-            : e.type.name;
+            : e.type == PlacedType.bouncer
+                ? e.tool.name
+                : e.type.name;
     return '($r,$c,$what)';
   }).join(' ');
 }

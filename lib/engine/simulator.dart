@@ -46,10 +46,10 @@ List<int> adjacentWallKeys(LevelData level, int key) {
   return out;
 }
 
-/// Every piece the LEVEL pins to the board, keyed by cell: fixed arrows, fixed
-/// shields and fixed pauses. They behave exactly like the player's own pieces
-/// once the run starts — the only difference is that they cannot be placed,
-/// moved or removed, and they are not drawn from the toolkit.
+/// Every piece the LEVEL pins to the board, keyed by cell: fixed arrows,
+/// bouncers, shields, pauses and portals. They behave exactly like the
+/// player's own pieces once the run starts — the only difference is that they
+/// cannot be placed, moved or removed, and they are not drawn from the toolkit.
 ///
 /// Single source of truth: the simulator, the solver, the live game and the
 /// painter all build their "forced" map from here, so a new kind of fixed piece
@@ -63,6 +63,9 @@ Map<int, PlacedElement> buildForcedPieces(LevelData level) {
       tool: a.dir.arrowTool,
       direction: a.dir,
     );
+  }
+  for (final b in level.forcedBouncers) {
+    out[b.r * n + b.c] = PlacedElement(type: PlacedType.bouncer, tool: b.tool);
   }
   for (final p in level.forcedShields) {
     out[p.r * n + p.c] = const PlacedElement(
@@ -432,6 +435,11 @@ SimResult simulateDetailed(
           dir = piece.direction!;
           // A one-shot turns the dot exactly once, then leaves the board.
           if (piece.tool.isOneShot) spent.add(key);
+        case PlacedType.bouncer:
+          // A quarter-turn, which way depending on the side the dot came in
+          // from. The bouncer itself never changes, so a later pass from
+          // another side turns the dot the other way.
+          dir = piece.tool.bounce(dir);
         case PlacedType.pause:
           pause = 2;
         case PlacedType.shield:
@@ -578,6 +586,8 @@ Set<int>? tracePath(LevelData level, Map<int, PlacedElement> placed) {
     if (piece != null && piece.type == PlacedType.arrow) {
       dir = piece.direction!;
       if (piece.tool.isOneShot) spent.add(r * n + c);
+    } else if (piece != null && piece.type == PlacedType.bouncer) {
+      dir = piece.tool.bounce(dir);
     } else if (piece != null && piece.type == PlacedType.pause) {
       pause = 2;
     } else if (piece != null && piece.type == PlacedType.shield) {

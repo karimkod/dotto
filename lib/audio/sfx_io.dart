@@ -95,6 +95,7 @@ void playPlace() => _play('place');
 void playRemove() => _play('remove');
 void playTick() => _play('tick');
 void playArrow() => _play('arrow');
+void playBounce() => _play('bounce');
 void playPause() => _play('pause');
 void playTeleport() => _play('teleport');
 void playDie() => _play('die');

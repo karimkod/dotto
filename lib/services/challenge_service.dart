@@ -318,6 +318,12 @@ class ChallengeService {
           {'type': 'shield', 'position': [p.r, p.c]},
         for (final p in l.forcedPauses)
           {'type': 'pause', 'position': [p.r, p.c]},
+        for (final b in l.forcedBouncers)
+          {
+            'type': 'bouncer',
+            'direction': _toolDir(b.tool),
+            'position': [b.r, b.c],
+          },
       ],
       'rotatingArrows': [
         for (final a in l.rotatingArrows)
@@ -357,11 +363,15 @@ class ChallengeService {
     final n = tool.name;
     if (n.startsWith('oneShot')) return 'oneShot';
     if (n.startsWith('arrow')) return 'arrow';
+    if (n.startsWith('bouncer')) return 'bouncer';
     return n; // shield, pause, teleporter
   }
 
   static String? _toolDir(Enum tool) {
     final n = tool.name;
+    // For a bouncer the direction says which way it leans, as the parser reads.
+    if (n == 'bouncerSlash') return 'slash';
+    if (n == 'bouncerBackslash') return 'backslash';
     for (final d in ['Up', 'Down', 'Left', 'Right']) {
       if (n.endsWith(d)) return d.toLowerCase();
     }

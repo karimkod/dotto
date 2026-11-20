@@ -38,6 +38,11 @@ class Sfx {
     if (_on) impl.playArrow();
   }
 
+  /// Springy boing when a bouncer turns the dot.
+  static void bounce() {
+    if (_on) impl.playBounce();
+  }
+
   static void pause() {
     if (_on) impl.playPause();
   }

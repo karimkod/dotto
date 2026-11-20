@@ -22,6 +22,7 @@ enum DesignTool {
   destroyer,
   forced,
   rotating,
+  bouncer,
   shield,
   pause,
   teleporter,
@@ -70,6 +71,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // Rotating arrows: cell -> initial heading. Pinned like a forced arrow, but
   // they turn a quarter-turn clockwise per pass at runtime.
   final Map<int, Direction> _rotating = {};
+  // Fixed bouncers: cell -> which way it leans. Tap again to flip it.
+  final Map<int, ToolType> _bouncers = {};
   // Fixed shields and pauses: real level content, pinned to the board like a
   // forced arrow and not drawn from the toolkit.
   final Set<int> _shields = {};
@@ -94,6 +97,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     ToolType.shield: 0,
     ToolType.pause: 0,
     ToolType.teleporter: 0, // 2 per pair
+    ToolType.bouncerSlash: 0,
+    ToolType.bouncerBackslash: 0,
   };
 
   DesignTool _tool = DesignTool.wall;
@@ -121,6 +126,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
   // Search constraints — skip any toolkit that doesn't match.
   bool _cMustShield = false;
   bool _cMustPause = false;
+  bool _cMustBounce = false;
   // Live progress through the candidate list (web only, where the search runs
   // in slices on this thread and can report as it goes).
   int _findChecked = 0;
@@ -161,6 +167,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     for (final a in lvl.rotatingArrows) {
       _rotating[_key(a.r, a.c)] = a.dir;
     }
+    for (final b in lvl.forcedBouncers) {
+      _bouncers[_key(b.r, b.c)] = b.tool;
+    }
     for (final p in lvl.forcedShields) {
       _shields.add(_key(p.r, p.c));
     }
@@ -192,6 +201,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.clear();
     _forced.clear();
     _rotating.clear();
+    _bouncers.clear();
     _shields.clear();
     _pauses.clear();
     _teleports.clear();
@@ -208,6 +218,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     if (_destroyers.contains(k)) return 'destroyer';
     if (_forced.containsKey(k)) return 'forced';
     if (_rotating.containsKey(k)) return 'rotating';
+    if (_bouncers.containsKey(k)) return 'bouncer';
     if (_shields.contains(k)) return 'shield';
     if (_pauses.contains(k)) return 'pause';
     if (_teleports.contains(k)) return 'teleporter';
@@ -220,6 +231,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     _destroyers.remove(k);
     _forced.remove(k);
     _rotating.remove(k);
+    _bouncers.remove(k);
     _shields.remove(k);
     _pauses.remove(k);
     _teleports.remove(k);
@@ -263,6 +275,16 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           } else if (occ != 'start' && occ != 'exit') {
             _clearMovable(k);
             _rotating[k] = _paintDir;
+          }
+        case DesignTool.bouncer:
+          if (occ == 'bouncer') {
+            // Tap again to make it lean the other way.
+            _bouncers[k] = _bouncers[k] == ToolType.bouncerSlash
+                ? ToolType.bouncerBackslash
+                : ToolType.bouncerSlash;
+          } else if (occ != 'start' && occ != 'exit') {
+            _clearMovable(k);
+            _bouncers[k] = ToolType.bouncerSlash;
           }
         case DesignTool.wall:
           if (occ != 'start' && occ != 'exit') {
@@ -331,6 +353,9 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
         rotatingArrows: _rotating.entries
             .map((e) => RotatingArrow(_row(e.key), _col(e.key), e.value))
             .toList(),
+        forcedBouncers: _bouncers.entries
+            .map((e) => ForcedBouncer(_row(e.key), _col(e.key), e.value))
+            .toList(),
         forcedShields: _shields.map((k) => Pos(_row(k), _col(k))).toList(),
         forcedPauses: _pauses.map((k) => Pos(_row(k), _col(k))).toList(),
         teleporters: _telePairs(),
@@ -348,6 +373,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             tool: e.value.arrowTool,
             direction: e.value,
           ),
+        for (final e in _bouncers.entries)
+          e.key: PlacedElement(type: PlacedType.bouncer, tool: e.value),
       };
 
   /// Teleporter cells taken two at a time. A trailing odd cell is dropped — a
@@ -411,6 +438,13 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
               'RotatingArrow(${_row(e.key)}, ${_col(e.key)}, Direction.${e.value.name})')
           .join(', ');
       b.writeln('  rotatingArrows: [$ra],');
+    }
+    if (_bouncers.isNotEmpty) {
+      final fb = _bouncers.entries
+          .map((e) =>
+              'ForcedBouncer(${_row(e.key)}, ${_col(e.key)}, ToolType.${e.value.name})')
+          .join(', ');
+      b.writeln('  forcedBouncers: [$fb],');
     }
     if (_shields.isNotEmpty) {
       b.writeln('  forcedShields: [${poss(_shields)}],');
@@ -582,6 +616,19 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
             .allMatches(rm.group(1)!)) {
           _rotating[_key(int.parse(am.group(1)!), int.parse(am.group(2)!))] =
               _dir(am.group(3)) ?? Direction.right;
+        }
+      }
+      final bm =
+          RegExp(r'forcedBouncers\s*:\s*\[([^\]]*)\]').firstMatch(text);
+      if (bm != null) {
+        for (final fm in RegExp(
+                r'ForcedBouncer\(\s*(\d+)\s*,\s*(\d+)\s*,\s*ToolType\.(\w+)\s*\)')
+            .allMatches(bm.group(1)!)) {
+          final kinds = ToolType.values
+              .where((t) => t.isBouncer && t.name == fm.group(3));
+          if (kinds.isEmpty) continue;
+          _bouncers[_key(int.parse(fm.group(1)!), int.parse(fm.group(2)!))] =
+              kinds.first;
         }
       }
       final mm = RegExp(r'movers\s*:\s*\[([^\]]*)\]').firstMatch(text);
@@ -777,16 +824,29 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     }
 
     build(0, 5, {});
+    // Bouncers only when the search must include one: then every mix of up to
+    // two of each kind, so a plain search keeps the list it always had.
+    final bounceMixes = _cMustBounce
+        ? [
+            for (var sl = 0; sl <= 2; sl++)
+              for (var bs = 0; bs <= 2; bs++)
+                if (sl + bs > 0) (sl, bs),
+          ]
+        : const [(0, 0)];
     final out = <Map<ToolType, int>>[];
     for (final a in arrowSets) {
       for (var s = 0; s <= 2; s++) {
         for (var p = 0; p <= 2; p++) {
-          final total = a.values.fold(0, (x, y) => x + y) + s + p;
-          if (total < 1) continue;
-          final kit = Map<ToolType, int>.of(a);
-          if (s > 0) kit[ToolType.shield] = s;
-          if (p > 0) kit[ToolType.pause] = p;
-          out.add(kit);
+          for (final (sl, bs) in bounceMixes) {
+            final total = a.values.fold(0, (x, y) => x + y) + s + p + sl + bs;
+            if (total < 1) continue;
+            final kit = Map<ToolType, int>.of(a);
+            if (s > 0) kit[ToolType.shield] = s;
+            if (p > 0) kit[ToolType.pause] = p;
+            if (sl > 0) kit[ToolType.bouncerSlash] = sl;
+            if (bs > 0) kit[ToolType.bouncerBackslash] = bs;
+            out.add(kit);
+          }
         }
       }
     }
@@ -813,6 +873,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       ToolType.oneShotRight,
       ToolType.shield,
       ToolType.pause,
+      ToolType.bouncerSlash,
+      ToolType.bouncerBackslash,
     ];
     String name(ToolType t) => switch (t) {
           ToolType.arrowUp => 'Up',
@@ -825,6 +887,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           ToolType.oneShotRight => '1× Right',
           ToolType.shield => 'Shield',
           ToolType.pause => 'Pause',
+          ToolType.bouncerSlash => '/ Bounce',
+          ToolType.bouncerBackslash => '\u005C Bounce',
           _ => t.name,
         };
     final parts = [
@@ -866,6 +930,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
           cursor: cursor,
           mustShield: _cMustShield,
           mustPause: _cMustPause,
+          mustBounce: _cMustBounce,
         ),
         onProgress: (checked, total) {
           if (!mounted) return;
@@ -1036,6 +1101,11 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
               _constraintCheck('Must include Pause', _cMustPause,
                   (v) => setState(() {
                         _cMustPause = v;
+                        _resetFindCursor();
+                      })),
+              _constraintCheck('Must include Bouncer', _cMustBounce,
+                  (v) => setState(() {
+                        _cMustBounce = v;
                         _resetFindCursor();
                       })),
             ],
@@ -1230,6 +1300,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (DesignTool.destroyer, 'Destroyer', Icons.dangerous_rounded),
       (DesignTool.forced, 'Forced', Icons.double_arrow_rounded),
       (DesignTool.rotating, 'Rotating', Icons.rotate_right_rounded),
+      (DesignTool.bouncer, 'Bouncer', Icons.swap_calls_rounded),
       (DesignTool.shield, 'Shield', Icons.shield_rounded),
       (DesignTool.pause, 'Pause', Icons.pause_rounded),
       (DesignTool.teleporter, 'Portal', Icons.circle_outlined),
@@ -1253,6 +1324,7 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
     DesignTool.destroyer: Color(0xFFEF5350),
     DesignTool.forced: Color(0xFF607D8B),
     DesignTool.rotating: Color(0xFF1E88E5), // matches the in-game arrow blue
+    DesignTool.bouncer: Color(0xFF00897B), // matches the bouncer teal
     DesignTool.shield: Color(0xFF38BDF8),
     DesignTool.pause: Color(0xFFBA68C8), // matches the pause piece's purple
     DesignTool.teleporter: Color(0xFFFF7043), // matches pair 1's orange
@@ -1297,6 +1369,8 @@ class _LevelDesignerScreenState extends State<LevelDesignerScreen> {
       (ToolType.shield, '◯ Shield'),
       (ToolType.pause, '⏸ Pause'),
       (ToolType.teleporter, '◎ Warp'), // 2 = one pair
+      (ToolType.bouncerSlash, '/ Bounce'),
+      (ToolType.bouncerBackslash, '\u005C Bounce'),
     ];
     return Wrap(
       spacing: 10,

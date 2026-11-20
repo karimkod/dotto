@@ -117,7 +117,11 @@ LevelData levelWithToolkit(LevelData base, Map<ToolType, int> kit) => LevelData(
       gaps: base.gaps,
       forcedArrows: base.forcedArrows,
       // Fixed pieces are LAYOUT, not toolkit — dropping them here would quietly
-      // solve a different level than the designer is looking at.
+      // solve a different level than the designer is looking at. Rotating
+      // arrows were once missing from this list, so a layout with a dial was
+      // searched as if it had none.
+      rotatingArrows: base.rotatingArrows,
+      forcedBouncers: base.forcedBouncers,
       forcedShields: base.forcedShields,
       forcedPauses: base.forcedPauses,
       teleporters: base.teleporters,
@@ -134,6 +138,7 @@ class FindToolkitRequest {
     required this.cursor,
     required this.mustShield,
     required this.mustPause,
+    this.mustBounce = false,
   });
 
   final LevelData base;
@@ -143,6 +148,9 @@ class FindToolkitRequest {
   final int cursor;
   final bool mustShield;
   final bool mustPause;
+
+  /// Skip any kit without a bouncer of either kind.
+  final bool mustBounce;
 }
 
 class FindToolkitResult {
@@ -191,6 +199,11 @@ _Route _routeFor(
 ) {
   if (req.mustShield && (kit[ToolType.shield] ?? 0) == 0) return _Route.filtered;
   if (req.mustPause && (kit[ToolType.pause] ?? 0) == 0) return _Route.filtered;
+  if (req.mustBounce &&
+      (kit[ToolType.bouncerSlash] ?? 0) + (kit[ToolType.bouncerBackslash] ?? 0) ==
+          0) {
+    return _Route.filtered;
+  }
   return needsBruteSolver(level) ? _Route.brute : _Route.path;
 }
 

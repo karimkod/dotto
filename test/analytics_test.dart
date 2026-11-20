@@ -83,7 +83,8 @@ void main() {
       expect(worldOf(kWorld5Start), 5);
       expect(worldOf(kWorld6Start), 6);
       expect(worldOf(kWorld7Start), 7);
-      expect(worldOf(kLevelCount), 7);
+      expect(worldOf(kWorld8Start), 8);
+      expect(worldOf(levelIds.last), 8);
     });
 
     test('the Master Trials count as World 5', () {
@@ -104,6 +105,7 @@ void main() {
         kWorld5Start,
         kWorld6Start,
         kWorld7Start,
+        kWorld8Start,
       ]) {
         expect(worldOf(start - 1), isNot(worldOf(start)),
             reason: 'finishing level ${start - 1} should unlock a new world');

@@ -17,8 +17,8 @@ final List<int> levelIds =
 /// Total number of built, playable levels:
 /// World 1 (10, ids 1–15) + World 2 (3, ids 16–20) + World 3 (21–30)
 /// + World 4 (31–50) + World 5 (51–60) + Master Trials (61–70)
-/// + World 6 (71–91) + World 7 (92–110).
-const int kLevelCount = 103;
+/// + World 6 (71–91) + World 7 (92–110) + World 8 (111–113).
+const int kLevelCount = 106;
 
 /// The level id at which World 2 (Static Destroyers) begins.
 const int kWorld2Start = 16;
@@ -39,7 +39,10 @@ const int kWorld6Start = 71;
 /// The level id at which World 7 (One-Shot Arrows) begins.
 const int kWorld7Start = 92;
 
-/// Which world a level belongs to, 1–7.
+/// The level id at which World 8 (Bouncers) begins.
+const int kWorld8Start = 111;
+
+/// Which world a level belongs to, 1–8.
 ///
 /// The Master Trials (61–70) are an interlude rather than a world of their own,
 /// and count as World 5 — the world whose pieces they revisit. The equivalent
@@ -47,6 +50,7 @@ const int kWorld7Start = 92;
 /// on 61–70 by design: one is labelling analytics, the other is grouping test
 /// output.
 int worldOf(int level) {
+  if (level >= kWorld8Start) return 8;
   if (level >= kWorld7Start) return 7;
   if (level >= kWorld6Start) return 6;
   if (level >= kWorld5Start) return 5;
@@ -124,7 +128,9 @@ List<Level> buildInitialLevels() {
     // World 7 (92–110): one-shot arrows, teaching the new piece from scratch.
     if (id <= 95) return Difficulty.easy; // learn the burn (92–95)
     if (id <= 103) return Difficulty.medium; // combine mechanics (96–103)
-    return Difficulty.hard; // 104–110 the burning exams
+    if (id <= 110) return Difficulty.hard; // 104–110 the burning exams
+    // World 8 (111–): bouncers, teaching the new piece from scratch.
+    return Difficulty.easy; // learn the bounce (111–113)
   }
 
   /// The climb: the first level is open from the start, and finishing a level

@@ -25,6 +25,7 @@ Map<int, PlacedElement> place(
   List<(int, int)> pauses = const [],
   List<(int, int)> teleports = const [],
   List<(int, int, Direction)> oneShots = const [],
+  List<(int, int, ToolType)> bouncers = const [],
 ]) {
   return {
     // One-shot arrows are PlacedType.arrow like the rest — the difference is the
@@ -63,6 +64,8 @@ Map<int, PlacedElement> place(
         tool: ToolType.pause,
         direction: null,
       ),
+    for (final (r, c, tool) in bouncers)
+      r * level.size + c: PlacedElement(type: PlacedType.bouncer, tool: tool),
   };
 }
 
@@ -74,6 +77,7 @@ void main() {
   final intended = kSolutionArrows;
   final teleports = kSolutionTeleports;
   final oneShots = kSolutionOneShots;
+  final bouncers = kSolutionBouncers;
   final pauses = kSolutionPauses;
   final shields = kSolutionShields;
 
@@ -118,7 +122,9 @@ void main() {
           ? 2
           : (n <= 30
               ? 3
-              : (n <= 50 ? 4 : (n <= 60 ? 5 : (n <= 91 ? 6 : 7)))));
+              : (n <= 50
+                  ? 4
+                  : (n <= 60 ? 5 : (n <= 91 ? 6 : (n <= 110 ? 7 : 8))))));
 
 
 
@@ -166,7 +172,7 @@ void main() {
               level,
               place(level, intended[n]!, shields[n] ?? const [],
                   pauses[n] ?? const [], teleports[n] ?? const [],
-                  oneShots[n] ?? const [])),
+                  oneShots[n] ?? const [], bouncers[n] ?? const [])),
           SimOutcome.win,
           reason: 'the recorded solution for level $n must win');
     });
@@ -217,7 +223,7 @@ void main() {
           level,
           place(level, intended[n]!, shields[n] ?? const [],
               pauses[n] ?? const [], teleports[n] ?? const [],
-              oneShots[n] ?? const []));
+              oneShots[n] ?? const [], bouncers[n] ?? const []));
       expect(visited, isNotNull);
       for (final a in level.forcedArrows) {
         final onRoute = visited!.contains(a.r * level.size + a.c);
@@ -433,7 +439,7 @@ void main() {
           level,
           place(level, intended[n]!, shields[n] ?? const [],
               pauses[n] ?? const [], teleports[n] ?? const [],
-              oneShots[n] ?? const []));
+              oneShots[n] ?? const [], bouncers[n] ?? const []));
       expect(visited, isNotNull, reason: 'level $n intended solution must win');
       // Reachability only has to cover the path on levels where it is actually
       // used to prune. With a teleporter in the TOOLKIT, candidateCells opts out

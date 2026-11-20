@@ -12,7 +12,8 @@
 // could not drift apart.
 //
 // Placements are grouped the way the toolkit is: arrows carry a direction,
-// shields, pauses and teleporters are bare cells. Teleporter order matters —
+// bouncers the tool that says which way they lean, and shields, pauses and
+// teleporters are bare cells. Teleporter order matters —
 // consecutive entries pair up, index i with i^1 — which is how a pairing that
 // board order cannot express (level 59's crossing wiring) is written down.
 
@@ -355,6 +356,8 @@ const kSolutionArrows = <int, List<(int, int, Direction)>>{
   // 109: the top-row west turn that starts the fall home.
   109: [(0, 7, Direction.left)],
   110: [],
+  // ----- World 8 (111–): bouncers only (below). -----
+  111: [], 112: [], 113: [],
 };
 
 // Intended teleporter placements (World 5). Both ends of a pair, since the
@@ -596,6 +599,20 @@ const kSolutionShields = <int, List<(int, int)>>{
   102: [(5, 1)],
 };
 
+// Intended bouncer placements (World 8). Each carries its tool, which says
+// which way it leans.
+const kSolutionBouncers = <int, List<(int, int, ToolType)>>{
+  // 111: the one floor cell under the exit, before the mine.
+  111: [(4, 3, ToolType.bouncerSlash)],
+  // 112: met twice, turning north from the west and south from the east.
+  112: [(2, 2, ToolType.bouncerSlash)],
+  // 113: down through the gap, then back west along the row below.
+  113: [
+    (1, 4, ToolType.bouncerBackslash),
+    (3, 4, ToolType.bouncerSlash),
+  ],
+};
+
 /// One placement from a level's recorded solution: which cell, and what goes
 /// there.
 class HintPlacement {
@@ -649,6 +666,14 @@ List<HintPlacement> recordedSolution(int level) {
         tool: dir.oneShotTool,
         direction: dir,
       ),
+    ));
+  }
+  for (final (r, c, tool)
+      in kSolutionBouncers[level] ?? const <(int, int, ToolType)>[]) {
+    out.add(HintPlacement(
+      r,
+      c,
+      PlacedElement(type: PlacedType.bouncer, tool: tool),
     ));
   }
   for (final (r, c) in kSolutionShields[level] ?? const <(int, int)>[]) {

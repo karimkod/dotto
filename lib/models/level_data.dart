@@ -53,6 +53,17 @@ class RotatingArrow {
   final Direction dir;
 }
 
+/// A bouncer the level fixes to the board. It turns the dot exactly like a
+/// placed one (see [ToolTypeX.bounce]), but the player cannot move or remove it
+/// and it is not drawn from the toolkit. [tool] says which way it leans:
+/// [ToolType.bouncerSlash] or [ToolType.bouncerBackslash].
+class ForcedBouncer {
+  const ForcedBouncer(this.r, this.c, this.tool);
+  final int r;
+  final int c;
+  final ToolType tool;
+}
+
 /// A destroyer that patrols a row ([horizontal]) or column, moving one cell per
 /// beat and bouncing off the grid edges and any solid cell (wall, static
 /// destroyer, exit) in its lane. [r],[c] is its starting cell; [dir] is the
@@ -85,6 +96,7 @@ class LevelData {
     this.gaps = const [],
     this.forcedArrows = const [],
     this.rotatingArrows = const [],
+    this.forcedBouncers = const [],
     this.forcedShields = const [],
     this.forcedPauses = const [],
     this.teleporters = const [],
@@ -106,6 +118,9 @@ class LevelData {
   /// Arrows fixed to the board that turn 90° clockwise each time the dot passes
   /// through — see [RotatingArrow].
   final List<RotatingArrow> rotatingArrows;
+
+  /// Bouncers fixed to the board. See [ForcedBouncer].
+  final List<ForcedBouncer> forcedBouncers;
 
   /// Shields fixed to the board: collected like a placed shield, but the player
   /// cannot move or remove them and they are not part of the toolkit.
@@ -135,12 +150,22 @@ class LevelData {
     return null;
   }
 
-  /// True when the level pins ANY piece to (r, c) — arrow, shield or pause.
+  /// The kind of bouncer the level fixes at (r, c), or null if none.
+  ToolType? forcedBouncerAt(int r, int c) {
+    for (final b in forcedBouncers) {
+      if (b.r == r && b.c == c) return b.tool;
+    }
+    return null;
+  }
+
+  /// True when the level pins ANY piece to (r, c) — arrow, bouncer, shield,
+  /// pause or portal.
   /// Placement checks must use this rather than [forcedArrowAt], or the player
   /// could drop a piece on top of a fixed shield or pause.
   bool hasForcedPieceAt(int r, int c) {
     if (forcedArrowAt(r, c) != null) return true;
     if (rotatingArrowAt(r, c) != null) return true;
+    if (forcedBouncerAt(r, c) != null) return true;
     for (final p in forcedShields) {
       if (p.r == r && p.c == c) return true;
     }

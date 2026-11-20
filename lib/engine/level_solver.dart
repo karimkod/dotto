@@ -88,8 +88,12 @@ Set<int> reachableCells(LevelData level) {
     final t = level.baseTypeAt(nr, nc);
     if (t == CellType.exit) continue; // the run ends here
     final forcedDir = level.forcedArrowAt(nr, nc);
+    final forcedBounce = level.forcedBouncerAt(nr, nc);
     if (forcedDir != null) {
       push(nr, nc, forcedDir);
+    } else if (forcedBounce != null) {
+      // A fixed bouncer turns the dot by the side it came in from.
+      push(nr, nc, forcedBounce.bounce(dir));
     } else if (level.rotatingArrowAt(nr, nc) != null) {
       // Over successive passes a rotating arrow can send the dot any of the four
       // ways, so explore them all — a generous superset keeps pruning safe.
@@ -439,6 +443,8 @@ class PathSearch {
     switch (piece.type) {
       case PlacedType.arrow:
         _cur.dir = piece.direction!;
+      case PlacedType.bouncer:
+        _cur.dir = piece.tool.bounce(_cur.dir);
       case PlacedType.pause:
         _cur.pause = 2;
       case PlacedType.shield:
@@ -899,10 +905,10 @@ int _adjacentWallMask(LevelData level, int key) {
 }
 
 /// Toolkit pieces the path solver places. Callers reach here only after
-/// [_requirePathSolvable], so every entry is an arrow or a shield — the whole
-/// toolkit is used. It must never quietly drop a piece: doing so made the solver
-/// answer a different question than it was asked (a level needing a pause looked
-/// unsolvable, or "solvable" without ever placing it).
+/// [_requirePathSolvable], so every entry is an arrow, a bouncer or a shield —
+/// the whole toolkit is used. It must never quietly drop a piece: doing so made
+/// the solver answer a different question than it was asked (a level needing a
+/// pause looked unsolvable, or "solvable" without ever placing it).
 Map<ToolType, int> _placeableKit(LevelData level) => {
       for (final e in level.toolkit) e.type: e.count,
     };
@@ -918,6 +924,11 @@ int pathMinPieces(LevelData level) {
   final forced = buildForcedPieces(level);
   final remaining = _placeableKit(level);
   final placed = <int, ToolType>{};
+  // Cells this run already passed over and left empty. A piece is on the board
+  // for the whole run or not at all, so a later visit must find them empty too,
+  // not branch again and place one: that would describe a board where the dot
+  // crossed bare floor first and met a piece in the same cell later.
+  final emptied = <int>{};
   final seen = <String>{};
   var best = 1 << 30;
 
@@ -965,6 +976,8 @@ int pathMinPieces(LevelData level) {
         switch (forcedHere.type) {
           case PlacedType.arrow:
             advance(nr, nc, forcedHere.direction!, shielded, removed);
+          case PlacedType.bouncer:
+            advance(nr, nc, forcedHere.tool.bounce(dir), shielded, removed);
           case PlacedType.shield:
             advance(nr, nc, dir, true, removed);
           case PlacedType.pause:
@@ -974,17 +987,25 @@ int pathMinPieces(LevelData level) {
       } else if (here != null) {
         if (here.direction != null) {
           advance(nr, nc, here.direction!, shielded, removed);
+        } else if (here.isBouncer) {
+          advance(nr, nc, here.bounce(dir), shielded, removed);
         } else {
           advance(nr, nc, dir, true, removed); // shield
         }
+      } else if (emptied.contains(key)) {
+        advance(nr, nc, dir, shielded, removed);
       } else {
+        emptied.add(key);
         advance(nr, nc, dir, shielded, removed); // leave empty
+        emptied.remove(key);
         for (final type in remaining.keys) {
           if (remaining[type]! <= 0) continue;
           remaining[type] = remaining[type]! - 1;
           placed[key] = type;
           if (type.direction != null) {
             advance(nr, nc, type.direction!, shielded, removed);
+          } else if (type.isBouncer) {
+            advance(nr, nc, type.bounce(dir), shielded, removed);
           } else {
             advance(nr, nc, dir, true, removed); // place a shield, pick it up
           }
@@ -1012,6 +1033,11 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
   final forced = buildForcedPieces(level);
   final remaining = _placeableKit(level);
   final placed = <int, ToolType>{};
+  // Cells this run already passed over and left empty. A piece is on the board
+  // for the whole run or not at all, so a later visit must find them empty too,
+  // not branch again and place one: that would describe a board where the dot
+  // crossed bare floor first and met a piece in the same cell later.
+  final emptied = <int>{};
   final seen = <String>{};
   final results = <Map<int, PlacedElement>>[];
 
@@ -1058,6 +1084,8 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
         switch (forcedHere.type) {
           case PlacedType.arrow:
             advance(nr, nc, forcedHere.direction!, shielded, removed);
+          case PlacedType.bouncer:
+            advance(nr, nc, forcedHere.tool.bounce(dir), shielded, removed);
           case PlacedType.shield:
             advance(nr, nc, dir, true, removed);
           case PlacedType.pause:
@@ -1067,17 +1095,25 @@ List<Map<int, PlacedElement>> pathSolve(LevelData level,
       } else if (here != null) {
         if (here.direction != null) {
           advance(nr, nc, here.direction!, shielded, removed);
+        } else if (here.isBouncer) {
+          advance(nr, nc, here.bounce(dir), shielded, removed);
         } else {
           advance(nr, nc, dir, true, removed);
         }
-      } else {
+      } else if (emptied.contains(key)) {
         advance(nr, nc, dir, shielded, removed);
+      } else {
+        emptied.add(key);
+        advance(nr, nc, dir, shielded, removed);
+        emptied.remove(key);
         for (final type in remaining.keys) {
           if (remaining[type]! <= 0) continue;
           remaining[type] = remaining[type]! - 1;
           placed[key] = type;
           if (type.direction != null) {
             advance(nr, nc, type.direction!, shielded, removed);
+          } else if (type.isBouncer) {
+            advance(nr, nc, type.bounce(dir), shielded, removed);
           } else {
             advance(nr, nc, dir, true, removed);
           }

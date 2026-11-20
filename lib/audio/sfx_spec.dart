@@ -100,6 +100,13 @@ const Map<String, List<SfxLayer>> kSfxSpecs = {
     SfxLayer.tone(880, dur: 0.06, gain: 0.16),
     SfxLayer.tone(1200, dur: 0.09, gain: 0.16, delay: 0.05),
   ],
+  // Bouncer: a boing. A low thump, then a spring that rises an octave and
+  // settles back, so a turn off a bouncer never sounds like the arrow's ping.
+  'bounce': [
+    SfxLayer.thock(300, dur: 0.06, gain: 0.20),
+    SfxLayer.tone(330, dur: 0.10, gain: 0.14, freqEnd: 660),
+    SfxLayer.tone(660, dur: 0.12, gain: 0.12, freqEnd: 495, delay: 0.08),
+  ],
   'pause': [
     SfxLayer.tone(200, dur: 0.20, gain: 0.16),
   ],

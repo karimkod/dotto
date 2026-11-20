@@ -2831,6 +2831,79 @@ const Map<int, LevelData> levelDefinitions = {
       ToolkitEntry(ToolType.teleporter, 2),
     ],
   ),
+
+  // ============== WORLD 8 (111–) — BOUNCERS =================================
+  // A piece that turns the dot a quarter-turn, and which way depends on the
+  // side the dot comes in from. It never changes during a run, so the same
+  // bouncer can turn the dot one way on one visit and the other way on the
+  // next. Two kinds: the slash joins the left side of its cell to the top and
+  // the right side to the bottom; the backslash joins left to bottom and right
+  // to top. The first three teach it on square boards, each one TIGHT and
+  // UNIQUE by BruteSearch, PathSearch and pathSolve alike.
+
+  // 111 — Bounce: the World 8 opener, one bouncer and one turn. The dot runs
+  // east along the floor towards a mine, and the exit sits at the top of
+  // column 3, so the only way out is to glance up that column before the
+  // mine: the slash at (4,3) turns the eastbound dot north. Further west it
+  // climbs a column with no exit and runs off the top edge.
+  111: LevelData(
+    id: 111,
+    size: 5,
+    title: 'Bounce',
+    tip: 'A bouncer turns the dot a quarter-turn. Its arrows show where the '
+        'dot leaves for each side it comes in from.',
+    start: StartSpec(4, 0, Direction.right),
+    exit: Pos(0, 3),
+    destroyers: [Pos(4, 4)],
+    toolkit: [ToolkitEntry(ToolType.bouncerSlash, 1)],
+  ),
+
+  // 112 — Both Ways: the lesson of the world. The dot reaches the bouncer at
+  // (2,2) twice. Coming in from the west it is turned north; the pinned arrows
+  // walk it round the top right and send it back west along its own row, and
+  // this time, coming in from the east, the same bouncer turns it south into
+  // the exit. An arrow in that cell would turn it the same way both times.
+  //
+  // Unique: anywhere else on the row the climb runs off the top edge.
+  112: LevelData(
+    id: 112,
+    size: 5,
+    title: 'Both Ways',
+    tip: 'The dot meets this bouncer twice. From each side, it turns the way '
+        'the arrows point.',
+    start: StartSpec(2, 0, Direction.right),
+    exit: Pos(4, 2),
+    forcedArrows: [
+      ForcedArrow(0, 2, Direction.right),
+      ForcedArrow(0, 4, Direction.down),
+      ForcedArrow(2, 4, Direction.left),
+    ],
+    toolkit: [ToolkitEntry(ToolType.bouncerSlash, 1)],
+  ),
+
+  // 113 — Hairpin: the second kind of bouncer. The wall under the start row
+  // has one gap, at column 4, and the exit is back at the west end of the row
+  // below it, so the dot has to drop through the gap and come home. The
+  // backslash at (1,4) turns the eastbound dot south and the slash at (3,4)
+  // turns it west along row 3. Swap them and the first throws the dot north
+  // off the board. The mines are guards: one past the gap on the start row,
+  // one below the second turn.
+  //
+  // Unique: the gap fixes the column, and the exit row fixes the second cell.
+  113: LevelData(
+    id: 113,
+    size: 6,
+    title: 'Hairpin',
+    tip: 'Bouncers lean two ways. Use one of each to turn the dot round.',
+    start: StartSpec(1, 0, Direction.right),
+    exit: Pos(3, 0),
+    walls: [Pos(2, 0), Pos(2, 1), Pos(2, 2), Pos(2, 3), Pos(2, 5)],
+    destroyers: [Pos(1, 5), Pos(4, 4)],
+    toolkit: [
+      ToolkitEntry(ToolType.bouncerBackslash, 1),
+      ToolkitEntry(ToolType.bouncerSlash, 1),
+    ],
+  ),
 };
 
 /// Returns the definition for a level number, or null if not yet built.

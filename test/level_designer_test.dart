@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dotto/data/level_definitions.dart';
 import 'package:dotto/models/grid_cell.dart';
 import 'package:dotto/models/level.dart';
 import 'package:dotto/models/level_data.dart';
@@ -22,8 +23,11 @@ void main() {
     expect(find.text('Wall'), findsOneWidget);
     expect(find.text('Destroyer'), findsOneWidget);
     expect(find.text('Shield'), findsOneWidget);
+    expect(find.text('Bouncer'), findsOneWidget);
     // Toolkit counters.
     expect(find.text('◯ Shield'), findsOneWidget);
+    expect(find.text('/ Bounce'), findsOneWidget);
+    expect(find.text('\u005C Bounce'), findsOneWidget);
     // Action buttons.
     expect(find.text('Play'), findsOneWidget);
     expect(find.text('Test'), findsOneWidget);
@@ -139,5 +143,53 @@ void main() {
     // cannot quietly drop one of these either.
     expect(grid.forced.keys, containsAll(<int>[0, 4 * 5 + 0, 4 * 5 + 4]));
     expect(grid.forced[0]!.direction, Direction.down);
+  });
+
+  // A kit the counters cannot show is a kit the designer silently drops on
+  // export, so a level with bouncers has to arrive with both counters set.
+  testWidgets('a bouncer kit survives the trip into the designer',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: LevelDesignerScreen(
+          initialLevel: levelDataFor(113)!, initialNumber: 113),
+    ));
+    await tester.pump();
+
+    for (final label in ['/ Bounce', '\u005C Bounce']) {
+      final counter = find.ancestor(
+          of: find.text(label), matching: find.byType(Row)).first;
+      expect(find.descendant(of: counter, matching: find.text('1')),
+          findsOneWidget,
+          reason: 'level 113 hands out one of each bouncer');
+    }
+  });
+
+  testWidgets('a pinned bouncer survives the trip into the designer',
+      (tester) async {
+    const lvl = LevelData(
+      id: 114,
+      size: 5,
+      title: 'Pinned',
+      tip: '',
+      start: StartSpec(0, 0, Direction.right),
+      exit: Pos(3, 4),
+      forcedBouncers: [ForcedBouncer(0, 2, ToolType.bouncerBackslash)],
+      toolkit: [ToolkitEntry(ToolType.arrowRight, 1)],
+    );
+    await tester.pumpWidget(const MaterialApp(
+      home: LevelDesignerScreen(initialLevel: lvl, initialNumber: 114),
+    ));
+    await tester.pump();
+
+    final grid = tester
+        .widgetList<CustomPaint>(find.descendant(
+            of: find.byKey(const ValueKey('designerBoard')),
+            matching: find.byType(CustomPaint)))
+        .map((p) => p.painter)
+        .whereType<GameGridPainter>()
+        .single;
+    expect(grid.forced[2]?.type, PlacedType.bouncer);
+    expect(grid.forced[2]?.tool, ToolType.bouncerBackslash,
+        reason: 'the lean must come through, not just the cell');
   });
 }

@@ -22,10 +22,15 @@ class _C {
   static const tele = Color(0xFFFF8A65);
   static const shield = Color(0xFF38BDF8);
   static const shieldFill = Color(0xFFE0F4FE);
+  static const bouncer = Color(0xFF00897B);
+  static const bouncerFill = Color(0xFFDDF2EF);
 }
 
 /// Cyan used for the shield bubble and the shielded-dot aura.
 const Color kShieldColor = _C.shield;
+
+/// Teal for the bouncer, and for the flash its cell gives as the dot turns.
+const Color kBouncerColor = _C.bouncer;
 
 /// Solid accent color used when a tool's cell glows.
 Color toolGlowColor(ToolType tool) {
@@ -38,6 +43,8 @@ Color toolGlowColor(ToolType tool) {
       return _C.tele;
     case PlacedType.shield:
       return _C.shield;
+    case PlacedType.bouncer:
+      return _C.bouncer;
   }
 }
 
@@ -200,6 +207,143 @@ class _ArrowGlyphPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ArrowGlyphPainter old) =>
       old.color != color || old.dir != dir || old.oneShot != oneShot;
+}
+
+/// The bouncer: two curved arrows, each joining two sides of the cell with a
+/// head at both ends, so the piece itself shows where the dot leaves for each
+/// side it can come in from. [half] is half the side of the square the bends
+/// span, and their tips land on its edges.
+///
+/// Each bend is ONE filled outline, curved shaft and both heads together.
+/// Stroking the curve and adding the heads as separate triangles left seams
+/// where a round line cap poked out beside a head, which read as jagged edges
+/// at board size.
+///
+/// [arrived] is the heading the dot came in with on its latest turn here, and
+/// [lit] (0..1) how strongly to show it: the bend that turn used thickens and
+/// the other all but melts into the cell, so the player sees which way the
+/// dot went.
+void paintBouncerIcon(
+  Canvas canvas,
+  Offset center,
+  double half,
+  Color color,
+  ToolType tool, {
+  Direction? arrived,
+  double lit = 0,
+}) {
+  final slash = tool == ToolType.bouncerSlash;
+  // Each bend turns round one corner of the square, from one side to another,
+  // given as angles about that corner. y points down, so a growing angle turns
+  // clockwise on screen.
+  final List<(Offset, double, double)> bends = slash
+      ? [
+          (center + Offset(-half, -half), math.pi / 2, 0), // left, top
+          (center + Offset(half, half), -math.pi / 2, math.pi), // right, bottom
+        ]
+      : [
+          (center + Offset(half, -half), math.pi, math.pi / 2), // top, right
+          (center + Offset(-half, half), 0, -math.pi / 2), // bottom, left
+        ];
+  // The first bend carries a dot that arrived heading right or down (slash),
+  // or down or left (backslash). The second carries the other two.
+  final usedFirst = arrived == null
+      ? null
+      : slash
+          ? arrived == Direction.right || arrived == Direction.down
+          : arrived == Direction.down || arrived == Direction.left;
+
+  final r = half;
+  final w = half * 0.19; // shaft thickness
+  final headLen = half * 0.35;
+  final headHalf = half * 0.23;
+  // How far round the curve each head starts, chosen so its tip lands exactly
+  // on the edge of the square.
+  final trim = math.atan(headLen / r);
+  for (var i = 0; i < bends.length; i++) {
+    final (k, from, to) = bends[i];
+    var sweep = to - from;
+    if (sweep > math.pi) sweep -= 2 * math.pi;
+    if (sweep < -math.pi) sweep += 2 * math.pi;
+    final sg = sweep > 0 ? 1.0 : -1.0;
+    final s = from + sg * trim;
+    final e = from + sweep - sg * trim;
+    Offset at(double rad, double ang) =>
+        k + Offset(math.cos(ang), math.sin(ang)) * rad;
+    // The tip of a head: from where the head starts, along the way the curve
+    // is travelling there.
+    Offset tip(double ang, double way) =>
+        at(r, ang) + Offset(-math.sin(ang), math.cos(ang)) * (way * headLen);
+    final ro = r + w / 2, ri = r - w / 2;
+    final path = Path()..moveTo(at(ro, s).dx, at(ro, s).dy);
+    path.arcTo(Rect.fromCircle(center: k, radius: ro), s, e - s, false);
+    for (final p in [
+      at(r + headHalf, e),
+      tip(e, sg),
+      at(r - headHalf, e),
+      at(ri, e),
+    ]) {
+      path.lineTo(p.dx, p.dy);
+    }
+    path.arcTo(Rect.fromCircle(center: k, radius: ri), e, s - e, false);
+    for (final p in [at(r - headHalf, s), tip(s, -sg), at(r + headHalf, s)]) {
+      path.lineTo(p.dx, p.dy);
+    }
+    path.close();
+
+    final used = usedFirst != null && usedFirst == (i == 0);
+    // The unused bend drops to about a tenth of its strength at the turn,
+    // close to the pale cell under it, and comes back as the flash dies away.
+    final fade = usedFirst == null || used ? 1.0 : 1 - 0.9 * lit;
+    canvas.drawPath(
+        path, Paint()..color = color.withValues(alpha: color.a * fade));
+    if (used && lit > 0) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = half * 0.14 * lit
+          ..strokeJoin = StrokeJoin.round
+          ..color = color,
+      );
+    }
+  }
+}
+
+/// A standalone bouncer for widget contexts: the toolbar tile and the drag
+/// ghost.
+class BouncerGlyph extends StatelessWidget {
+  const BouncerGlyph({
+    super.key,
+    required this.size,
+    required this.tool,
+    this.color = _C.bouncer,
+  });
+
+  final double size;
+  final ToolType tool;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _BouncerGlyphPainter(color, tool)),
+      );
+}
+
+class _BouncerGlyphPainter extends CustomPainter {
+  _BouncerGlyphPainter(this.color, this.tool);
+  final Color color;
+  final ToolType tool;
+
+  @override
+  void paint(Canvas canvas, Size size) => paintBouncerIcon(
+      canvas, size.center(Offset.zero), size.width * 0.46, color, tool);
+
+  @override
+  bool shouldRepaint(covariant _BouncerGlyphPainter old) =>
+      old.color != color || old.tool != tool;
 }
 
 /// The pause piece: two rounded bars, [height] tall. Drawn rather than typed for
@@ -528,6 +672,9 @@ class DragGhost extends StatelessWidget {
       case PlacedType.shield:
         fill = _C.shieldFill;
         color = _C.shield;
+      case PlacedType.bouncer:
+        fill = _C.bouncerFill;
+        color = _C.bouncer;
     }
     return Material(
       color: Colors.transparent,
@@ -563,6 +710,8 @@ class DragGhost extends StatelessWidget {
                   color: color,
                   oneShot: tool.isOneShot),
             PlacedType.pause => PauseGlyph(size: size * 0.7, color: color),
+            PlacedType.bouncer =>
+              BouncerGlyph(size: size * 0.7, tool: tool, color: color),
           },
         ),
       ),
@@ -708,6 +857,7 @@ class GameGridPainter extends CustomPainter {
     this.spinCell,
     this.spinProgress = 0,
     this.hinted = const {},
+    this.bounceLit = const {},
   });
 
   final LevelData level;
@@ -717,6 +867,10 @@ class GameGridPainter extends CustomPainter {
   /// rest of the visit, so they wear the dashed "locked here" border of a fixed
   /// piece.
   final Set<int> hinted;
+
+  /// Bouncers the dot has just turned on: cell -> the heading it arrived with.
+  /// With that cell [cellGlow] it lights the bend the turn used.
+  final Map<int, Direction> bounceLit;
 
   /// Immovable, level-defined arrows (drawn with a fixed "pinned" look).
   final Map<int, PlacedElement> forced;
@@ -1105,6 +1259,9 @@ class GameGridPainter extends CustomPainter {
         if (tool.isOneShot) paintOneShotBadge(canvas, rrect, geo.cell, color);
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
+      case PlacedType.bouncer:
+        paintBouncerIcon(canvas, center, (geo.cell - 7) / 2, color, tool,
+            arrived: bounceLit[key], lit: cellGlow[key] ?? 0);
     }
     canvas.restore();
   }
@@ -1179,6 +1336,10 @@ class GameGridPainter extends CustomPainter {
         }
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, color);
+      case PlacedType.bouncer:
+        paintBouncerIcon(
+            canvas, center, (geo.cell - 7) / 2, color, piece.tool,
+            arrived: bounceLit[key], lit: cellGlow[key] ?? 0);
     }
   }
 
@@ -1414,6 +1575,8 @@ class GameGridPainter extends CustomPainter {
         if (tool.isOneShot) paintOneShotBadge(canvas, rrect, geo.cell, ghost);
       case PlacedType.pause:
         paintPauseIcon(canvas, center, geo.cell * kPauseHeight, ghost);
+      case PlacedType.bouncer:
+        paintBouncerIcon(canvas, center, (geo.cell - 7) / 2, ghost, tool);
     }
     canvas.restore();
   }
@@ -1429,6 +1592,8 @@ class GameGridPainter extends CustomPainter {
         return (_C.teleFill, _C.tele, '◎');
       case PlacedType.shield:
         return (_C.shieldFill, _C.shield, ''); // icon drawn separately
+      case PlacedType.bouncer:
+        return (_C.bouncerFill, _C.bouncer, tool.glyph);
     }
   }
 
