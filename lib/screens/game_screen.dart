@@ -109,7 +109,8 @@ class _GameScreenState extends State<GameScreen>
 
   final Map<int, PlacedElement> _placed = {};
 
-  /// Cells holding a piece a hint put down. Each was paid for — the daily hint,
+  /// Cells holding a piece a hint put down, or vouched for when the player had
+  /// it right already (see [_nextHint]). Each was paid for — the daily hint,
   /// one won from a challenge, or an ad — so it stays for the rest of the
   /// visit: Reset, Clear & Edit and the fail card's Use Hint clear the board
   /// around it, and a tap or a drag will not take it back. Losing it would only
@@ -471,18 +472,12 @@ class _GameScreenState extends State<GameScreen>
   /// an offer of help before the player has thought about it reads as the game
   /// assuming they cannot do it.
   ///
-  /// The availability test is against the *recorded solution*, not the current
-  /// board. By the time a run has failed the player has usually placed every
-  /// piece they own, so the kit is empty and [_nextHint] finds nothing — asking
-  /// it here would hide the offer in precisely the situation it exists for.
-  /// [_onFailHintPressed] clears the board first, which puts the player's own
-  /// pieces back. Hinted ones stay down, so once every piece of the solution
-  /// has been hinted there is nothing left to sell.
-  bool get _offerHintOnFail =>
-      _attempts >= 2 &&
-      _level != null &&
-      recordedSolution(_level!.id)
-          .any((p) => !_hinted.contains(_idx(p.r, p.c)));
+  /// Like the bulb, it asks only whether a piece of the solution is still to be
+  /// given ([_hintsLeft]), never what is on the board. [_onFailHintPressed]
+  /// clears the board first, which puts the player's own pieces back. Hinted
+  /// ones stay down, so once every piece of the solution has been hinted there
+  /// is nothing left to sell.
+  bool get _offerHintOnFail => _attempts >= 2 && _level != null && _hintsLeft;
 
   // ----- hints -----
 
@@ -499,13 +494,8 @@ class _GameScreenState extends State<GameScreen>
   late final List<HintPlacement> _hintPlan =
       hintOrder(_level!, recordedSolution(_level!.id));
 
-  /// The first placement in [from] the player has not made, and still has the
-  /// piece for.
-  ///
-  /// Skipping cells that are already occupied means a hint never fights the
-  /// player for a square — but it also means the hint only completes a winning
-  /// board if what is already down is right. A hint is a nudge toward the
-  /// recorded solution, not a promise that the current board can still reach it.
+  /// The first placement in [from] that goes on an empty square, with a piece
+  /// of its kind still in the kit.
   HintPlacement? _firstUnplaced(Iterable<HintPlacement> from) {
     for (final p in from) {
       if (_occupied(p.r, p.c)) continue;
@@ -515,18 +505,116 @@ class _GameScreenState extends State<GameScreen>
     return null;
   }
 
-  /// The next placement to give away.
-  HintPlacement? _nextHint() =>
-      _level == null ? null : _firstUnplaced(_hintPlan);
+  /// The next placement to give away, or null when there is none.
+  ///
+  /// A piece for an empty square, straight from the kit, comes first: a hint
+  /// does not fight the player for a square while it has the choice. A board
+  /// filled up wrongly leaves no such piece — the whole kit down, or the right
+  /// squares taken by the wrong pieces — and the bulb used to grey out there,
+  /// a hint in hand, in front of a player who was stuck (Hot Landing with all
+  /// four pieces on wrong squares was the report). The hint makes room
+  /// instead, trying in turn:
+  ///
+  ///  * a piece of the solution the board lacks, put down after taking back
+  ///    whatever is in its way — see [_liftsFor];
+  ///  * a portal on its own square but joined to the wrong partner, taken up
+  ///    and put down again joined to the right one. Only kits of two pairs or
+  ///    more can get there: a lone pair always joins;
+  ///  * on a board that already holds the solution, one of the player's own
+  ///    pieces, vouched for: pulsed and locked in like a placed hint.
+  ///
+  /// A hint is still a nudge toward the recorded solution, one piece at a
+  /// time, not a promise that the rest of the board can reach it.
+  HintPlacement? _nextHint() {
+    if (_level == null) return null;
+    bool open(HintPlacement p) => !_hinted.contains(_idx(p.r, p.c));
+    return _firstUnplaced(_hintPlan) ??
+        _hintPlan
+            .where((p) => !_hasKind(p) && _liftsFor(p) != null)
+            .firstOrNull ??
+        _hintPlan
+            .where((p) => open(p) && _hasKind(p) && !_holds(p))
+            .firstOrNull ??
+        _hintPlan.where((p) => open(p) && _holds(p)).firstOrNull;
+  }
 
-  /// Whether there is anything left to give away. Which piece comes first does
-  /// not matter for that, so this reads the solution as recorded and never
-  /// pays for the ranking — it is asked on every build.
+  /// Whether [p]'s square holds the kind of piece [p] puts there. An arrow's
+  /// kind carries its heading, so an arrow turned the wrong way is wrong.
+  bool _hasKind(HintPlacement p) =>
+      _placed[_idx(p.r, p.c)]?.tool == p.element.tool;
+
+  /// Whether the board already has [p] right: its piece on its square and, for
+  /// a portal, joined to the portal on its partner's square.
+  bool _holds(HintPlacement p) {
+    if (!_hasKind(p)) return false;
+    if (p.element.type != PlacedType.teleporter) return true;
+    final key = _idx(p.r, p.c);
+    final i = _placed[key]!.portalIndex;
+    final partner = _solutionPartner[key];
+    return i != null &&
+        partner != null &&
+        _placed[partner]?.portalIndex == (i ^ 1);
+  }
+
+  /// The player's pieces a hint at [p] takes back to make room: whatever stands
+  /// on its square and, when the kit has none of [p]'s kind left, one of that
+  /// kind from a square where the solution has none. Kits are tight, so with
+  /// the kind all down and [p]'s square lacking it there is always one; null
+  /// says there is not, rather than charging for a hint that cannot land.
+  List<int>? _liftsFor(HintPlacement p) {
+    final key = _idx(p.r, p.c);
+    final there = _placed[key];
+    if (there != null && _hinted.contains(key)) return null;
+    final lifts = [if (there != null) key];
+    final tool = p.element.tool;
+    if ((_kit[tool] ?? 0) > 0 || there?.tool == tool) return lifts;
+    final spare = _spareFor(p);
+    return spare == null ? null : [...lifts, spare];
+  }
+
+  /// A piece of [p]'s kind that the player put where the solution has none.
+  /// For a portal, the one joined to the portal on [p]'s partner square goes
+  /// first: it holds the very slot the hint is about to take, and any other
+  /// choice leaves it on the board, moved aside and still wrong.
+  int? _spareFor(HintPlacement p) {
+    final tool = p.element.tool;
+    final spares = [
+      for (final e in _placed.entries)
+        if (e.value.tool == tool &&
+            !_hinted.contains(e.key) &&
+            _solutionTool[e.key] != tool)
+          e.key,
+    ];
+    final partner = _solutionPartner[_idx(p.r, p.c)];
+    final j = partner == null ? null : _placed[partner]?.portalIndex;
+    return spares
+            .where((s) => j != null && _placed[s]!.portalIndex == (j ^ 1))
+            .firstOrNull ??
+        spares.firstOrNull;
+  }
+
+  /// Square -> the kind of piece the recorded solution puts there.
+  late final Map<int, ToolType> _solutionTool = {
+    for (final p in recordedSolution(_level!.id))
+      _idx(p.r, p.c): p.element.tool,
+  };
+
+  /// Whether the bulb has anything to give: a piece of the solution not yet
+  /// handed over. The board does not come into it. A hint can always make room
+  /// (see [_nextHint]), and it must not: with the whole kit down, a bulb that
+  /// lit up only for a wrong board would tell the player whether they had
+  /// solved the level without their running it.
   bool get _hintAvailable =>
       _status == GameStatus.planning &&
       !_hintRunning &&
       _level != null &&
-      _firstUnplaced(recordedSolution(_level!.id)) != null;
+      _hintsLeft;
+
+  /// Whether any piece of the recorded solution is still to be given away.
+  /// Asked on every build, so it reads the solution as recorded rather than
+  /// paying for the ranking.
+  bool get _hintsLeft => recordedSolution(_level!.id)
+      .any((p) => !_hinted.contains(_idx(p.r, p.c)));
 
   /// Restart the idle clock and call off any wiggle. Every player action that
   /// counts as "still thinking about this level" routes through here.
@@ -579,7 +667,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _onHintPressed() async {
-    if (!_hintAvailable) return;
+    // Nothing is charged for a hint with nowhere to land. Tight kits never
+    // leave one in that state, but the check is cheap next to a lost hint.
+    if (!_hintAvailable || _nextHint() == null) return;
     _noteActivity();
     if (await _payForHint()) await _revealHint();
   }
@@ -739,11 +829,21 @@ class _GameScreenState extends State<GameScreen>
       ));
   }
 
-  /// Pulse the target cell in gold, then drop the piece on it.
+  /// Pulse the target cell in gold, then drop the piece on it: after taking
+  /// back what is in its way, or, when the player has it right already, lock
+  /// their own piece in instead. See [_nextHint].
   Future<void> _revealHint() async {
     final hint = _nextHint();
     if (hint == null) return;
     final key = _idx(hint.r, hint.c);
+    final vouch = _holds(hint);
+    if (!vouch) {
+      // The wrong pieces leave first, so the player sees them go before the
+      // gold says where the right one lands.
+      for (final cell in _liftsFor(hint) ?? const <int>[]) {
+        _removeAt(cell);
+      }
+    }
     setState(() => _hintRunning = true);
     Sfx.shield(); // the rising shimmer — reads as "look here"
 
@@ -757,13 +857,24 @@ class _GameScreenState extends State<GameScreen>
         if (mounted) setState(() => _hintRunning = false);
         return;
       }
-      // The player may have filled the cell while the pulse ran.
-      if (_occupied(hint.r, hint.c)) {
+      // The player may have filled the cell while the pulse ran, or, when the
+      // hint is vouching for their piece, taken it up.
+      if (vouch ? !_holds(hint) : _occupied(hint.r, hint.c)) {
         setState(() => _hintRunning = false);
         return;
       }
     }
     setState(() => _hintRunning = false);
+    if (vouch) {
+      // Nothing lands, so the landing's flash and thud mark the lock-in.
+      setState(() {
+        _hinted.add(key);
+        _glow(key, toolGlowColor(hint.element.tool), 1.0);
+      });
+      Sfx.place();
+      Haptics.medium();
+      return;
+    }
     final (piece, bump) = _hintPiece(hint);
     // Goes through the same funnel as a drop, so the kit count, the pop-in and
     // the neighbour ripple all behave exactly as if the player had placed it.
